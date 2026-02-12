@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { Canvas, Path, Skia } from '@shopify/react-native-skia';
 import { generateMapSnapshot } from '@/lib/nativeMapSnapshot';
@@ -24,13 +24,16 @@ export function RouteLayer({
 }: Props) {
   const [mapLoadFailed, setMapLoadFailed] = useState(false);
   const [iosMapUri, setIosMapUri] = useState<string | null>(null);
+  const iosSnapshotKeyRef = useRef<string | null>(null);
   const routePath = useMemo(() => {
     if (!polyline) return null;
 
     const source = decodePolyline(polyline);
     if (!source.length) return null;
 
-    const padding = mode === 'map' ? 16 : 8;
+    // Keep the same route footprint for both modes (map and trace-only)
+    // so toggling does not change apparent route size.
+    const padding = 16;
     const minX = Math.min(...source.map((p) => p.x));
     const maxX = Math.max(...source.map((p) => p.x));
     const minY = Math.min(...source.map((p) => p.y));
@@ -64,7 +67,7 @@ export function RouteLayer({
     return { path };
   }, [polyline, width, height, mode]);
   const mapImageUrl = useMemo(() => {
-    if (!polyline || mode !== 'map') return null;
+    if (!polyline) return null;
     if (Platform.OS === 'ios') return null;
     if (!MAPBOX_TOKEN) return null;
 
@@ -95,17 +98,22 @@ export function RouteLayer({
       `${Math.round(width)}x${Math.round(height)}${pixelRatioSuffix}` +
       `?access_token=${encodeURIComponent(MAPBOX_TOKEN)}`
     );
-  }, [polyline, mode, width, height]);
+  }, [polyline, width, height]);
 
   useEffect(() => {
     setMapLoadFailed(false);
   }, [mapImageUrl, mode, polyline]);
 
   useEffect(() => {
-    if (mode !== 'map' || Platform.OS !== 'ios' || !polyline) {
+    if (Platform.OS !== 'ios' || !polyline) {
       setIosMapUri(null);
+      iosSnapshotKeyRef.current = null;
       return;
     }
+    const snapshotKey = `${polyline}|${Math.round(width)}x${Math.round(height)}`;
+    const hasMatchingSnapshot =
+      iosSnapshotKeyRef.current === snapshotKey && Boolean(iosMapUri);
+    if (hasMatchingSnapshot) return;
 
     let cancelled = false;
     setMapLoadFailed(false);
@@ -119,11 +127,13 @@ export function RouteLayer({
       .then((uri) => {
         if (!cancelled) {
           setIosMapUri(uri);
+          iosSnapshotKeyRef.current = snapshotKey;
         }
       })
       .catch(() => {
         if (!cancelled) {
           setIosMapUri(null);
+          iosSnapshotKeyRef.current = null;
           setMapLoadFailed(true);
         }
       });
@@ -131,7 +141,7 @@ export function RouteLayer({
     return () => {
       cancelled = true;
     };
-  }, [mode, polyline, width, height]);
+  }, [polyline, width, height, iosMapUri]);
 
   if (!routePath) {
     return (

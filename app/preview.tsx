@@ -48,6 +48,8 @@ import {
 
 const ROUTE_LAYER_WIDTH = 280;
 const ROUTE_LAYER_HEIGHT = 180;
+const ROUTE_LAYER_INITIAL_X = (STORY_WIDTH - ROUTE_LAYER_WIDTH) / 2;
+const ROUTE_LAYER_INITIAL_Y = (STORY_HEIGHT - ROUTE_LAYER_HEIGHT) / 2;
 const IMAGE_OVERLAY_MAX_INITIAL = 180;
 const IMAGE_OVERLAY_MIN_INITIAL = 90;
 
@@ -284,6 +286,11 @@ export default function PreviewScreen() {
     selectTemplate(TEMPLATES[nextIndex]);
   }
 
+  function cycleRouteMode() {
+    if (routeMode === 'off') return;
+    setRouteMode((prev) => (prev === 'map' ? 'trace' : 'map'));
+  }
+
   function moveLayer(layerId: LayerId, direction: 'up' | 'down') {
     const current = layerOrder.indexOf(layerId);
     if (current === -1) return;
@@ -314,12 +321,31 @@ export default function PreviewScreen() {
   }
 
   function toggleLayer(layerId: LayerId, value: boolean) {
+    if (layerId === 'route') {
+      if (value) {
+        setRouteMode((prev) => (prev === 'off' ? 'trace' : prev));
+        setVisibleLayers((prev) => ({ ...prev, route: true }));
+        setBehindSubjectLayers((prev) => ({ ...prev, route: false }));
+        setSelectedLayer('route');
+      } else {
+        setVisibleLayers((prev) => ({ ...prev, route: false }));
+        setBehindSubjectLayers((prev) => ({ ...prev, route: false }));
+        setRouteMode('off');
+        if (selectedLayer === 'route') {
+          setSelectedLayer('stats');
+        }
+      }
+      return;
+    }
     setVisibleLayers((prev) => ({ ...prev, [layerId]: value }));
   }
 
   function removeLayer(layerId: LayerId) {
     setVisibleLayers((prev) => ({ ...prev, [layerId]: false }));
     setBehindSubjectLayers((prev) => ({ ...prev, [layerId]: false }));
+    if (layerId === 'route') {
+      setRouteMode('off');
+    }
     if (layerId.startsWith('image:')) {
       const id = layerId.replace('image:', '');
       setImageOverlays((prev) => prev.filter((item) => item.id !== id));
@@ -580,9 +606,9 @@ export default function PreviewScreen() {
 
           {routeMode !== 'off' && visibleLayers.route ? (
             <DraggableBlock
-              key={`route-${routeMode}`}
-              initialX={42}
-              initialY={170}
+              key="route-layer"
+              initialX={ROUTE_LAYER_INITIAL_X}
+              initialY={ROUTE_LAYER_INITIAL_Y}
               selected={activeLayer === 'route'}
               outlineRadius={0}
               canvasWidth={STORY_WIDTH}
@@ -590,6 +616,7 @@ export default function PreviewScreen() {
               onDragGuideChange={setCenterGuides}
               onRotationGuideChange={setShowRotationGuide}
               onSelect={() => setSelectedLayer('route')}
+              onTap={cycleRouteMode}
               onInteractionChange={(active) =>
                 setActiveLayer(active ? 'route' : null)
               }
@@ -699,8 +726,10 @@ export default function PreviewScreen() {
             ),
           ] as [LayerId, string][]
         ).map(([id, label]) => {
-          const routeDisabled = id === 'route' && routeMode === 'off';
-          const disabled = routeDisabled;
+          const isRouteLayer = id === 'route';
+          const switchValue = isRouteLayer
+            ? routeMode !== 'off' && Boolean(visibleLayers.route)
+            : Boolean(visibleLayers[id]);
           const isImageLayer = id.startsWith('image:');
           return (
             <View key={id} style={styles.layerRow}>
@@ -714,8 +743,7 @@ export default function PreviewScreen() {
                 <Text style={styles.controlLabel}>{label}</Text>
               </Pressable>
               <Switch
-                value={visibleLayers[id] && !disabled}
-                disabled={disabled}
+                value={switchValue}
                 onValueChange={(value) => toggleLayer(id, value)}
               />
               <Pressable
@@ -732,7 +760,7 @@ export default function PreviewScreen() {
               >
                 <Text style={styles.layerActionText}>↓</Text>
               </Pressable>
-              {id === 'route' || isImageLayer ? (
+              {isImageLayer ? (
                 <Pressable
                   style={styles.layerDelete}
                   onPress={() => removeLayer(id)}
@@ -910,41 +938,10 @@ export default function PreviewScreen() {
         })}
       </ScrollView>
 
-      <Text style={styles.sectionTitle}>Route</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipRow}
-      >
-        {(
-          [
-            { id: 'off', label: 'Off' },
-            { id: 'map', label: 'Map' },
-            { id: 'trace', label: 'Tracé seul' },
-          ] as { id: RouteMode; label: string }[]
-        ).map((item) => {
-          const selected = item.id === routeMode;
-          return (
-            <Pressable
-              key={item.id}
-              style={[styles.chip, selected && styles.chipSelected]}
-              onPress={() => {
-                setRouteMode(item.id);
-                if (item.id !== 'off') {
-                  setVisibleLayers((prev) => ({ ...prev, route: true }));
-                }
-              }}
-            >
-              <Text style={styles.chipText}>{item.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
       <Text style={styles.note}>
         Pinch and drag blocks to resize and place them. Center guide lines
         appear when aligned. Press ↓ at the bottom to place a layer behind the
-        auto subject.
+        auto subject. Tap the route layer to switch between trace and map.
       </Text>
       {message ? <Text style={styles.note}>{message}</Text> : null}
 
