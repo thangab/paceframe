@@ -19,6 +19,7 @@ type Props = {
   style?: StyleProp<ViewStyle>;
   children: ReactNode;
   onSelect?: () => void;
+  onTap?: () => void;
   onDragGuideChange?: (guides: { showVertical: boolean; showHorizontal: boolean }) => void;
   onInteractionChange?: (active: boolean) => void;
   onRotationGuideChange?: (active: boolean) => void;
@@ -42,6 +43,7 @@ export function DraggableBlock({
   style,
   children,
   onSelect,
+  onTap,
   onDragGuideChange,
   onInteractionChange,
   onRotationGuideChange,
@@ -220,11 +222,18 @@ export function DraggableBlock({
       }
     });
 
-  const tap = Gesture.Tap().onEnd(() => {
-    if (onSelect) {
-      runOnJS(onSelect)();
-    }
-  });
+  const tap = Gesture.Tap()
+    .maxDuration(180)
+    .maxDistance(6)
+    .onEnd((_event, success) => {
+      if (!success) return;
+      if (onSelect) {
+        runOnJS(onSelect)();
+      }
+      if (onTap) {
+        runOnJS(onTap)();
+      }
+    });
 
   const gesture = Gesture.Simultaneous(tap, pan, pinch, rotate);
 

@@ -269,6 +269,12 @@ export default function PreviewScreen() {
     setSelectedTemplateId(next.id);
   }
 
+  function cycleStatsTemplate() {
+    const currentIndex = TEMPLATES.findIndex((item) => item.id === template.id);
+    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % TEMPLATES.length : 0;
+    selectTemplate(TEMPLATES[nextIndex]);
+  }
+
   function moveLayer(layerId: LayerId, direction: 'up' | 'down') {
     const current = layerOrder.indexOf(layerId);
     if (current === -1) return;
@@ -531,6 +537,7 @@ export default function PreviewScreen() {
               onDragGuideChange={setCenterGuides}
               onRotationGuideChange={setShowRotationGuide}
               onSelect={() => setSelectedLayer('stats')}
+              onTap={cycleStatsTemplate}
               onInteractionChange={(active) =>
                 setActiveLayer(active ? 'stats' : null)
               }
