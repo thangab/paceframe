@@ -45,6 +45,9 @@ import {
   StatsTemplate,
 } from '@/types/preview';
 
+const ROUTE_LAYER_WIDTH = 280;
+const ROUTE_LAYER_HEIGHT = 180;
+
 export default function PreviewScreen() {
   const activity = useActivityStore((s) => s.selectedActivity());
   const isPremium = useSubscriptionStore((s) => s.isPremium);
@@ -66,8 +69,6 @@ export default function PreviewScreen() {
   const [selectedFontId, setSelectedFontId] = useState(FONT_PRESETS[0].id);
   const [routeMode, setRouteMode] = useState<RouteMode>('off');
   const [visible, setVisible] = useState<Record<FieldId, boolean>>({
-    title: true,
-    date: true,
     distance: true,
     time: true,
     pace: true,
@@ -511,7 +512,8 @@ export default function PreviewScreen() {
                 activeLayer === 'meta' && styles.layerSelected,
               ]}
             >
-              <Text style={styles.metaSubtitle}>{dateText} | PaceFrame</Text>
+              <Text style={styles.metaTitle}>{activity.name}</Text>
+              <Text style={styles.metaSubtitle}>{dateText}</Text>
             </DraggableBlock>
           ) : null}
 
@@ -546,8 +548,6 @@ export default function PreviewScreen() {
                 template={template}
                 fontPreset={fontPreset}
                 visible={visible}
-                activityName={activity.name}
-                dateText={dateText}
                 distanceText={distanceText}
                 durationText={durationText}
                 paceText={paceText}
@@ -581,8 +581,8 @@ export default function PreviewScreen() {
               <RouteLayer
                 polyline={activity.map.summary_polyline}
                 mode={routeMode === 'map' ? 'map' : 'trace'}
-                width={230}
-                height={130}
+                width={ROUTE_LAYER_WIDTH}
+                height={ROUTE_LAYER_HEIGHT}
               />
             </DraggableBlock>
           ) : null}
@@ -843,8 +843,6 @@ export default function PreviewScreen() {
       <View style={styles.controls}>
         {(
           [
-            ['title', 'Block title'],
-            ['date', 'Date'],
             ['distance', 'Distance'],
             ['time', 'Time'],
             ['pace', 'Pace'],
@@ -870,7 +868,7 @@ export default function PreviewScreen() {
         {(
           [
             { id: 'off', label: 'Off' },
-            { id: 'map', label: 'Map + Tracé' },
+            { id: 'map', label: 'Map' },
             { id: 'trace', label: 'Tracé seul' },
           ] as { id: RouteMode; label: string }[]
         ).map((item) => {
@@ -1057,12 +1055,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  metaTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
   layerSelected: {
     borderColor: '#22D3EE',
     borderWidth: 2,
   },
   routeBlock: {
-    padding: 8,
+    padding: 4,
     borderRadius: 16,
     backgroundColor: 'rgba(0,0,0,0.28)',
     borderWidth: 1,

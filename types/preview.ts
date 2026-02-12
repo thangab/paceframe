@@ -1,4 +1,4 @@
-export type FieldId = 'title' | 'date' | 'distance' | 'time' | 'pace' | 'elev';
+export type FieldId = 'distance' | 'time' | 'pace' | 'elev';
 export type RouteMode = 'off' | 'map' | 'trace';
 export type StatsLayout = 'row' | 'stack' | 'inline' | 'right';
 export type BaseLayerId = 'meta' | 'stats' | 'route';
