@@ -53,7 +53,9 @@ const ROUTE_LAYER_INITIAL_Y = (STORY_HEIGHT - ROUTE_LAYER_HEIGHT) / 2;
 const IMAGE_OVERLAY_MAX_INITIAL = 180;
 const IMAGE_OVERLAY_MIN_INITIAL = 90;
 const EXPORT_PNG_WIDTH = 1080;
-const EXPORT_PNG_HEIGHT = Math.round((EXPORT_PNG_WIDTH * STORY_HEIGHT) / STORY_WIDTH);
+const EXPORT_PNG_HEIGHT = Math.round(
+  (EXPORT_PNG_WIDTH * STORY_HEIGHT) / STORY_WIDTH,
+);
 
 export default function PreviewScreen() {
   const activity = useActivityStore((s) => s.selectedActivity());
@@ -113,7 +115,10 @@ export default function PreviewScreen() {
       FONT_PRESETS[0],
     [selectedFontId],
   );
-  const distanceText = formatDistanceMeters(activity?.distance ?? 0, distanceUnit);
+  const distanceText = formatDistanceMeters(
+    activity?.distance ?? 0,
+    distanceUnit,
+  );
   const durationText = formatDuration(activity?.moving_time ?? 0);
   const paceText = formatPace(
     activity?.distance ?? 0,
@@ -122,6 +127,28 @@ export default function PreviewScreen() {
   );
   const elevText = `${Math.round(activity?.total_elevation_gain ?? 0)} m`;
   const dateText = activity ? formatDate(activity.start_date) : '';
+  const supportsFullStatsPreview = useMemo(() => {
+    const t = (activity?.type || '').toLowerCase();
+    return (
+      t === 'run' ||
+      t === 'ride' ||
+      t === 'walk' ||
+      t === 'hike' ||
+      t === 'swim'
+    );
+  }, [activity?.type]);
+  const effectiveVisible = useMemo<Record<FieldId, boolean>>(
+    () =>
+      supportsFullStatsPreview
+        ? visible
+        : {
+            distance: false,
+            time: true,
+            pace: false,
+            elev: false,
+          },
+    [supportsFullStatsPreview, visible],
+  );
   const layerZ = useMemo(() => {
     return layerOrder.reduce(
       (acc, id, index) => ({ ...acc, [id]: index + 1 }),
@@ -284,7 +311,8 @@ export default function PreviewScreen() {
 
   function cycleStatsTemplate() {
     const currentIndex = TEMPLATES.findIndex((item) => item.id === template.id);
-    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % TEMPLATES.length : 0;
+    const nextIndex =
+      currentIndex >= 0 ? (currentIndex + 1) % TEMPLATES.length : 0;
     selectTemplate(TEMPLATES[nextIndex]);
   }
 
@@ -474,7 +502,8 @@ export default function PreviewScreen() {
           style={[
             styles.storyCanvas,
             (isCapturingOverlay || isExportingPng) && styles.storyCanvasSquare,
-            (isCapturingOverlay || isExportingPng) && styles.storyCanvasNoBorder,
+            (isCapturingOverlay || isExportingPng) &&
+              styles.storyCanvasNoBorder,
             (isCapturingOverlay || (isExportingPng && pngTransparentOnly)) &&
               styles.storyCanvasTransparent,
           ]}
@@ -601,7 +630,7 @@ export default function PreviewScreen() {
               <StatsLayerContent
                 template={template}
                 fontPreset={fontPreset}
-                visible={visible}
+                visible={effectiveVisible}
                 distanceText={distanceText}
                 durationText={durationText}
                 paceText={paceText}
@@ -912,12 +941,18 @@ export default function PreviewScreen() {
           <View key={id} style={styles.switchRow}>
             <Text style={styles.controlLabel}>{label}</Text>
             <Switch
-              value={visible[id]}
+              value={effectiveVisible[id]}
+              disabled={!supportsFullStatsPreview}
               onValueChange={(value) => toggleField(id, value)}
             />
           </View>
         ))}
       </View>
+      {!supportsFullStatsPreview ? (
+        <Text style={styles.note}>
+          For this activity type, preview shows Time only.
+        </Text>
+      ) : null}
 
       <Text style={styles.sectionTitle}>Unit</Text>
       <ScrollView
@@ -973,7 +1008,10 @@ function getInitialOverlaySize(
   assetHeight?: number,
 ): { width: number; height: number } {
   if (!assetWidth || !assetHeight) {
-    return { width: IMAGE_OVERLAY_MAX_INITIAL, height: IMAGE_OVERLAY_MAX_INITIAL };
+    return {
+      width: IMAGE_OVERLAY_MAX_INITIAL,
+      height: IMAGE_OVERLAY_MAX_INITIAL,
+    };
   }
 
   const maxSide = IMAGE_OVERLAY_MAX_INITIAL;
@@ -1146,7 +1184,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   imageOverlayBlock: {
-    borderRadius: radius.lg,
+    borderRadius: 0,
     overflow: 'hidden',
     backgroundColor: 'transparent',
   },

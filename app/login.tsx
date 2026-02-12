@@ -2,14 +2,23 @@ import { useState } from 'react';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, spacing } from '@/constants/theme';
+import { importActivitiesFromHealthKit } from '@/lib/healthkit';
 import {
   exchangeCodeWithSupabase,
   getMockTokens,
   isMockStravaEnabled,
 } from '@/lib/strava';
+import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -19,6 +28,12 @@ export default function LoginScreen() {
   const login = useAuthStore((s) => s.login);
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const setActivities = useActivityStore((s) => s.setActivities);
+  const shouldShowHealthSettings =
+    Platform.OS === 'ios' &&
+    Boolean(
+      error && /(healthkit|authorization|denied|permission)/i.test(error),
+    );
 
   // Strava validates redirect host against "Authorization Callback Domain".
   // Keep host as localhost for native deep link compatibility.
@@ -53,7 +68,10 @@ export default function LoginScreen() {
         `&approval_prompt=auto` +
         `&scope=read,activity:read_all`;
 
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+      const result = await WebBrowser.openAuthSessionAsync(
+        authUrl,
+        redirectUri,
+      );
 
       if (result.type !== 'success') {
         setIsBusy(false);
@@ -90,6 +108,36 @@ export default function LoginScreen() {
       setError(err instanceof Error ? err.message : 'Mock login failed.');
     } finally {
       setIsBusy(false);
+    }
+  }
+
+  async function handleHealthKitImport() {
+    if (Platform.OS !== 'ios') return;
+
+    try {
+      setIsBusy(true);
+      setError(null);
+      const activities = await importActivitiesFromHealthKit();
+      if (activities.length === 0) {
+        setError('No HealthKit workouts found.');
+        return;
+      }
+      // Keep auth flow consistent for guarded routes.
+      await login(getMockTokens());
+      setActivities(activities, 'healthkit');
+      router.replace('/activities');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'HealthKit import failed.');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function openIosSettings() {
+    try {
+      await Linking.openSettings();
+    } catch {
+      setError('Unable to open iOS settings. Please open Settings manually.');
     }
   }
 
@@ -134,14 +182,23 @@ export default function LoginScreen() {
         </Pressable>
       ) : null}
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {Platform.OS === 'ios' ? (
+        <PrimaryButton
+          label="Import from HealthKit"
+          onPress={handleHealthKitImport}
+          variant="secondary"
+          disabled={isBusy}
+        />
+      ) : null}
 
-      <Text style={styles.hint}>
-        Use `EXPO_PUBLIC_USE_MOCK_STRAVA=true` in development to bypass live
-        Strava activity calls.
-      </Text>
-      <Text style={styles.hint}>Client ID loaded: {clientId || 'NO'}</Text>
-      <Text style={styles.hint}>Redirect URI: {redirectUri}</Text>
+      {shouldShowHealthSettings ? (
+        <View style={styles.healthHelpWrap}>
+          <Text style={styles.healthHelpText}>
+            Open Settings {'>'} Privacy & Security {'>'} Health app {'>'}{' '}
+            PaceFrame and enable Workout + Workout Routes.
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -218,5 +275,13 @@ const styles = StyleSheet.create({
     color: '#D4FF54',
     fontSize: 30,
     lineHeight: 32,
+  },
+  healthHelpWrap: {
+    gap: spacing.xs,
+  },
+  healthHelpText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
   },
 });

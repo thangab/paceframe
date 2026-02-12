@@ -94,7 +94,16 @@ function normalizeDistance(distance: string) {
 function activityTypeIcon(type: string) {
   if (type === 'Run') return '🏃';
   if (type === 'Ride') return '🚴';
-  if (type === 'Hike' || type === 'Walk') return '🥾';
+  if (type === 'Walk') return '🚶';
+  if (type === 'Hike') return '🥾';
+  if (type === 'Swim') return '🏊';
+  if (type === 'Rowing') return '🚣';
+  if (type === 'Elliptical' || type === 'WeightTraining') return '🏋️';
+  if (type === 'Stair') return '🪜';
+  if (type === 'Strength') return '💪';
+  if (type === 'HIIT') return '⚡';
+  if (type === 'Yoga') return '🧘';
+  if (type === 'Workout') return '🏅';
   return '';
 }
 

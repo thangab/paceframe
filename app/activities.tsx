@@ -19,6 +19,8 @@ export default function ActivitiesScreen() {
   const tokens = useAuthStore((s) => s.tokens);
   const logout = useAuthStore((s) => s.logout);
   const activities = useActivityStore((s) => s.activities);
+  const source = useActivityStore((s) => s.source);
+  const clearActivities = useActivityStore((s) => s.clearActivities);
   const selectedActivityId = useActivityStore((s) => s.selectedActivityId);
   const setActivities = useActivityStore((s) => s.setActivities);
   const selectActivity = useActivityStore((s) => s.selectActivity);
@@ -27,6 +29,10 @@ export default function ActivitiesScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const loadActivities = useCallback(async () => {
+    if (source === 'healthkit' && activities.length > 0) {
+      return;
+    }
+
     if (!tokens?.accessToken) {
       router.replace('/login');
       return;
@@ -36,7 +42,7 @@ export default function ActivitiesScreen() {
       setLoading(true);
       setError(null);
       const rows = await fetchActivities(tokens.accessToken);
-      setActivities(rows);
+      setActivities(rows, 'strava');
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Could not load activities.',
@@ -44,7 +50,7 @@ export default function ActivitiesScreen() {
     } finally {
       setLoading(false);
     }
-  }, [tokens?.accessToken, setActivities]);
+  }, [source, activities.length, tokens?.accessToken, setActivities]);
 
   useEffect(() => {
     loadActivities();
@@ -52,6 +58,7 @@ export default function ActivitiesScreen() {
 
   async function handleLogout() {
     await logout();
+    clearActivities();
     router.replace('/login');
   }
 

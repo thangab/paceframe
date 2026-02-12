@@ -15,6 +15,8 @@
 		8C5B996C2F33AA2200A1D001 /* PaceFrameVideoComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B996B2F33AA2200A1D001 /* PaceFrameVideoComposer.swift */; };
 		8C5B997A2F33AB1200A1D001 /* PaceFrameMapSnapshot.m in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B99792F33AB1200A1D001 /* PaceFrameMapSnapshot.m */; };
 		8C5B997C2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B997B2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift */; };
+		8C5B998A2F33AC1200A1D001 /* PaceFrameHealthKit.m in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B99892F33AC1200A1D001 /* PaceFrameHealthKit.m */; };
+		8C5B998C2F33AC2200A1D001 /* PaceFrameHealthKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B998B2F33AC2200A1D001 /* PaceFrameHealthKit.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 		FF3A14F3C10921455FD95F6C /* libPods-PaceFrame.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4DD5A0A0000188B77728288F /* libPods-PaceFrame.a */; };
@@ -30,6 +32,8 @@
 		8C5B996B2F33AA2200A1D001 /* PaceFrameVideoComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PaceFrameVideoComposer.swift; path = PaceFrame/PaceFrameVideoComposer.swift; sourceTree = "<group>"; };
 		8C5B99792F33AB1200A1D001 /* PaceFrameMapSnapshot.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = PaceFrameMapSnapshot.m; path = PaceFrame/PaceFrameMapSnapshot.m; sourceTree = "<group>"; };
 		8C5B997B2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PaceFrameMapSnapshot.swift; path = PaceFrame/PaceFrameMapSnapshot.swift; sourceTree = "<group>"; };
+		8C5B99892F33AC1200A1D001 /* PaceFrameHealthKit.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = PaceFrameHealthKit.m; path = PaceFrame/PaceFrameHealthKit.m; sourceTree = "<group>"; };
+		8C5B998B2F33AC2200A1D001 /* PaceFrameHealthKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PaceFrameHealthKit.swift; path = PaceFrame/PaceFrameHealthKit.swift; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = PaceFrame/SplashScreen.storyboard; sourceTree = "<group>"; };
 		B0A9F9BBA39F19A9ED9083CF /* Pods-PaceFrame.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PaceFrame.release.xcconfig"; path = "Target Support Files/Pods-PaceFrame/Pods-PaceFrame.release.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
@@ -37,6 +41,7 @@
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = PaceFrame/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* PaceFrame-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "PaceFrame-Bridging-Header.h"; path = "PaceFrame/PaceFrame-Bridging-Header.h"; sourceTree = "<group>"; };
+		F11748452D0722820044C1D9 /* PaceFrame.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = PaceFrame.entitlements; path = PaceFrame/PaceFrame.entitlements; sourceTree = "<group>"; };
 		F71F63E470F0913BAC9D9009 /* Pods-PaceFrame.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PaceFrame.debug.xcconfig"; path = "Target Support Files/Pods-PaceFrame/Pods-PaceFrame.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -57,8 +62,11 @@
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
 				F11748442D0722820044C1D9 /* PaceFrame-Bridging-Header.h */,
+				F11748452D0722820044C1D9 /* PaceFrame.entitlements */,
 				8C5B997B2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift */,
 				8C5B99792F33AB1200A1D001 /* PaceFrameMapSnapshot.m */,
+				8C5B998B2F33AC2200A1D001 /* PaceFrameHealthKit.swift */,
+				8C5B99892F33AC1200A1D001 /* PaceFrameHealthKit.m */,
 				8C5B996B2F33AA2200A1D001 /* PaceFrameVideoComposer.swift */,
 				8C5B99692F33AA1200A1D001 /* PaceFrameVideoComposer.m */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
@@ -298,6 +306,7 @@
 			inputPaths = (
 				"$(SRCROOT)/.xcode.env",
 				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/PaceFrame/PaceFrame.entitlements",
 				"$(SRCROOT)/Pods/Target Support Files/Pods-PaceFrame/expo-configure-project.sh",
 			);
 			name = "[Expo] Configure project";
@@ -320,6 +329,8 @@
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
 				8C5B997C2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift in Sources */,
 				8C5B997A2F33AB1200A1D001 /* PaceFrameMapSnapshot.m in Sources */,
+				8C5B998C2F33AC2200A1D001 /* PaceFrameHealthKit.swift in Sources */,
+				8C5B998A2F33AC1200A1D001 /* PaceFrameHealthKit.m in Sources */,
 				8C5B996C2F33AA2200A1D001 /* PaceFrameVideoComposer.swift in Sources */,
 				8C5B996A2F33AA1200A1D001 /* PaceFrameVideoComposer.m in Sources */,
 				59A6CD3BA84D6500C1645C1F /* ExpoModulesProvider.swift in Sources */,
@@ -335,6 +346,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = PaceFrame/PaceFrame.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = R9XPB6JTAH;
 				ENABLE_BITCODE = NO;
@@ -370,6 +382,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = PaceFrame/PaceFrame.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = R9XPB6JTAH;
 				INFOPLIST_FILE = PaceFrame/Info.plist;
