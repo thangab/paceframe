@@ -30,6 +30,7 @@ import {
 import { removeBackgroundOnDevice } from '@/lib/backgroundRemoval';
 import { composeVideoWithOverlay } from '@/lib/nativeVideoComposer';
 import {
+  DistanceUnit,
   formatDate,
   formatDistanceMeters,
   formatDuration,
@@ -67,6 +68,7 @@ export default function PreviewScreen() {
   const [imageOverlays, setImageOverlays] = useState<ImageOverlay[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState(TEMPLATES[0].id);
   const [selectedFontId, setSelectedFontId] = useState(FONT_PRESETS[0].id);
+  const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>('km');
   const [routeMode, setRouteMode] = useState<RouteMode>('off');
   const [visible, setVisible] = useState<Record<FieldId, boolean>>({
     distance: true,
@@ -105,11 +107,12 @@ export default function PreviewScreen() {
       FONT_PRESETS[0],
     [selectedFontId],
   );
-  const distanceText = formatDistanceMeters(activity?.distance ?? 0);
+  const distanceText = formatDistanceMeters(activity?.distance ?? 0, distanceUnit);
   const durationText = formatDuration(activity?.moving_time ?? 0);
   const paceText = formatPace(
     activity?.distance ?? 0,
     activity?.moving_time ?? 0,
+    distanceUnit,
   );
   const elevText = `${Math.round(activity?.total_elevation_gain ?? 0)} m`;
   const dateText = activity ? formatDate(activity.start_date) : '';
@@ -873,6 +876,31 @@ export default function PreviewScreen() {
           </View>
         ))}
       </View>
+
+      <Text style={styles.sectionTitle}>Unit</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipRow}
+      >
+        {(
+          [
+            { id: 'km', label: 'Kilometers' },
+            { id: 'mi', label: 'Miles' },
+          ] as { id: DistanceUnit; label: string }[]
+        ).map((item) => {
+          const selected = item.id === distanceUnit;
+          return (
+            <Pressable
+              key={item.id}
+              style={[styles.chip, selected && styles.chipSelected]}
+              onPress={() => setDistanceUnit(item.id)}
+            >
+              <Text style={styles.chipText}>{item.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
       <Text style={styles.sectionTitle}>Route</Text>
       <ScrollView

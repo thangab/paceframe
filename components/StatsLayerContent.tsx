@@ -331,7 +331,7 @@ function ValueWithUnit({
 
 function splitMetricValue(value: string) {
   const normalized = value.trim();
-  const match = normalized.match(/^(.*?)(?:\s*)(\/km|km|m)$/i);
+  const match = normalized.match(/^(.*?)(?:\s*)(\/km|\/mi|km|mi|m)$/i);
   if (!match) return { main: normalized, unit: '' };
   return { main: match[1], unit: match[2] };
 }
@@ -352,8 +352,8 @@ const styles = StyleSheet.create({
   },
   heroDistanceValue: {
     color: '#FFFFFF',
-    fontSize: 58,
-    lineHeight: 62,
+    fontSize: 48,
+    lineHeight: 54,
   },
   heroUnit: {
     color: '#D1D5DB',
@@ -372,8 +372,8 @@ const styles = StyleSheet.create({
   },
   verticalValue: {
     color: '#FFFFFF',
-    fontSize: 54,
-    lineHeight: 58,
+    fontSize: 28,
+    lineHeight: 32,
     marginBottom: 4,
   },
   verticalUnit: {
@@ -388,8 +388,8 @@ const styles = StyleSheet.create({
   },
   compactDistanceValue: {
     color: '#FFFFFF',
-    fontSize: 64,
-    lineHeight: 66,
+    fontSize: 48,
+    lineHeight: 54,
   },
   compactUnit: {
     color: '#D1D5DB',
