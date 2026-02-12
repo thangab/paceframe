@@ -52,6 +52,8 @@ const ROUTE_LAYER_INITIAL_X = (STORY_WIDTH - ROUTE_LAYER_WIDTH) / 2;
 const ROUTE_LAYER_INITIAL_Y = (STORY_HEIGHT - ROUTE_LAYER_HEIGHT) / 2;
 const IMAGE_OVERLAY_MAX_INITIAL = 180;
 const IMAGE_OVERLAY_MIN_INITIAL = 90;
+const EXPORT_PNG_WIDTH = 1080;
+const EXPORT_PNG_HEIGHT = Math.round((EXPORT_PNG_WIDTH * STORY_HEIGHT) / STORY_WIDTH);
 
 export default function PreviewScreen() {
   const activity = useActivityStore((s) => s.selectedActivity());
@@ -375,15 +377,18 @@ export default function PreviewScreen() {
       setIsExportingPng(true);
       await new Promise((resolve) => setTimeout(resolve, 80));
 
+      const exportFormat = includeImageBackground ? 'jpg' : 'png';
       const uri = await captureRef(exportRef, {
-        format: 'png',
+        format: exportFormat,
         quality: 1,
         result: 'tmpfile',
+        width: EXPORT_PNG_WIDTH,
+        height: EXPORT_PNG_HEIGHT,
       });
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {
-          mimeType: 'image/png',
+          mimeType: includeImageBackground ? 'image/jpeg' : 'image/png',
           dialogTitle: 'Share PaceFrame story',
         });
       } else {
@@ -392,8 +397,8 @@ export default function PreviewScreen() {
 
       setMessage(
         includeImageBackground
-          ? 'PNG exported with image + layers.'
-          : 'PNG exported with transparent background + layers only.',
+          ? `JPG exported with image + layers (${EXPORT_PNG_WIDTH}x${EXPORT_PNG_HEIGHT}).`
+          : `PNG exported with transparent background + layers only (${EXPORT_PNG_WIDTH}x${EXPORT_PNG_HEIGHT}).`,
       );
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Failed to export.');
@@ -469,7 +474,8 @@ export default function PreviewScreen() {
           style={[
             styles.storyCanvas,
             (isCapturingOverlay || isExportingPng) && styles.storyCanvasSquare,
-            (isCapturingOverlay || isExportingPng) &&
+            (isCapturingOverlay || isExportingPng) && styles.storyCanvasNoBorder,
+            (isCapturingOverlay || (isExportingPng && pngTransparentOnly)) &&
               styles.storyCanvasTransparent,
           ]}
         >
@@ -1033,8 +1039,13 @@ const styles = StyleSheet.create({
   storyCanvasSquare: {
     borderRadius: 0,
   },
+  storyCanvasNoBorder: {
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
   storyCanvasTransparent: {
     backgroundColor: 'transparent',
+    borderWidth: 0,
     borderColor: 'transparent',
   },
   media: {
