@@ -233,6 +233,7 @@ function MetricCell({
         valueStyle={styles.metricValue}
         unitStyle={styles.metricUnit}
         numberOfLines={1}
+        autoFit={false}
       />
     </View>
   );
