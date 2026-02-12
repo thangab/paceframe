@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Canvas, Circle, Path, RoundedRect, Skia } from '@shopify/react-native-skia';
-import { decodePolyline, normalizePoints } from '@/lib/polyline';
+import { useEffect, useMemo, useState } from 'react';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { Canvas, Path, Skia } from '@shopify/react-native-skia';
+import { decodePolyline } from '@/lib/polyline';
 
 type RouteMode = 'map' | 'trace';
 
@@ -12,16 +12,38 @@ type Props = {
   height?: number;
 };
 
+const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+const MAPBOX_STYLE = 'mapbox/streets-v12';
+
 export function RouteLayer({ polyline, mode, width = 250, height = 150 }: Props) {
+  const [mapLoadFailed, setMapLoadFailed] = useState(false);
   const routePath = useMemo(() => {
     if (!polyline) return null;
 
-    const points = normalizePoints(
-      decodePolyline(polyline),
-      width,
-      height,
-      mode === 'map' ? 18 : 8,
-    );
+    const source = decodePolyline(polyline);
+    if (!source.length) return null;
+
+    const padding = mode === 'map' ? 16 : 8;
+    const minX = Math.min(...source.map((p) => p.x));
+    const maxX = Math.max(...source.map((p) => p.x));
+    const minY = Math.min(...source.map((p) => p.y));
+    const maxY = Math.max(...source.map((p) => p.y));
+    const dataWidth = Math.max(maxX - minX, 0.0001);
+    const dataHeight = Math.max(maxY - minY, 0.0001);
+
+    const innerWidth = Math.max(width - padding * 2, 1);
+    const innerHeight = Math.max(height - padding * 2, 1);
+    const scale = Math.min(innerWidth / dataWidth, innerHeight / dataHeight);
+
+    const scaledWidth = dataWidth * scale;
+    const scaledHeight = dataHeight * scale;
+    const offsetX = (width - scaledWidth) / 2;
+    const offsetY = (height - scaledHeight) / 2;
+
+    const points = source.map((p) => ({
+      x: (p.x - minX) * scale + offsetX,
+      y: height - ((p.y - minY) * scale + offsetY),
+    }));
 
     if (!points.length) return null;
 
@@ -32,34 +54,44 @@ export function RouteLayer({ polyline, mode, width = 250, height = 150 }: Props)
       path.lineTo(points[i].x, points[i].y);
     }
 
-    return {
-      path,
-      start: points[0],
-      end: points[points.length - 1],
-    };
+    return { path };
   }, [polyline, width, height, mode]);
+  const mapImageUrl = useMemo(() => {
+    if (!polyline || mode !== 'map') return null;
+    if (!MAPBOX_TOKEN) return null;
 
-  const gridPath = useMemo(() => {
-    if (mode !== 'map') return null;
+    const source = decodePolyline(polyline);
+    if (!source.length) return null;
 
-    const path = Skia.Path.Make();
-    const rows = 6;
-    const cols = 5;
+    const latLngs = source.map((p) => ({ lat: p.y, lng: p.x }));
+    const sampled = sampleForStaticMap(latLngs, 50);
 
-    for (let i = 1; i < rows; i += 1) {
-      const y = (height / rows) * i;
-      path.moveTo(0, y);
-      path.lineTo(width, y);
-    }
+    const lats = latLngs.map((p) => p.lat);
+    const lngs = latLngs.map((p) => p.lng);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
 
-    for (let i = 1; i < cols; i += 1) {
-      const x = (width / cols) * i;
-      path.moveTo(x, 0);
-      path.lineTo(x, height);
-    }
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLng = (minLng + maxLng) / 2;
+    const zoom = fitZoom(minLat, maxLat, minLng, maxLng, width, height);
+    const encodedPolyline = encodeURIComponent(encodePolyline(sampled));
+    const overlay = `path-4+ff6b00-0.95(${encodedPolyline})`;
+    const pixelRatioSuffix = '@2x';
 
-    return path;
-  }, [mode, width, height]);
+    return (
+      `https://api.mapbox.com/styles/v1/${MAPBOX_STYLE}/static/` +
+      `${overlay}/` +
+      `${centerLng.toFixed(5)},${centerLat.toFixed(5)},${zoom},0/` +
+      `${Math.round(width)}x${Math.round(height)}${pixelRatioSuffix}` +
+      `?access_token=${encodeURIComponent(MAPBOX_TOKEN)}`
+    );
+  }, [polyline, mode, width, height]);
+
+  useEffect(() => {
+    setMapLoadFailed(false);
+  }, [mapImageUrl, mode, polyline]);
 
   if (!routePath) {
     return (
@@ -69,38 +101,123 @@ export function RouteLayer({ polyline, mode, width = 250, height = 150 }: Props)
     );
   }
 
+  if (mode === 'map') {
+    if (!mapImageUrl || mapLoadFailed) {
+      return (
+        <View style={[styles.empty, { width, height }]}>
+          <Text style={styles.emptyText}>
+            {MAPBOX_TOKEN
+              ? 'Map unavailable for this activity'
+              : 'Missing EXPO_PUBLIC_MAPBOX_TOKEN'}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={[styles.mapWrap, { width, height }]}>
+        <Image
+          source={{ uri: mapImageUrl }}
+          style={styles.mapImage}
+          resizeMode="cover"
+          onError={() => setMapLoadFailed(true)}
+        />
+      </View>
+    );
+  }
+
   return (
     <Canvas style={{ width, height }}>
-      {mode === 'map' ? (
-        <>
-          <RoundedRect x={0} y={0} width={width} height={height} r={14} color="#0f172a" />
-          {gridPath ? (
-            <Path
-              path={gridPath}
-              style="stroke"
-              strokeWidth={1}
-              color="rgba(148,163,184,0.35)"
-            />
-          ) : null}
-        </>
-      ) : null}
-
       <Path
         path={routePath.path}
         style="stroke"
-        strokeWidth={mode === 'map' ? 4 : 5}
-        color={mode === 'map' ? '#38bdf8' : '#ffffff'}
+        strokeWidth={5}
+        color="#F97316"
         strokeJoin="round"
         strokeCap="round"
       />
-
-      <Circle cx={routePath.start.x} cy={routePath.start.y} r={4} color="#22c55e" />
-      <Circle cx={routePath.end.x} cy={routePath.end.y} r={4} color="#f97316" />
     </Canvas>
   );
 }
 
+function sampleForStaticMap(
+  points: { lat: number; lng: number }[],
+  maxPoints: number,
+) {
+  if (points.length <= maxPoints) return points;
+  const step = (points.length - 1) / (maxPoints - 1);
+  const sampled: { lat: number; lng: number }[] = [];
+  for (let i = 0; i < maxPoints; i += 1) {
+    sampled.push(points[Math.round(i * step)]);
+  }
+  return sampled;
+}
+
+function fitZoom(
+  minLat: number,
+  maxLat: number,
+  minLng: number,
+  maxLng: number,
+  width: number,
+  height: number,
+) {
+  const WORLD_SIZE = 256;
+  const paddingRatio = 0.82;
+
+  const lngToX = (lng: number) => (lng + 180) / 360;
+  const latToY = (lat: number) => {
+    const sin = Math.sin((lat * Math.PI) / 180);
+    return 0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI);
+  };
+
+  const dx = Math.max(Math.abs(lngToX(maxLng) - lngToX(minLng)), 0.000001);
+  const dy = Math.max(Math.abs(latToY(maxLat) - latToY(minLat)), 0.000001);
+
+  const zoomX = Math.log2((width * paddingRatio) / (WORLD_SIZE * dx));
+  const zoomY = Math.log2((height * paddingRatio) / (WORLD_SIZE * dy));
+  const zoom = Math.floor(Math.min(zoomX, zoomY));
+  return Math.max(1, Math.min(18, zoom));
+}
+
+function encodePolyline(points: { lat: number; lng: number }[]) {
+  let lastLat = 0;
+  let lastLng = 0;
+  let result = '';
+
+  const encodeValue = (value: number) => {
+    let v = value < 0 ? ~(value << 1) : value << 1;
+    let output = '';
+    while (v >= 0x20) {
+      output += String.fromCharCode((0x20 | (v & 0x1f)) + 63);
+      v >>= 5;
+    }
+    output += String.fromCharCode(v + 63);
+    return output;
+  };
+
+  for (const p of points) {
+    const lat = Math.round(p.lat * 1e5);
+    const lng = Math.round(p.lng * 1e5);
+    const dLat = lat - lastLat;
+    const dLng = lng - lastLng;
+    lastLat = lat;
+    lastLng = lng;
+    result += encodeValue(dLat) + encodeValue(dLng);
+  }
+
+  return result;
+}
+
 const styles = StyleSheet.create({
+  mapWrap: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#0f172a',
+  },
+  mapImage: {
+    width: '100%',
+    height: '100%',
+  },
   empty: {
     borderRadius: 14,
     borderWidth: 1,
