@@ -57,6 +57,19 @@ export const TEMPLATES: StatsTemplate[] = [
     borderWidth: 0,
     radius: 0,
   },
+  {
+    id: 'grid',
+    name: 'Grid 2x2',
+    layout: 'grid',
+    premium: false,
+    x: 18,
+    y: 290,
+    width: 284,
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
+    borderWidth: 0,
+    radius: 0,
+  },
 ];
 
 export const FONT_PRESETS: FontPreset[] = [

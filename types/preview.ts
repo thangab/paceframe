@@ -1,6 +1,6 @@
 export type FieldId = 'distance' | 'time' | 'pace' | 'elev';
 export type RouteMode = 'off' | 'map' | 'trace';
-export type StatsLayout = 'row' | 'stack' | 'inline' | 'right';
+export type StatsLayout = 'row' | 'stack' | 'inline' | 'right' | 'grid';
 export type BaseLayerId = 'meta' | 'stats' | 'route';
 export type LayerId = BaseLayerId | `image:${string}`;
 

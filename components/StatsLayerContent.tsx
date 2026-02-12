@@ -209,6 +209,39 @@ export function StatsLayerContent({
           ) : null}
         </View>
       ) : null}
+
+      {template.layout === 'grid' ? (
+        <View style={styles.gridRows}>
+          <View style={styles.gridRow}>
+            <GridMetric
+              visible={visible.distance}
+              label="Distance"
+              value={distanceText}
+              fontPreset={fontPreset}
+            />
+            <GridMetric
+              visible={visible.pace}
+              label="Avg Pace"
+              value={paceText}
+              fontPreset={fontPreset}
+            />
+          </View>
+          <View style={styles.gridRow}>
+            <GridMetric
+              visible={visible.time}
+              label="Moving Time"
+              value={durationText}
+              fontPreset={fontPreset}
+            />
+            <GridMetric
+              visible={visible.elev}
+              label="Elevation Gain"
+              value={elevText}
+              fontPreset={fontPreset}
+            />
+          </View>
+        </View>
+      ) : null}
     </>
   );
 }
@@ -287,6 +320,38 @@ function ColumnMetric({
         fontPreset={fontPreset}
         valueStyle={styles.columnValue}
         unitStyle={styles.columnUnit}
+      />
+    </View>
+  );
+}
+
+function GridMetric({
+  visible,
+  label,
+  value,
+  fontPreset,
+}: {
+  visible: boolean;
+  label: string;
+  value: string;
+  fontPreset: FontPreset;
+}) {
+  if (!visible) {
+    return <View style={styles.gridItem} />;
+  }
+
+  return (
+    <View style={styles.gridItem}>
+      <Text style={[styles.gridLabel, { fontFamily: fontPreset.family }]}>
+        {label}
+      </Text>
+      <ValueWithUnit
+        value={value}
+        fontPreset={fontPreset}
+        valueStyle={styles.gridValue}
+        unitStyle={styles.gridUnit}
+        numberOfLines={1}
+        autoFit={false}
       />
     </View>
   );
@@ -454,6 +519,39 @@ const styles = StyleSheet.create({
   columnUnit: {
     color: '#D1D5DB',
     fontSize: 12,
+    fontWeight: '600',
+  },
+  gridRows: {
+    width: '100%',
+    gap: 18,
+    alignItems: 'center',
+  },
+  gridRow: {
+    width: 'auto',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  gridItem: {
+    width: '48%',
+    alignItems: 'center',
+  },
+  gridLabel: {
+    color: '#D1D5DB',
+    fontSize: 12,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  gridValue: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    lineHeight: 32,
+    textAlign: 'center',
+  },
+  gridUnit: {
+    color: '#D1D5DB',
+    fontSize: 16,
     fontWeight: '600',
   },
 });
