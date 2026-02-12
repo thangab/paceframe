@@ -677,7 +677,7 @@ export default function PreviewScreen() {
                 <Image
                   source={{ uri: overlay.uri }}
                   style={styles.imageOverlayImage}
-                  resizeMode="cover"
+                  resizeMode="contain"
                 />
               </DraggableBlock>
             );
