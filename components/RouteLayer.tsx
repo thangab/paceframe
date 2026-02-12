@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { Canvas, Path, Skia } from '@shopify/react-native-skia';
+import { generateMapSnapshot } from '@/lib/nativeMapSnapshot';
 import { decodePolyline } from '@/lib/polyline';
 
 type RouteMode = 'map' | 'trace';
@@ -15,8 +16,14 @@ type Props = {
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
 const MAPBOX_STYLE = 'mapbox/streets-v12';
 
-export function RouteLayer({ polyline, mode, width = 250, height = 150 }: Props) {
+export function RouteLayer({
+  polyline,
+  mode,
+  width = 250,
+  height = 150,
+}: Props) {
   const [mapLoadFailed, setMapLoadFailed] = useState(false);
+  const [iosMapUri, setIosMapUri] = useState<string | null>(null);
   const routePath = useMemo(() => {
     if (!polyline) return null;
 
@@ -58,6 +65,7 @@ export function RouteLayer({ polyline, mode, width = 250, height = 150 }: Props)
   }, [polyline, width, height, mode]);
   const mapImageUrl = useMemo(() => {
     if (!polyline || mode !== 'map') return null;
+    if (Platform.OS === 'ios') return null;
     if (!MAPBOX_TOKEN) return null;
 
     const source = decodePolyline(polyline);
@@ -93,6 +101,38 @@ export function RouteLayer({ polyline, mode, width = 250, height = 150 }: Props)
     setMapLoadFailed(false);
   }, [mapImageUrl, mode, polyline]);
 
+  useEffect(() => {
+    if (mode !== 'map' || Platform.OS !== 'ios' || !polyline) {
+      setIosMapUri(null);
+      return;
+    }
+
+    let cancelled = false;
+    setMapLoadFailed(false);
+
+    generateMapSnapshot({
+      polyline,
+      width,
+      height,
+      strokeColorHex: '#F97316',
+    })
+      .then((uri) => {
+        if (!cancelled) {
+          setIosMapUri(uri);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIosMapUri(null);
+          setMapLoadFailed(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, polyline, width, height]);
+
   if (!routePath) {
     return (
       <View style={[styles.empty, { width, height }]}>
@@ -102,11 +142,14 @@ export function RouteLayer({ polyline, mode, width = 250, height = 150 }: Props)
   }
 
   if (mode === 'map') {
-    if (!mapImageUrl || mapLoadFailed) {
+    const mapUri = Platform.OS === 'ios' ? iosMapUri : mapImageUrl;
+    if (!mapUri || mapLoadFailed) {
       return (
         <View style={[styles.empty, { width, height }]}>
           <Text style={styles.emptyText}>
-            {MAPBOX_TOKEN
+            {Platform.OS === 'ios'
+              ? 'Map unavailable for this activity'
+              : MAPBOX_TOKEN
               ? 'Map unavailable for this activity'
               : 'Missing EXPO_PUBLIC_MAPBOX_TOKEN'}
           </Text>
@@ -117,7 +160,7 @@ export function RouteLayer({ polyline, mode, width = 250, height = 150 }: Props)
     return (
       <View style={[styles.mapWrap, { width, height }]}>
         <Image
-          source={{ uri: mapImageUrl }}
+          source={{ uri: mapUri }}
           style={styles.mapImage}
           resizeMode="cover"
           onError={() => setMapLoadFailed(true)}

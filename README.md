@@ -12,7 +12,7 @@ PaceFrame is an Expo React Native app to connect Strava, pick an activity, desig
 - Preview editor with draggable/pinchable/rotatable blocks:
   - header/meta block
   - stats block templates
-  - route block (map+trace or trace only)
+  - route block (`Map` or `Trace`)
   - extra image overlay layers
 - Auto subject extraction on image import (`react-native-background-remover`)
 - Layer ordering controls + center alignment guides + rotation snap guide (0°)
@@ -22,6 +22,9 @@ PaceFrame is an Expo React Native app to connect Strava, pick an activity, desig
     - with image: image + layers
     - without image: transparent PNG with layers only
   - Video + layers export on iOS (native AVFoundation composer)
+- Route map rendering:
+  - iOS: native MapKit snapshot + orange route overlay
+  - Android: Mapbox static image fallback
 - Freemium/paywall with RevenueCat
 
 ## Tech Stack
@@ -75,6 +78,8 @@ supabase/
 ios/
   PaceFrame/PaceFrameVideoComposer.swift
   PaceFrame/PaceFrameVideoComposer.m
+  PaceFrame/PaceFrameMapSnapshot.swift
+  PaceFrame/PaceFrameMapSnapshot.m
 ```
 
 ## Prerequisites

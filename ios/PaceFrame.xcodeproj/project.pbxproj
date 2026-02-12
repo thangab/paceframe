@@ -13,6 +13,8 @@
 		59A6CD3BA84D6500C1645C1F /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73131AC59E59530DC0B1EB67 /* ExpoModulesProvider.swift */; };
 		8C5B996A2F33AA1200A1D001 /* PaceFrameVideoComposer.m in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B99692F33AA1200A1D001 /* PaceFrameVideoComposer.m */; };
 		8C5B996C2F33AA2200A1D001 /* PaceFrameVideoComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B996B2F33AA2200A1D001 /* PaceFrameVideoComposer.swift */; };
+		8C5B997A2F33AB1200A1D001 /* PaceFrameMapSnapshot.m in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B99792F33AB1200A1D001 /* PaceFrameMapSnapshot.m */; };
+		8C5B997C2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B997B2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 		FF3A14F3C10921455FD95F6C /* libPods-PaceFrame.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4DD5A0A0000188B77728288F /* libPods-PaceFrame.a */; };
@@ -26,6 +28,8 @@
 		73131AC59E59530DC0B1EB67 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-PaceFrame/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		8C5B99692F33AA1200A1D001 /* PaceFrameVideoComposer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = PaceFrameVideoComposer.m; path = PaceFrame/PaceFrameVideoComposer.m; sourceTree = "<group>"; };
 		8C5B996B2F33AA2200A1D001 /* PaceFrameVideoComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PaceFrameVideoComposer.swift; path = PaceFrame/PaceFrameVideoComposer.swift; sourceTree = "<group>"; };
+		8C5B99792F33AB1200A1D001 /* PaceFrameMapSnapshot.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = PaceFrameMapSnapshot.m; path = PaceFrame/PaceFrameMapSnapshot.m; sourceTree = "<group>"; };
+		8C5B997B2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PaceFrameMapSnapshot.swift; path = PaceFrame/PaceFrameMapSnapshot.swift; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = PaceFrame/SplashScreen.storyboard; sourceTree = "<group>"; };
 		B0A9F9BBA39F19A9ED9083CF /* Pods-PaceFrame.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PaceFrame.release.xcconfig"; path = "Target Support Files/Pods-PaceFrame/Pods-PaceFrame.release.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
@@ -53,6 +57,8 @@
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
 				F11748442D0722820044C1D9 /* PaceFrame-Bridging-Header.h */,
+				8C5B997B2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift */,
+				8C5B99792F33AB1200A1D001 /* PaceFrameMapSnapshot.m */,
 				8C5B996B2F33AA2200A1D001 /* PaceFrameVideoComposer.swift */,
 				8C5B99692F33AA1200A1D001 /* PaceFrameVideoComposer.m */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
@@ -312,6 +318,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
+				8C5B997C2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift in Sources */,
+				8C5B997A2F33AB1200A1D001 /* PaceFrameMapSnapshot.m in Sources */,
 				8C5B996C2F33AA2200A1D001 /* PaceFrameVideoComposer.swift in Sources */,
 				8C5B996A2F33AA1200A1D001 /* PaceFrameVideoComposer.m in Sources */,
 				59A6CD3BA84D6500C1645C1F /* ExpoModulesProvider.swift in Sources */,
