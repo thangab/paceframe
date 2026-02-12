@@ -100,7 +100,8 @@ export function DraggableBlock({
       let showHorizontal = false;
 
       if (canvasWidth && width.value > 0) {
-        const centerX = nextX + (width.value * scale.value) / 2;
+        // Scale is applied around center, so visual center stays at x + width/2.
+        const centerX = nextX + width.value / 2;
         const deltaToCenterX = centerX - canvasWidth / 2;
         if (Math.abs(deltaToCenterX) <= snapThreshold) {
           nextX -= deltaToCenterX;
@@ -109,7 +110,8 @@ export function DraggableBlock({
       }
 
       if (canvasHeight && height.value > 0) {
-        const centerY = nextY + (height.value * scale.value) / 2;
+        // Same logic for Y axis: center is independent from scale factor.
+        const centerY = nextY + height.value / 2;
         const deltaToCenterY = centerY - canvasHeight / 2;
         if (Math.abs(deltaToCenterY) <= snapThreshold) {
           nextY -= deltaToCenterY;
