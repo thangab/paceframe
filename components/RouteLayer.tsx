@@ -15,6 +15,8 @@ type Props = {
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
 const MAPBOX_STYLE = 'mapbox/streets-v12';
+const IOS_TRACE_ZOOM_OFFSET = 0.85;
+const TRACE_STROKE_WIDTH = 4;
 
 export function RouteLayer({
   polyline,
@@ -25,35 +27,45 @@ export function RouteLayer({
   const [mapLoadFailed, setMapLoadFailed] = useState(false);
   const [iosMapUri, setIosMapUri] = useState<string | null>(null);
   const iosSnapshotKeyRef = useRef<string | null>(null);
-  const routePath = useMemo(() => {
-    if (!polyline) return null;
-
+  const latLngs = useMemo(() => {
+    if (!polyline) return [];
     const source = decodePolyline(polyline);
-    if (!source.length) return null;
+    return source.map((p) => ({ lat: p.y, lng: p.x }));
+  }, [polyline]);
+  const viewport = useMemo(() => {
+    if (!latLngs.length) return null;
 
-    // Keep the same route footprint for both modes (map and trace-only)
-    // so toggling does not change apparent route size.
-    const padding = 16;
-    const minX = Math.min(...source.map((p) => p.x));
-    const maxX = Math.max(...source.map((p) => p.x));
-    const minY = Math.min(...source.map((p) => p.y));
-    const maxY = Math.max(...source.map((p) => p.y));
-    const dataWidth = Math.max(maxX - minX, 0.0001);
-    const dataHeight = Math.max(maxY - minY, 0.0001);
+    const lats = latLngs.map((p) => p.lat);
+    const lngs = latLngs.map((p) => p.lng);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
 
-    const innerWidth = Math.max(width - padding * 2, 1);
-    const innerHeight = Math.max(height - padding * 2, 1);
-    const scale = Math.min(innerWidth / dataWidth, innerHeight / dataHeight);
+    return {
+      centerLat: (minLat + maxLat) / 2,
+      centerLng: (minLng + maxLng) / 2,
+      zoom: fitZoom(minLat, maxLat, minLng, maxLng, width, height),
+    };
+  }, [latLngs, width, height]);
+  const routePath = useMemo(() => {
+    if (!latLngs.length || !viewport) return null;
+    const traceZoom =
+      Platform.OS === 'ios'
+        ? viewport.zoom + IOS_TRACE_ZOOM_OFFSET
+        : viewport.zoom;
 
-    const scaledWidth = dataWidth * scale;
-    const scaledHeight = dataHeight * scale;
-    const offsetX = (width - scaledWidth) / 2;
-    const offsetY = (height - scaledHeight) / 2;
-
-    const points = source.map((p) => ({
-      x: (p.x - minX) * scale + offsetX,
-      y: height - ((p.y - minY) * scale + offsetY),
-    }));
+    const points = latLngs.map((p) =>
+      projectPointToViewport({
+        lat: p.lat,
+        lng: p.lng,
+        centerLat: viewport.centerLat,
+        centerLng: viewport.centerLng,
+        zoom: traceZoom,
+        width,
+        height,
+      }),
+    );
 
     if (!points.length) return null;
 
@@ -65,28 +77,13 @@ export function RouteLayer({
     }
 
     return { path };
-  }, [polyline, width, height, mode]);
+  }, [latLngs, viewport, width, height]);
   const mapImageUrl = useMemo(() => {
-    if (!polyline) return null;
+    if (!polyline || !viewport) return null;
     if (Platform.OS === 'ios') return null;
     if (!MAPBOX_TOKEN) return null;
 
-    const source = decodePolyline(polyline);
-    if (!source.length) return null;
-
-    const latLngs = source.map((p) => ({ lat: p.y, lng: p.x }));
     const sampled = sampleForStaticMap(latLngs, 50);
-
-    const lats = latLngs.map((p) => p.lat);
-    const lngs = latLngs.map((p) => p.lng);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-
-    const centerLat = (minLat + maxLat) / 2;
-    const centerLng = (minLng + maxLng) / 2;
-    const zoom = fitZoom(minLat, maxLat, minLng, maxLng, width, height);
     const encodedPolyline = encodeURIComponent(encodePolyline(sampled));
     const overlay = `path-4+ff6b00-0.95(${encodedPolyline})`;
     const pixelRatioSuffix = '@2x';
@@ -94,11 +91,11 @@ export function RouteLayer({
     return (
       `https://api.mapbox.com/styles/v1/${MAPBOX_STYLE}/static/` +
       `${overlay}/` +
-      `${centerLng.toFixed(5)},${centerLat.toFixed(5)},${zoom},0/` +
+      `${viewport.centerLng.toFixed(5)},${viewport.centerLat.toFixed(5)},${viewport.zoom},0/` +
       `${Math.round(width)}x${Math.round(height)}${pixelRatioSuffix}` +
       `?access_token=${encodeURIComponent(MAPBOX_TOKEN)}`
     );
-  }, [polyline, width, height]);
+  }, [polyline, latLngs, viewport, width, height]);
 
   useEffect(() => {
     setMapLoadFailed(false);
@@ -184,13 +181,42 @@ export function RouteLayer({
       <Path
         path={routePath.path}
         style="stroke"
-        strokeWidth={5}
+        strokeWidth={TRACE_STROKE_WIDTH}
         color="#F97316"
         strokeJoin="round"
         strokeCap="round"
       />
     </Canvas>
   );
+}
+
+function projectPointToViewport({
+  lat,
+  lng,
+  centerLat,
+  centerLng,
+  zoom,
+  width,
+  height,
+}: {
+  lat: number;
+  lng: number;
+  centerLat: number;
+  centerLng: number;
+  zoom: number;
+  width: number;
+  height: number;
+}) {
+  const WORLD_SIZE = 256;
+  const scale = 2 ** zoom;
+  const worldPx = WORLD_SIZE * scale;
+
+  const x =
+    (lngToMercatorX(lng) - lngToMercatorX(centerLng)) * worldPx + width / 2;
+  const y =
+    (latToMercatorY(lat) - latToMercatorY(centerLat)) * worldPx + height / 2;
+
+  return { x, y };
 }
 
 function sampleForStaticMap(
@@ -230,6 +256,15 @@ function fitZoom(
   const zoomY = Math.log2((height * paddingRatio) / (WORLD_SIZE * dy));
   const zoom = Math.floor(Math.min(zoomX, zoomY));
   return Math.max(1, Math.min(18, zoom));
+}
+
+function lngToMercatorX(lng: number) {
+  return (lng + 180) / 360;
+}
+
+function latToMercatorY(lat: number) {
+  const sin = Math.sin((lat * Math.PI) / 180);
+  return 0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI);
 }
 
 function encodePolyline(points: { lat: number; lng: number }[]) {
