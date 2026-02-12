@@ -1,0 +1,49 @@
+import { StravaActivity } from '@/types/strava';
+
+export const mockActivities: StravaActivity[] = [
+  {
+    id: 900001,
+    name: 'Morning Tempo',
+    distance: 10320,
+    moving_time: 3020,
+    elapsed_time: 3180,
+    total_elevation_gain: 42,
+    type: 'Run',
+    start_date: '2026-02-08T06:20:00Z',
+    average_speed: 3.42,
+    map: {
+      summary_polyline: 'gfo}EtohhUxD@bAxJmGF',
+    },
+    photoUrl: 'https://images.unsplash.com/photo-1571008887538-b36bb32f4571?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    id: 900002,
+    name: 'Easy Recovery',
+    distance: 5100,
+    moving_time: 1760,
+    elapsed_time: 1820,
+    total_elevation_gain: 18,
+    type: 'Run',
+    start_date: '2026-02-06T18:20:00Z',
+    average_speed: 2.9,
+    map: {
+      summary_polyline: 'o~ocF~kbkVfS~@vCjBvD',
+    },
+    photoUrl: 'https://images.unsplash.com/photo-1517963879433-6ad2b056d712?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    id: 900003,
+    name: 'Long Run',
+    distance: 21500,
+    moving_time: 7000,
+    elapsed_time: 7250,
+    total_elevation_gain: 120,
+    type: 'Run',
+    start_date: '2026-02-02T05:15:00Z',
+    average_speed: 3.07,
+    map: {
+      summary_polyline: 'mfp_Ix~vpAqCwAqBsBqCaC',
+    },
+    photoUrl: 'https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?auto=format&fit=crop&w=600&q=80',
+  },
+];
