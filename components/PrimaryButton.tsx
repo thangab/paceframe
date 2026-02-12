@@ -8,7 +8,12 @@ type Props = {
   variant?: 'primary' | 'secondary' | 'danger';
 };
 
-export function PrimaryButton({ label, onPress, disabled, variant = 'primary' }: Props) {
+export function PrimaryButton({
+  label,
+  onPress,
+  disabled,
+  variant = 'primary',
+}: Props) {
   return (
     <Pressable
       onPress={onPress}
@@ -49,7 +54,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   label: {
-    color: '#fff',
+    color: '#111500',
     fontWeight: '700',
     fontSize: 16,
   },

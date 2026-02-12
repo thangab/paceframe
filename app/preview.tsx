@@ -960,18 +960,10 @@ export default function PreviewScreen() {
       ) : null}
 
       <PrimaryButton
-        label={busy ? 'Exporting...' : 'Export PNG'}
-        onPress={exportAndShare}
+        label={busy ? 'Exporting...' : 'Export'}
+        onPress={media?.type === 'video' ? exportVideo : exportAndShare}
         disabled={busy}
       />
-      {media?.type === 'video' ? (
-        <PrimaryButton
-          label={busy ? 'Exporting...' : 'Export video + layers'}
-          onPress={exportVideo}
-          disabled={busy}
-          variant="secondary"
-        />
-      ) : null}
     </ScrollView>
   );
 }

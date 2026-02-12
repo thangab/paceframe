@@ -221,7 +221,7 @@ export function StatsLayerContent({
             />
             <GridMetric
               visible={visible.pace}
-              label="Avg Pace"
+              label="Pace"
               value={paceText}
               fontPreset={fontPreset}
             />
@@ -229,13 +229,13 @@ export function StatsLayerContent({
           <View style={styles.gridRow}>
             <GridMetric
               visible={visible.time}
-              label="Moving Time"
+              label="Time"
               value={durationText}
               fontPreset={fontPreset}
             />
             <GridMetric
               visible={visible.elev}
-              label="Elevation Gain"
+              label="Elev Gain"
               value={elevText}
               fontPreset={fontPreset}
             />

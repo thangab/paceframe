@@ -4,7 +4,7 @@ export const colors = {
   surfaceAlt: '#EEF2F7',
   text: '#111827',
   textMuted: '#6B7280',
-  primary: '#1D4ED8',
+  primary: '#D4FF54',
   accent: '#F97316',
   border: '#D1D5DB',
   success: '#059669',
