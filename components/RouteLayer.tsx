@@ -150,8 +150,8 @@ export function RouteLayer({
             {Platform.OS === 'ios'
               ? 'Map unavailable for this activity'
               : MAPBOX_TOKEN
-              ? 'Map unavailable for this activity'
-              : 'Missing EXPO_PUBLIC_MAPBOX_TOKEN'}
+                ? 'Map unavailable for this activity'
+                : 'Missing EXPO_PUBLIC_MAPBOX_TOKEN'}
           </Text>
         </View>
       );
@@ -253,21 +253,21 @@ function encodePolyline(points: { lat: number; lng: number }[]) {
 
 const styles = StyleSheet.create({
   mapWrap: {
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#0f172a',
+    backgroundColor: 'transparent',
   },
   mapImage: {
     width: '100%',
     height: '100%',
   },
   empty: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderRadius: 0,
+    borderWidth: 0,
+    borderColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(15,23,42,0.6)',
+    backgroundColor: 'transparent',
     paddingHorizontal: 12,
   },
   emptyText: {

@@ -428,7 +428,8 @@ export default function PreviewScreen() {
           style={[
             styles.storyCanvas,
             (isCapturingOverlay || isExportingPng) && styles.storyCanvasSquare,
-            (isCapturingOverlay || isExportingPng) && styles.storyCanvasTransparent,
+            (isCapturingOverlay || isExportingPng) &&
+              styles.storyCanvasTransparent,
           ]}
         >
           {!isExportingPng && !isCapturingOverlay ? (
@@ -438,7 +439,9 @@ export default function PreviewScreen() {
                   key={tile.key}
                   style={[
                     styles.checkerTile,
-                    tile.dark ? styles.checkerTileDark : styles.checkerTileLight,
+                    tile.dark
+                      ? styles.checkerTileDark
+                      : styles.checkerTileLight,
                     { left: tile.left, top: tile.top },
                   ]}
                 />
@@ -462,7 +465,8 @@ export default function PreviewScreen() {
               source={{ uri: media.uri }}
               style={[
                 styles.media,
-                (isCapturingOverlay || (isExportingPng && pngTransparentOnly)) &&
+                (isCapturingOverlay ||
+                  (isExportingPng && pngTransparentOnly)) &&
                   styles.hiddenForCapture,
               ]}
               shouldPlay
@@ -1044,10 +1048,10 @@ const styles = StyleSheet.create({
     width: 240,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderColor: 'transparent',
     alignItems: 'center',
   },
   metaSubtitle: {
@@ -1065,11 +1069,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   routeBlock: {
-    padding: 4,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.28)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    padding: 0,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   imageOverlayBlock: {
     width: STORY_WIDTH,
@@ -1205,5 +1209,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.84)',
     fontWeight: '800',
     letterSpacing: 1,
+    zIndex: 5000,
+    elevation: 5000,
   },
 });
