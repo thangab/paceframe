@@ -48,6 +48,8 @@ import {
 
 const ROUTE_LAYER_WIDTH = 280;
 const ROUTE_LAYER_HEIGHT = 180;
+const IMAGE_OVERLAY_MAX_INITIAL = 180;
+const IMAGE_OVERLAY_MIN_INITIAL = 90;
 
 export default function PreviewScreen() {
   const activity = useActivityStore((s) => s.selectedActivity());
@@ -242,6 +244,8 @@ export default function PreviewScreen() {
     if (result.canceled) return;
 
     const asset = result.assets[0];
+    const { width: overlayWidth, height: overlayHeight } =
+      getInitialOverlaySize(asset.width, asset.height);
     const id = `${Date.now()}-${Math.round(Math.random() * 1000)}`;
     const layerId: LayerId = `image:${id}`;
 
@@ -253,6 +257,8 @@ export default function PreviewScreen() {
         name: `Image ${prev.length + 1}`,
         opacity: 1,
         rotationDeg: 0,
+        width: overlayWidth,
+        height: overlayHeight,
       },
     ]);
     setVisibleLayers((prev) => ({ ...prev, [layerId]: true }));
@@ -627,6 +633,8 @@ export default function PreviewScreen() {
                 style={[
                   styles.imageOverlayBlock,
                   {
+                    width: overlay.width ?? IMAGE_OVERLAY_MAX_INITIAL,
+                    height: overlay.height ?? IMAGE_OVERLAY_MAX_INITIAL,
                     zIndex: baseLayerZ(layerId),
                     elevation: baseLayerZ(layerId),
                     opacity: overlay.opacity,
@@ -965,6 +973,33 @@ export default function PreviewScreen() {
   );
 }
 
+function getInitialOverlaySize(
+  assetWidth?: number,
+  assetHeight?: number,
+): { width: number; height: number } {
+  if (!assetWidth || !assetHeight) {
+    return { width: IMAGE_OVERLAY_MAX_INITIAL, height: IMAGE_OVERLAY_MAX_INITIAL };
+  }
+
+  const maxSide = IMAGE_OVERLAY_MAX_INITIAL;
+  const ratio = assetWidth / assetHeight;
+  let width = maxSide;
+  let height = maxSide;
+
+  if (ratio >= 1) {
+    width = maxSide;
+    height = width / ratio;
+  } else {
+    height = maxSide;
+    width = height * ratio;
+  }
+
+  return {
+    width: Math.max(IMAGE_OVERLAY_MIN_INITIAL, Math.round(width)),
+    height: Math.max(IMAGE_OVERLAY_MIN_INITIAL, Math.round(height)),
+  };
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1111,8 +1146,6 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   imageOverlayBlock: {
-    width: STORY_WIDTH,
-    height: STORY_HEIGHT,
     borderRadius: radius.lg,
     overflow: 'hidden',
     backgroundColor: 'transparent',

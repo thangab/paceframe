@@ -32,4 +32,6 @@ export type ImageOverlay = {
   name: string;
   opacity: number;
   rotationDeg: number;
+  width: number;
+  height: number;
 };
