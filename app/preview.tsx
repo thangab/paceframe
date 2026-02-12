@@ -505,6 +505,8 @@ export default function PreviewScreen() {
               key="meta-layer"
               initialX={42}
               initialY={44}
+              selected={activeLayer === 'meta'}
+              outlineRadius={0}
               canvasWidth={STORY_WIDTH}
               canvasHeight={STORY_HEIGHT}
               onDragGuideChange={setCenterGuides}
@@ -519,7 +521,6 @@ export default function PreviewScreen() {
                   zIndex: baseLayerZ('meta'),
                   elevation: baseLayerZ('meta'),
                 },
-                activeLayer === 'meta' && styles.layerSelected,
               ]}
             >
               <Text style={styles.metaTitle}>{activity.name}</Text>
@@ -532,6 +533,8 @@ export default function PreviewScreen() {
               key={template.id}
               initialX={template.x}
               initialY={template.y}
+              selected={activeLayer === 'stats'}
+              outlineRadius={template.radius}
               canvasWidth={STORY_WIDTH}
               canvasHeight={STORY_HEIGHT}
               onDragGuideChange={setCenterGuides}
@@ -552,7 +555,6 @@ export default function PreviewScreen() {
                   zIndex: baseLayerZ('stats'),
                   elevation: baseLayerZ('stats'),
                 },
-                activeLayer === 'stats' && styles.layerSelected,
               ]}
             >
               <StatsLayerContent
@@ -572,6 +574,8 @@ export default function PreviewScreen() {
               key={`route-${routeMode}`}
               initialX={42}
               initialY={170}
+              selected={activeLayer === 'route'}
+              outlineRadius={0}
               canvasWidth={STORY_WIDTH}
               canvasHeight={STORY_HEIGHT}
               onDragGuideChange={setCenterGuides}
@@ -586,7 +590,6 @@ export default function PreviewScreen() {
                   zIndex: baseLayerZ('route'),
                   elevation: baseLayerZ('route'),
                 },
-                activeLayer === 'route' && styles.layerSelected,
               ]}
             >
               <RouteLayer
@@ -607,6 +610,8 @@ export default function PreviewScreen() {
                 key={layerId}
                 initialX={20 + index * 12}
                 initialY={80 + index * 12}
+                selected={activeLayer === layerId}
+                outlineRadius={radius.lg}
                 canvasWidth={STORY_WIDTH}
                 canvasHeight={STORY_HEIGHT}
                 onDragGuideChange={setCenterGuides}
@@ -623,7 +628,6 @@ export default function PreviewScreen() {
                     elevation: baseLayerZ(layerId),
                     opacity: overlay.opacity,
                   },
-                  activeLayer === layerId && styles.layerSelected,
                 ]}
               >
                 <Image
@@ -1070,10 +1074,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '800',
-  },
-  layerSelected: {
-    borderColor: '#22D3EE',
-    borderWidth: 2,
   },
   routeBlock: {
     padding: 0,

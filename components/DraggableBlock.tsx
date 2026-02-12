@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { StyleProp, ViewStyle } from 'react-native';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -18,6 +18,8 @@ type Props = {
   snapThreshold?: number;
   style?: StyleProp<ViewStyle>;
   children: ReactNode;
+  selected?: boolean;
+  outlineRadius?: number;
   onSelect?: () => void;
   onTap?: () => void;
   onDragGuideChange?: (guides: { showVertical: boolean; showHorizontal: boolean }) => void;
@@ -42,6 +44,8 @@ export function DraggableBlock({
   snapThreshold = 8,
   style,
   children,
+  selected,
+  outlineRadius,
   onSelect,
   onTap,
   onDragGuideChange,
@@ -255,8 +259,27 @@ export function DraggableBlock({
         }}
         style={[{ position: 'absolute', left: 0, top: 0 }, style, animatedStyle]}
       >
+        {selected ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.selectionOutline,
+              typeof outlineRadius === 'number'
+                ? { borderRadius: outlineRadius }
+                : null,
+            ]}
+          />
+        ) : null}
         {children}
       </Animated.View>
     </GestureDetector>
   );
 }
+
+const styles = StyleSheet.create({
+  selectionOutline: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 2,
+    borderColor: '#22D3EE',
+  },
+});
