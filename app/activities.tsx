@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { ActivityCard } from '@/components/ActivityCard';
-import { PrimaryButton } from '@/components/PrimaryButton';
-import { colors, spacing } from '@/constants/theme';
+import { spacing } from '@/constants/theme';
 import { fetchActivities } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
@@ -31,7 +38,9 @@ export default function ActivitiesScreen() {
       const rows = await fetchActivities(tokens.accessToken);
       setActivities(rows);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load activities.');
+      setError(
+        err instanceof Error ? err.message : 'Could not load activities.',
+      );
     } finally {
       setLoading(false);
     }
@@ -49,21 +58,30 @@ export default function ActivitiesScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.title}>Your Runs</Text>
-        <PrimaryButton label="Logout" onPress={handleLogout} variant="secondary" />
+        <Text style={styles.title}>
+          {activities.length} activit{activities.length !== 1 ? 'ies' : 'y'}
+        </Text>
+        <View style={styles.headerActions}>
+          <Pressable onPress={handleLogout} style={styles.logoutBtn}>
+            <Text style={styles.logoutText}>Logout</Text>
+          </Pressable>
+        </View>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {loading && activities.length === 0 ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color="#D4FF54" />
         </View>
       ) : (
         <FlatList
           data={activities}
           keyExtractor={(item) => String(item.id)}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={loadActivities} />}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={loading} onRefresh={loadActivities} />
+          }
           renderItem={({ item }) => (
             <ActivityCard
               activity={item}
@@ -71,15 +89,24 @@ export default function ActivitiesScreen() {
               onPress={() => selectActivity(item.id)}
             />
           )}
-          ListEmptyComponent={<Text style={styles.empty}>No run activities found.</Text>}
+          ListEmptyComponent={
+            <Text style={styles.empty}>No run activities found.</Text>
+          }
         />
       )}
 
-      <PrimaryButton
-        label="Preview Image"
-        onPress={() => router.push('/preview')}
-        disabled={!selectedActivityId}
-      />
+      <View style={styles.bottomBar}>
+        <Pressable
+          style={[
+            styles.generateBtn,
+            !selectedActivityId ? styles.generateBtnDisabled : null,
+          ]}
+          onPress={() => router.push('/preview')}
+          disabled={!selectedActivityId}
+        >
+          <Text style={styles.generateBtnText}>Generate Visual ✨</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -87,19 +114,43 @@ export default function ActivitiesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: spacing.md,
-    gap: spacing.sm,
-    backgroundColor: colors.background,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: '#06080D',
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: spacing.sm,
   },
   title: {
-    fontSize: 28,
+    fontSize: 30 / 1.5,
     fontWeight: '800',
-    color: colors.text,
+    color: '#D2D8E6',
+    letterSpacing: 0.8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  countBadge: {
+    color: '#C9D0DE',
+    fontWeight: '800',
+    fontSize: 13,
+    backgroundColor: '#2A2E38',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  logoutBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  logoutText: {
+    color: '#8A93A5',
+    fontWeight: '700',
   },
   centered: {
     flex: 1,
@@ -107,11 +158,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   error: {
-    color: colors.danger,
+    color: '#F87171',
+    marginBottom: spacing.sm,
   },
   empty: {
     marginTop: spacing.lg,
-    color: colors.textMuted,
+    color: '#8A93A5',
     textAlign: 'center',
+  },
+  listContent: {
+    paddingBottom: 120,
+  },
+  bottomBar: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    bottom: spacing.md,
+  },
+  generateBtn: {
+    borderRadius: 20,
+    backgroundColor: '#D4FF54',
+    height: 74,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.25)',
+  },
+  generateBtnDisabled: {
+    opacity: 0.5,
+  },
+  generateBtnText: {
+    color: '#111500',
+    fontSize: 38 / 2,
+    fontWeight: '900',
   },
 });

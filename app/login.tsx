@@ -2,7 +2,7 @@ import { useState } from 'react';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, spacing } from '@/constants/theme';
 import {
@@ -80,6 +80,19 @@ export default function LoginScreen() {
     }
   }
 
+  async function handleMockLogin() {
+    try {
+      setIsBusy(true);
+      setError(null);
+      await login(getMockTokens());
+      router.replace('/activities');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Mock login failed.');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>PaceFrame</Text>
@@ -98,6 +111,28 @@ export default function LoginScreen() {
         onPress={handleLogin}
         disabled={isBusy}
       />
+
+      {!isMockStravaEnabled() ? (
+        <Pressable
+          style={({ pressed }) => [
+            styles.mockCard,
+            pressed ? styles.mockCardPressed : null,
+          ]}
+          onPress={handleMockLogin}
+          disabled={isBusy}
+        >
+          <View style={styles.mockIconWrap}>
+            <Text style={styles.mockIcon}>✦</Text>
+          </View>
+          <View style={styles.mockCopy}>
+            <Text style={styles.mockTitle}>Try Mock Activity</Text>
+            <Text style={styles.mockSubtitle}>
+              No Strava account? Use demo data to see how it works.
+            </Text>
+          </View>
+          <Text style={styles.mockArrow}>›</Text>
+        </Pressable>
+      ) : null}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -136,5 +171,52 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: spacing.md,
     fontSize: 13,
+  },
+  mockCard: {
+    marginTop: spacing.xs,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(212,255,84,0.35)',
+    backgroundColor: '#222712',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  mockCardPressed: {
+    opacity: 0.9,
+  },
+  mockIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: '#D4FF54',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mockIcon: {
+    color: '#101404',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  mockCopy: {
+    flex: 1,
+  },
+  mockTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  mockSubtitle: {
+    color: '#B7BF9A',
+    marginTop: 2,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  mockArrow: {
+    color: '#D4FF54',
+    fontSize: 30,
+    lineHeight: 32,
   },
 });

@@ -51,7 +51,7 @@ export async function exchangeCodeWithSupabase({
 export async function fetchActivities(
   accessToken: string,
 ): Promise<StravaActivity[]> {
-  if (USE_MOCK_STRAVA) {
+  if (USE_MOCK_STRAVA || accessToken.startsWith('mock-')) {
     await new Promise((resolve) => setTimeout(resolve, 350));
     return mockActivities;
   }
