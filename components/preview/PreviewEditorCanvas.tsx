@@ -51,7 +51,8 @@ type Props = {
   elevText: string;
   centeredStatsXDisplay: number;
   dynamicStatsWidthDisplay: number;
-  canvasRelativeScale: number;
+  canvasScaleX: number;
+  canvasScaleY: number;
   cycleStatsTemplate: () => void;
   routeMode: RouteMode;
   routeInitialXDisplay: number;
@@ -97,7 +98,8 @@ export function PreviewEditorCanvas({
   elevText,
   centeredStatsXDisplay,
   dynamicStatsWidthDisplay,
-  canvasRelativeScale,
+  canvasScaleX,
+  canvasScaleY,
   cycleStatsTemplate,
   routeMode,
   routeInitialXDisplay,
@@ -193,8 +195,8 @@ export function PreviewEditorCanvas({
           {visibleLayers.meta ? (
             <DraggableBlock
               key="meta-layer"
-              initialX={Math.round(42 * canvasRelativeScale)}
-              initialY={Math.round(44 * canvasRelativeScale)}
+              initialX={Math.round(42 * canvasScaleX)}
+              initialY={Math.round(44 * canvasScaleY)}
               selected={activeLayer === 'meta'}
               outlineRadius={0}
               canvasWidth={canvasDisplayWidth}
@@ -217,7 +219,7 @@ export function PreviewEditorCanvas({
             <DraggableBlock
               key="stats-layer"
               initialX={centeredStatsXDisplay}
-              initialY={Math.round(template.y * canvasRelativeScale)}
+              initialY={Math.round(template.y * canvasScaleY)}
               selected={activeLayer === 'stats'}
               outlineRadius={template.radius}
               canvasWidth={canvasDisplayWidth}
@@ -287,8 +289,8 @@ export function PreviewEditorCanvas({
             return (
               <DraggableBlock
                 key={layerId}
-                initialX={Math.round((20 + index * 12) * canvasRelativeScale)}
-                initialY={Math.round((80 + index * 12) * canvasRelativeScale)}
+                initialX={Math.round((20 + index * 12) * canvasScaleX)}
+                initialY={Math.round((80 + index * 12) * canvasScaleY)}
                 selected={activeLayer === layerId}
                 outlineRadius={radius.lg}
                 canvasWidth={canvasDisplayWidth}
@@ -301,8 +303,8 @@ export function PreviewEditorCanvas({
                 style={[
                   styles.imageOverlayBlock,
                   {
-                    width: Math.round((overlay.width ?? imageOverlayMaxInitial) * canvasRelativeScale),
-                    height: Math.round((overlay.height ?? imageOverlayMaxInitial) * canvasRelativeScale),
+                    width: Math.round((overlay.width ?? imageOverlayMaxInitial) * canvasScaleX),
+                    height: Math.round((overlay.height ?? imageOverlayMaxInitial) * canvasScaleY),
                     zIndex: baseLayerZ(layerId),
                     elevation: baseLayerZ(layerId),
                     opacity: overlay.opacity,

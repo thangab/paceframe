@@ -30,6 +30,8 @@ type Props = {
   onPickVideo: () => void;
   onClearBackground: () => void;
   onAddImageOverlay: () => void;
+  isSquareFormat: boolean;
+  onToggleSquareFormat: () => void;
   layerEntries: [LayerId, string][];
   routeMode: RouteMode;
   visibleLayers: Partial<Record<LayerId, boolean>>;
@@ -63,6 +65,8 @@ export function PreviewEditorPanel({
   onPickVideo,
   onClearBackground,
   onAddImageOverlay,
+  isSquareFormat,
+  onToggleSquareFormat,
   layerEntries,
   routeMode,
   visibleLayers,
@@ -128,6 +132,12 @@ export function PreviewEditorPanel({
                   />
                 </View>
               </View>
+              <PrimaryButton
+                label={isSquareFormat ? 'Passer en Story (9:16)' : 'Redimensionner en carré (1:1)'}
+                onPress={onToggleSquareFormat}
+                variant="secondary"
+                disabled={busy}
+              />
             </View>
           ) : null}
 

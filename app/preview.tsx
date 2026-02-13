@@ -50,7 +50,6 @@ const ROUTE_LAYER_HEIGHT = 180;
 const IMAGE_OVERLAY_MAX_INITIAL = 180;
 const IMAGE_OVERLAY_MIN_INITIAL = 90;
 const EXPORT_PNG_WIDTH = 1080;
-const EXPORT_PNG_HEIGHT = 1920;
 
 export default function PreviewScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -99,6 +98,7 @@ export default function PreviewScreen() {
   const [activeLayer, setActiveLayer] = useState<LayerId | null>(null);
   const [activePanel, setActivePanel] = useState<PreviewPanelTab>('background');
   const [panelOpen, setPanelOpen] = useState(true);
+  const [isSquareFormat, setIsSquareFormat] = useState(false);
 
   const exportRef = useRef<View>(null);
 
@@ -181,8 +181,9 @@ export default function PreviewScreen() {
     [imageOverlays],
   );
   const canvasDisplaySize = useMemo(() => {
-    // Keep exact story ratio while fitting visible space above the bottom overlay.
-    const ratio = STORY_WIDTH / STORY_HEIGHT;
+    // Keep exact target ratio while fitting visible space above the bottom overlay.
+    const targetHeight = isSquareFormat ? STORY_WIDTH : STORY_HEIGHT;
+    const ratio = STORY_WIDTH / targetHeight;
     const canvasShrinkFactor = 0.94;
     const reservedBottom = 120;
     const maxWidth = Math.max(220, screenWidth);
@@ -200,28 +201,33 @@ export default function PreviewScreen() {
       width: Math.round(width * canvasShrinkFactor),
       height: Math.round(height * canvasShrinkFactor),
     };
-  }, [screenHeight, screenWidth]);
+  }, [isSquareFormat, screenHeight, screenWidth]);
   const canvasDisplayWidth = canvasDisplaySize.width;
   const canvasDisplayHeight = canvasDisplaySize.height;
-  const canvasRelativeScale = useMemo(
+  const canvasScaleX = useMemo(
     () => canvasDisplayWidth / STORY_WIDTH,
     [canvasDisplayWidth],
   );
+  const canvasScaleY = useMemo(
+    () => canvasDisplayHeight / STORY_HEIGHT,
+    [canvasDisplayHeight],
+  );
+  const exportHeight = isSquareFormat ? EXPORT_PNG_WIDTH : 1920;
   const dynamicStatsWidthDisplay = useMemo(
-    () => Math.round(dynamicStatsWidth * canvasRelativeScale),
-    [canvasRelativeScale, dynamicStatsWidth],
+    () => Math.round(dynamicStatsWidth * canvasScaleX),
+    [canvasScaleX, dynamicStatsWidth],
   );
   const centeredStatsXDisplay = useMemo(
     () => Math.round((canvasDisplayWidth - dynamicStatsWidthDisplay) / 2),
     [canvasDisplayWidth, dynamicStatsWidthDisplay],
   );
   const routeLayerWidthDisplay = useMemo(
-    () => Math.round(ROUTE_LAYER_WIDTH * canvasRelativeScale),
-    [canvasRelativeScale],
+    () => Math.round(ROUTE_LAYER_WIDTH * canvasScaleX),
+    [canvasScaleX],
   );
   const routeLayerHeightDisplay = useMemo(
-    () => Math.round(ROUTE_LAYER_HEIGHT * canvasRelativeScale),
-    [canvasRelativeScale],
+    () => Math.round(ROUTE_LAYER_HEIGHT * canvasScaleY),
+    [canvasScaleY],
   );
   const routeInitialXDisplay = useMemo(
     () => Math.round((canvasDisplayWidth - routeLayerWidthDisplay) / 2),
@@ -480,7 +486,7 @@ export default function PreviewScreen() {
         quality: 1,
         result: 'tmpfile',
         width: EXPORT_PNG_WIDTH,
-        height: EXPORT_PNG_HEIGHT,
+        height: exportHeight,
       });
 
       if (await Sharing.isAvailableAsync()) {
@@ -494,8 +500,8 @@ export default function PreviewScreen() {
 
       setMessage(
         includeImageBackground
-          ? `JPG exported with image + layers (${EXPORT_PNG_WIDTH}x${EXPORT_PNG_HEIGHT}).`
-          : `PNG exported with transparent background + layers only (${EXPORT_PNG_WIDTH}x${EXPORT_PNG_HEIGHT}).`,
+          ? `JPG exported with image + layers (${EXPORT_PNG_WIDTH}x${exportHeight}).`
+          : `PNG exported with transparent background + layers only (${EXPORT_PNG_WIDTH}x${exportHeight}).`,
       );
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Failed to export.');
@@ -619,7 +625,8 @@ export default function PreviewScreen() {
           elevText={elevText}
           centeredStatsXDisplay={centeredStatsXDisplay}
           dynamicStatsWidthDisplay={dynamicStatsWidthDisplay}
-          canvasRelativeScale={canvasRelativeScale}
+          canvasScaleX={canvasScaleX}
+          canvasScaleY={canvasScaleY}
           cycleStatsTemplate={cycleStatsTemplate}
           routeMode={routeMode}
           routeInitialXDisplay={routeInitialXDisplay}
@@ -646,6 +653,8 @@ export default function PreviewScreen() {
           onPickVideo={pickVideoMedia}
           onClearBackground={clearBackgroundMedia}
           onAddImageOverlay={addImageOverlay}
+          isSquareFormat={isSquareFormat}
+          onToggleSquareFormat={() => setIsSquareFormat((prev) => !prev)}
           layerEntries={layerEntries}
           routeMode={routeMode}
           visibleLayers={visibleLayers}
