@@ -35,3 +35,8 @@ export type ImageOverlay = {
   width: number;
   height: number;
 };
+
+export type BackgroundGradient = {
+  colors: [string, string, string];
+  direction: 'vertical' | 'horizontal';
+};

@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { radius, spacing } from '@/constants/theme';
+import { colors, radius, spacing } from '@/constants/theme';
 import type { DistanceUnit } from '@/lib/format';
 import { FONT_PRESETS, TEMPLATES } from '@/lib/previewConfig';
 import type {
@@ -35,6 +35,7 @@ type Props = {
   onPickImage: () => void;
   onPickVideo: () => void;
   onClearBackground: () => void;
+  onGenerateGradient: () => void;
   onAddImageOverlay: () => void;
   isSquareFormat: boolean;
   layerEntries: [LayerId, string][];
@@ -69,6 +70,7 @@ export function PreviewEditorPanel({
   onPickImage,
   onPickVideo,
   onClearBackground,
+  onGenerateGradient,
   onAddImageOverlay,
   isSquareFormat,
   layerEntries,
@@ -149,6 +151,17 @@ export function PreviewEditorPanel({
                       label="Reset"
                       icon="dots-square"
                       onPress={onClearBackground}
+                      variant="secondary"
+                      disabled={busy}
+                    />
+                  </View>
+                </View>
+                <View style={styles.mediaPickRow}>
+                  <View style={styles.mediaPickCell}>
+                    <PrimaryButton
+                      label="Gradient"
+                      icon="gradient-horizontal"
+                      onPress={onGenerateGradient}
                       variant="secondary"
                       disabled={busy}
                     />
@@ -299,25 +312,43 @@ export function PreviewEditorPanel({
             >
               <View style={styles.controls}>
                 <Text style={styles.sectionTitle}>Visible Infos</Text>
-                <View style={styles.controls}>
+                <View style={styles.statsPillsWrap}>
                   {(
                     [
                       ['time', 'Time'],
                       ['pace', 'Pace'],
-                      ['elev', 'Elevation gain'],
+                      ['elev', 'Elev'],
                     ] as [FieldId, string][]
-                  ).map(([id, label]) => (
-                    <View key={id} style={styles.switchRow}>
-                      <Text style={styles.controlLabel}>{label}</Text>
-                      <Switch
-                        value={effectiveVisible[id]}
-                        disabled={
-                          !supportsFullStatsPreview || id === 'distance'
-                        }
-                        onValueChange={(value) => onToggleField(id, value)}
-                      />
-                    </View>
-                  ))}
+                  ).map(([id, label]) => {
+                    const selected = effectiveVisible[id];
+                    const disabled = !supportsFullStatsPreview;
+                    return (
+                      <Pressable
+                        key={id}
+                        disabled={disabled}
+                        onPress={() => onToggleField(id, !selected)}
+                        style={[
+                          styles.statsPill,
+                          selected && styles.statsPillSelected,
+                          disabled && styles.statsPillDisabled,
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name="check"
+                          size={14}
+                          color={selected ? '#111500' : '#9CA3AF'}
+                        />
+                        <Text
+                          style={[
+                            styles.statsPillText,
+                            selected && styles.statsPillTextSelected,
+                          ]}
+                        >
+                          {label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
 
                 <Text style={styles.sectionTitle}>Unit</Text>
@@ -577,16 +608,43 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#FEE2E2',
   },
-  switchRow: {
+  statsPillsWrap: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: 8,
     borderWidth: 1,
     borderColor: '#2F3644',
+    borderRadius: 12,
     backgroundColor: '#202632',
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
+    padding: 8,
+  },
+  statsPill: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#3A4356',
+    backgroundColor: '#2A3140',
     paddingVertical: 8,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  statsPillSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  statsPillDisabled: {
+    opacity: 0.45,
+  },
+  statsPillText: {
+    color: '#D1D5DB',
+    fontWeight: '500',
+    fontSize: 13,
+  },
+  statsPillTextSelected: {
+    color: '#111500',
   },
   controlLabel: {
     color: '#F3F4F6',

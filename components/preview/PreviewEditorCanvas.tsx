@@ -2,12 +2,14 @@ import { RefObject } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type * as ImagePicker from 'expo-image-picker';
 import { ResizeMode, Video } from 'expo-av';
+import { LinearGradient } from 'expo-linear-gradient';
 import { DraggableBlock } from '@/components/DraggableBlock';
 import { RouteLayer } from '@/components/RouteLayer';
 import { StatsLayerContent } from '@/components/StatsLayerContent';
 import { colors, radius } from '@/constants/theme';
 import { CHECKER_SIZE } from '@/lib/previewConfig';
 import type {
+  BackgroundGradient,
   FieldId,
   FontPreset,
   ImageOverlay,
@@ -35,6 +37,7 @@ type Props = {
   centerGuides: GuideState;
   showRotationGuide: boolean;
   media: ImagePicker.ImagePickerAsset | null;
+  backgroundGradient: BackgroundGradient | null;
   autoSubjectUri: string | null;
   visibleLayers: Partial<Record<LayerId, boolean>>;
   selectedLayer: LayerId | null;
@@ -84,6 +87,7 @@ export function PreviewEditorCanvas({
   centerGuides,
   showRotationGuide,
   media,
+  backgroundGradient,
   autoSubjectUri,
   visibleLayers,
   selectedLayer,
@@ -118,6 +122,8 @@ export function PreviewEditorCanvas({
   onDragGuideChange,
   onRotationGuideChange,
 }: Props) {
+  const showSelectionOutline = !isCapturingOverlay && !isExportingPng;
+
   return (
     <View
       style={[
@@ -197,6 +203,26 @@ export function PreviewEditorCanvas({
               resizeMode="cover"
             />
           ) : null}
+          {!media && backgroundGradient ? (
+            <LinearGradient
+              pointerEvents="none"
+              colors={backgroundGradient.colors}
+              start={
+                backgroundGradient.direction === 'vertical'
+                  ? { x: 0.5, y: 0 }
+                  : { x: 0, y: 0.5 }
+              }
+              end={
+                backgroundGradient.direction === 'vertical'
+                  ? { x: 0.5, y: 1 }
+                  : { x: 1, y: 0.5 }
+              }
+              style={[
+                styles.gradientLayer,
+                isExportingPng && pngTransparentOnly && styles.hiddenForCapture,
+              ]}
+            />
+          ) : null}
 
           {autoSubjectUri ? (
             <View pointerEvents="none" style={styles.autoSubjectLayer}>
@@ -215,7 +241,7 @@ export function PreviewEditorCanvas({
               key="meta-layer"
               initialX={Math.max(0, Math.round((canvasDisplayWidth - 240) / 2))}
               initialY={Math.round(44 * canvasScaleY)}
-              selected={selectedLayer === 'meta'}
+              selected={showSelectionOutline && selectedLayer === 'meta'}
               outlineRadius={0}
               canvasWidth={canvasDisplayWidth}
               canvasHeight={canvasDisplayHeight}
@@ -240,7 +266,7 @@ export function PreviewEditorCanvas({
               key="stats-layer"
               initialX={centeredStatsXDisplay}
               initialY={Math.round(template.y * canvasScaleY)}
-              selected={selectedLayer === 'stats'}
+              selected={showSelectionOutline && selectedLayer === 'stats'}
               outlineRadius={template.radius}
               canvasWidth={canvasDisplayWidth}
               canvasHeight={canvasDisplayHeight}
@@ -281,7 +307,7 @@ export function PreviewEditorCanvas({
               key="route-layer"
               initialX={routeInitialXDisplay}
               initialY={routeInitialYDisplay}
-              selected={selectedLayer === 'route'}
+              selected={showSelectionOutline && selectedLayer === 'route'}
               outlineRadius={0}
               canvasWidth={canvasDisplayWidth}
               canvasHeight={canvasDisplayHeight}
@@ -315,7 +341,7 @@ export function PreviewEditorCanvas({
                 key={layerId}
                 initialX={Math.round((20 + index * 12) * canvasScaleX)}
                 initialY={Math.round((80 + index * 12) * canvasScaleY)}
-                selected={selectedLayer === layerId}
+                selected={showSelectionOutline && selectedLayer === layerId}
                 outlineRadius={radius.lg}
                 canvasWidth={canvasDisplayWidth}
                 canvasHeight={canvasDisplayHeight}
@@ -402,6 +428,14 @@ const styles = StyleSheet.create({
     height: '100%',
     zIndex: 0,
     elevation: 0,
+  },
+  gradientLayer: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    zIndex: 0,
+    elevation: 0,
+    overflow: 'hidden',
   },
   checkerboardBase: {
     position: 'absolute',

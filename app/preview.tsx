@@ -40,6 +40,7 @@ import {
 import { useActivityStore } from '@/store/activityStore';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import {
+  BackgroundGradient,
   FieldId,
   ImageOverlay,
   LayerId,
@@ -81,6 +82,8 @@ export default function PreviewScreen() {
   });
   const [showRotationGuide, setShowRotationGuide] = useState(false);
   const [media, setMedia] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [backgroundGradient, setBackgroundGradient] =
+    useState<BackgroundGradient | null>(null);
   const [autoSubjectUri, setAutoSubjectUri] = useState<string | null>(null);
   const [imageOverlays, setImageOverlays] = useState<ImageOverlay[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState(TEMPLATES[0].id);
@@ -335,6 +338,7 @@ export default function PreviewScreen() {
       };
 
       setMedia(asset);
+      setBackgroundGradient(null);
       setAutoSubjectUri(null);
 
       try {
@@ -377,6 +381,7 @@ export default function PreviewScreen() {
 
     const asset = result.assets[0];
     setMedia(asset);
+    setBackgroundGradient(null);
     setAutoSubjectUri(null);
     setMessage('Video loaded.');
   }
@@ -518,12 +523,13 @@ export default function PreviewScreen() {
     try {
       setBusy(true);
       setMessage(null);
-      const includeImageBackground = media?.type === 'image';
-      setPngTransparentOnly(!includeImageBackground);
+      const includeOpaqueBackground =
+        media?.type === 'image' || backgroundGradient !== null;
+      setPngTransparentOnly(!includeOpaqueBackground);
       setIsExportingPng(true);
       await new Promise((resolve) => setTimeout(resolve, 80));
 
-      const exportFormat = includeImageBackground ? 'jpg' : 'png';
+      const exportFormat = includeOpaqueBackground ? 'jpg' : 'png';
       const uri = await captureRef(exportRef, {
         format: exportFormat,
         quality: 1,
@@ -534,7 +540,7 @@ export default function PreviewScreen() {
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {
-          mimeType: includeImageBackground ? 'image/jpeg' : 'image/png',
+          mimeType: includeOpaqueBackground ? 'image/jpeg' : 'image/png',
           dialogTitle: 'Share PaceFrame story',
         });
       } else {
@@ -542,8 +548,8 @@ export default function PreviewScreen() {
       }
 
       setMessage(
-        includeImageBackground
-          ? `JPG exported with image + layers (${EXPORT_PNG_WIDTH}x${exportHeight}).`
+        includeOpaqueBackground
+          ? `JPG exported with background + layers (${EXPORT_PNG_WIDTH}x${exportHeight}).`
           : `PNG exported with transparent background + layers only (${EXPORT_PNG_WIDTH}x${exportHeight}).`,
       );
     } catch (err) {
@@ -608,8 +614,16 @@ export default function PreviewScreen() {
 
   function clearBackgroundMedia() {
     setMedia(null);
+    setBackgroundGradient(null);
     setAutoSubjectUri(null);
     setMessage('Transparent background selected.');
+  }
+
+  function generateRandomGradientBackground() {
+    setMedia(null);
+    setAutoSubjectUri(null);
+    setBackgroundGradient(createRandomGradient());
+    setMessage('Random gradient background generated.');
   }
 
   function toggleSquareFormat() {
@@ -690,6 +704,7 @@ export default function PreviewScreen() {
           centerGuides={centerGuides}
           showRotationGuide={showRotationGuide}
           media={media}
+          backgroundGradient={backgroundGradient}
           autoSubjectUri={autoSubjectUri}
           visibleLayers={visibleLayers}
           selectedLayer={outlinedLayer}
@@ -735,6 +750,7 @@ export default function PreviewScreen() {
           onPickImage={pickImageMedia}
           onPickVideo={pickVideoMedia}
           onClearBackground={clearBackgroundMedia}
+          onGenerateGradient={generateRandomGradientBackground}
           onAddImageOverlay={addImageOverlay}
           isSquareFormat={isSquareFormat}
           layerEntries={layerEntries}
@@ -817,6 +833,60 @@ function getDynamicStatsWidth(template: StatsTemplate, visibleCount: number) {
     default:
       return Math.max(130, Math.round(template.width * (0.42 + count * 0.145)));
   }
+}
+
+function createRandomGradient(): BackgroundGradient {
+  const baseHue = Math.round(Math.random() * 359);
+  const hueStep = 38 + Math.round(Math.random() * 46);
+  const direction = Math.random() > 0.5 ? 'vertical' : 'horizontal';
+
+  const colorA = hslToHex(baseHue, 76, 54);
+  const colorB = hslToHex((baseHue + hueStep) % 360, 70, 50);
+  const colorC = hslToHex((baseHue + hueStep * 2) % 360, 74, 58);
+
+  return {
+    colors: [colorA, colorB, colorC],
+    direction,
+  };
+}
+
+function hslToHex(hue: number, saturation: number, lightness: number): string {
+  const s = saturation / 100;
+  const l = lightness / 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = l - c / 2;
+
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (hue >= 0 && hue < 60) {
+    r = c;
+    g = x;
+  } else if (hue < 120) {
+    r = x;
+    g = c;
+  } else if (hue < 180) {
+    g = c;
+    b = x;
+  } else if (hue < 240) {
+    g = x;
+    b = c;
+  } else if (hue < 300) {
+    r = x;
+    b = c;
+  } else {
+    r = c;
+    b = x;
+  }
+
+  const toHex = (channel: number) =>
+    Math.round((channel + m) * 255)
+      .toString(16)
+      .padStart(2, '0');
+
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
 const styles = StyleSheet.create({

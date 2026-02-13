@@ -332,7 +332,6 @@ function GridMetric({
   fontPreset: FontPreset;
   singleMetric?: boolean;
 }) {
-  const allowsShrink = /\/km|\/mi|km|mi/i.test(value);
   return (
     <View style={[styles.gridItem, singleMetric && styles.gridItemSingle]}>
       <Text style={[styles.gridLabel, { fontFamily: fontPreset.family }]}>
@@ -344,7 +343,7 @@ function GridMetric({
         valueStyle={styles.gridValue}
         unitStyle={styles.gridUnit}
         numberOfLines={1}
-        autoFit={!singleMetric && allowsShrink}
+        autoFit={!singleMetric}
         minimumFontScale={0.84}
       />
     </View>
