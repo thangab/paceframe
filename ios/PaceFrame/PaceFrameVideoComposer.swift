@@ -77,13 +77,23 @@ class PaceFrameVideoComposer: NSObject {
     }
 
     let transformedSize = sourceVideoTrack.naturalSize.applying(sourceVideoTrack.preferredTransform)
-    let renderSize = CGSize(width: abs(transformedSize.width), height: abs(transformedSize.height))
+    let sourceSize = CGSize(width: abs(transformedSize.width), height: abs(transformedSize.height))
+    let overlaySize = CGSize(width: overlayCGImage.width, height: overlayCGImage.height)
+    let renderSize = overlaySize
 
     let instruction = AVMutableVideoCompositionInstruction()
     instruction.timeRange = CMTimeRange(start: .zero, duration: composition.duration)
 
     let videoLayerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compositionVideoTrack)
-    videoLayerInstruction.setTransform(sourceVideoTrack.preferredTransform, at: .zero)
+    let scale = max(renderSize.width / sourceSize.width, renderSize.height / sourceSize.height)
+    let scaledSourceSize = CGSize(width: sourceSize.width * scale, height: sourceSize.height * scale)
+    let xOffset = (renderSize.width - scaledSourceSize.width) / 2
+    let yOffset = (renderSize.height - scaledSourceSize.height) / 2
+
+    let videoTransform = sourceVideoTrack.preferredTransform
+      .concatenating(CGAffineTransform(scaleX: scale, y: scale))
+      .concatenating(CGAffineTransform(translationX: xOffset, y: yOffset))
+    videoLayerInstruction.setTransform(videoTransform, at: .zero)
     instruction.layerInstructions = [videoLayerInstruction]
 
     let videoComposition = AVMutableVideoComposition()
@@ -115,21 +125,41 @@ class PaceFrameVideoComposer: NSObject {
       return
     }
 
+    exportSession.videoComposition = videoComposition
+    exportSession.shouldOptimizeForNetworkUse = true
+
+    let isSquare = abs(renderSize.width - renderSize.height) < 1
+    let outputFileType: AVFileType
+    if isSquare, exportSession.supportedFileTypes.contains(.mov) {
+      outputFileType = .mov
+    } else if exportSession.supportedFileTypes.contains(.mp4) {
+      outputFileType = .mp4
+    } else if let firstSupported = exportSession.supportedFileTypes.first {
+      outputFileType = firstSupported
+    } else {
+      reject("E_EXPORT_INIT", "No supported output file types.", nil)
+      return
+    }
+
+    let outputExtension: String
+    switch outputFileType {
+    case .mov:
+      outputExtension = "mov"
+    case .mp4:
+      outputExtension = "mp4"
+    default:
+      outputExtension = "mov"
+    }
+
     let outputURL = URL(fileURLWithPath: NSTemporaryDirectory())
-      .appendingPathComponent("paceframe-composed-\(Int(Date().timeIntervalSince1970)).mp4")
+      .appendingPathComponent("paceframe-composed-\(Int(Date().timeIntervalSince1970)).\(outputExtension)")
 
     if FileManager.default.fileExists(atPath: outputURL.path) {
       try? FileManager.default.removeItem(at: outputURL)
     }
 
     exportSession.outputURL = outputURL
-    exportSession.videoComposition = videoComposition
-    exportSession.shouldOptimizeForNetworkUse = true
-    if exportSession.supportedFileTypes.contains(.mp4) {
-      exportSession.outputFileType = .mp4
-    } else {
-      exportSession.outputFileType = .mov
-    }
+    exportSession.outputFileType = outputFileType
 
     exportSession.exportAsynchronously {
       switch exportSession.status {

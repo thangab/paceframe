@@ -1,8 +1,9 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
+  runOnUI,
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
@@ -31,6 +32,15 @@ type Props = {
 function clamp(value: number, min: number, max: number) {
   'worklet';
   return Math.min(Math.max(value, min), max);
+}
+
+function getAxisBounds(canvasSize: number, layerSize: number) {
+  'worklet';
+  const overflowAllowance = layerSize * 0.5;
+  return {
+    min: -overflowAllowance,
+    max: canvasSize - overflowAllowance,
+  };
 }
 
 export function DraggableBlock({
@@ -86,6 +96,18 @@ export function DraggableBlock({
     return v;
   };
 
+  const clampInsideCanvas = () => {
+    'worklet';
+    if (!canvasWidth || !canvasHeight || width.value <= 0 || height.value <= 0) {
+      return;
+    }
+
+    const xBounds = getAxisBounds(canvasWidth, width.value);
+    const yBounds = getAxisBounds(canvasHeight, height.value);
+    tx.value = clamp(tx.value, xBounds.min, xBounds.max);
+    ty.value = clamp(ty.value, yBounds.min, yBounds.max);
+  };
+
   const pan = Gesture.Pan()
     .onBegin(() => {
       if (onSelect) {
@@ -113,6 +135,9 @@ export function DraggableBlock({
           nextX -= deltaToCenterX;
           showVertical = true;
         }
+
+        const xBounds = getAxisBounds(canvasWidth, width.value);
+        nextX = clamp(nextX, xBounds.min, xBounds.max);
       }
 
       if (canvasHeight && height.value > 0) {
@@ -123,6 +148,9 @@ export function DraggableBlock({
           nextY -= deltaToCenterY;
           showHorizontal = true;
         }
+
+        const yBounds = getAxisBounds(canvasHeight, height.value);
+        nextY = clamp(nextY, yBounds.min, yBounds.max);
       }
 
       tx.value = nextX;
@@ -139,6 +167,7 @@ export function DraggableBlock({
       }
     })
     .onEnd(() => {
+      clampInsideCanvas();
       if (onInteractionChange) {
         runOnJS(emitInteraction)(false);
       }
@@ -149,6 +178,7 @@ export function DraggableBlock({
       }
     })
     .onFinalize(() => {
+      clampInsideCanvas();
       if (onInteractionChange) {
         runOnJS(emitInteraction)(false);
       }
@@ -170,11 +200,13 @@ export function DraggableBlock({
       scale.value = clamp(startScale.value * event.scale, minScale, maxScale);
     })
     .onEnd(() => {
+      clampInsideCanvas();
       if (onInteractionChange) {
         runOnJS(emitInteraction)(false);
       }
     })
     .onFinalize(() => {
+      clampInsideCanvas();
       if (onInteractionChange) {
         runOnJS(emitInteraction)(false);
       }
@@ -208,6 +240,7 @@ export function DraggableBlock({
       }
     })
     .onEnd(() => {
+      clampInsideCanvas();
       if (onInteractionChange) {
         runOnJS(emitInteraction)(false);
       }
@@ -217,6 +250,7 @@ export function DraggableBlock({
       }
     })
     .onFinalize(() => {
+      clampInsideCanvas();
       if (onInteractionChange) {
         runOnJS(emitInteraction)(false);
       }
@@ -250,12 +284,25 @@ export function DraggableBlock({
     ],
   }));
 
+  useEffect(() => {
+    runOnUI(clampInsideCanvas)();
+  }, [canvasWidth, canvasHeight]);
+
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View
         onLayout={(event) => {
-          width.value = event.nativeEvent.layout.width;
-          height.value = event.nativeEvent.layout.height;
+          const measuredWidth = event.nativeEvent.layout.width;
+          const measuredHeight = event.nativeEvent.layout.height;
+          width.value = measuredWidth;
+          height.value = measuredHeight;
+
+          if (canvasWidth && canvasHeight) {
+            const xBounds = getAxisBounds(canvasWidth, measuredWidth);
+            const yBounds = getAxisBounds(canvasHeight, measuredHeight);
+            tx.value = clamp(tx.value, xBounds.min, xBounds.max);
+            ty.value = clamp(ty.value, yBounds.min, yBounds.max);
+          }
         }}
         style={[{ position: 'absolute', left: 0, top: 0 }, style, animatedStyle]}
       >

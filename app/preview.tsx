@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { router, Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import ImageCropPicker from 'react-native-image-crop-picker';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { PrimaryButton } from '@/components/PrimaryButton';
@@ -50,6 +51,18 @@ const ROUTE_LAYER_HEIGHT = 180;
 const IMAGE_OVERLAY_MAX_INITIAL = 180;
 const IMAGE_OVERLAY_MIN_INITIAL = 90;
 const EXPORT_PNG_WIDTH = 1080;
+
+function normalizeLocalUri(path: string) {
+  if (
+    path.startsWith('file://') ||
+    path.startsWith('content://') ||
+    path.startsWith('ph://') ||
+    path.startsWith('assets-library://')
+  ) {
+    return path;
+  }
+  return `file://${path}`;
+}
 
 export default function PreviewScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -96,7 +109,7 @@ export default function PreviewScreen() {
   >({});
   const [selectedLayer, setSelectedLayer] = useState<LayerId>('stats');
   const [activeLayer, setActiveLayer] = useState<LayerId | null>(null);
-  const [activePanel, setActivePanel] = useState<PreviewPanelTab>('background');
+  const [activePanel, setActivePanel] = useState<PreviewPanelTab>('content');
   const [panelOpen, setPanelOpen] = useState(true);
   const [isSquareFormat, setIsSquareFormat] = useState(false);
 
@@ -289,35 +302,57 @@ export default function PreviewScreen() {
   async function pickImageMedia() {
     const allowed = await ensureMediaPermission();
     if (!allowed) return;
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'] as ImagePicker.MediaType[],
-      quality: 1,
-      allowsEditing: false,
-      allowsMultipleSelection: false,
-    });
-
-    if (result.canceled) return;
-
-    const asset = result.assets[0];
-    setMedia(asset);
-    setAutoSubjectUri(null);
-
     try {
-      setIsExtracting(true);
-      setMessage('Extracting subject...');
-      const cutoutUri = await removeBackgroundOnDevice(asset.uri);
-      setAutoSubjectUri(cutoutUri);
-      setMessage('Subject extracted automatically.');
-    } catch (err) {
-      const details = err instanceof Error ? ` (${err.message})` : '';
-      setMessage(`Image loaded. Subject extraction unavailable${details}.`);
-    } finally {
-      setIsExtracting(false);
+      const cropResult = await ImageCropPicker.openPicker({
+        mediaType: 'photo',
+        cropping: true,
+        width: 1080,
+        height: isSquareFormat ? 1080 : 1920,
+        compressImageQuality: 1,
+        forceJpg: true,
+      });
+
+      const asset: ImagePicker.ImagePickerAsset = {
+        uri: normalizeLocalUri(cropResult.path),
+        width: cropResult.width,
+        height: cropResult.height,
+        type: 'image',
+        fileName: cropResult.filename ?? null,
+        fileSize: cropResult.size ?? null,
+        mimeType: cropResult.mime ?? null,
+        duration: null,
+        assetId: null,
+        base64: null,
+        exif: null,
+      };
+
+      setMedia(asset);
+      setAutoSubjectUri(null);
+
+      try {
+        setIsExtracting(true);
+        setMessage('Extracting subject...');
+        const cutoutUri = await removeBackgroundOnDevice(asset.uri);
+        setAutoSubjectUri(cutoutUri);
+        setMessage('Subject extracted automatically.');
+      } catch (err) {
+        const details = err instanceof Error ? ` (${err.message})` : '';
+        setMessage(`Image loaded. Subject extraction unavailable${details}.`);
+      } finally {
+        setIsExtracting(false);
+      }
+    } catch (err: any) {
+      if (err?.code === 'E_PICKER_CANCELLED') return;
+      setMessage(err instanceof Error ? err.message : 'Could not choose image.');
     }
   }
 
   async function pickVideoMedia() {
+    if (isSquareFormat) {
+      setMessage('Video background is unavailable in square mode.');
+      return;
+    }
+
     const allowed = await ensureMediaPermission();
     if (!allowed) return;
 
@@ -534,6 +569,8 @@ export default function PreviewScreen() {
         format: 'png',
         quality: 1,
         result: 'tmpfile',
+        width: EXPORT_PNG_WIDTH,
+        height: exportHeight,
       });
       setIsCapturingOverlay(false);
 
@@ -544,7 +581,6 @@ export default function PreviewScreen() {
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(composedVideoUri, {
-          mimeType: 'video/mp4',
           dialogTitle: 'Share PaceFrame video + layers',
         });
       } else {
@@ -568,6 +604,14 @@ export default function PreviewScreen() {
     setMessage('Transparent background selected.');
   }
 
+  function toggleSquareFormat() {
+    if (!isSquareFormat && media?.type === 'video') {
+      setMessage('Switch to an image background before square mode.');
+      return;
+    }
+    setIsSquareFormat((prev) => !prev);
+  }
+
   function triggerExport() {
     void (media?.type === 'video' ? exportVideo() : exportAndShare());
   }
@@ -577,24 +621,43 @@ export default function PreviewScreen() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <Pressable
-              onPress={() => {
-                if (busy) return;
-                triggerExport();
-              }}
-              hitSlop={8}
-              style={styles.headerExportButton}
-            >
-              <Text style={styles.headerExportText}>
-                {busy ? '...' : 'Export'}
-              </Text>
-            </Pressable>
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={toggleSquareFormat}
+                hitSlop={8}
+                style={[
+                  styles.headerFormatButton,
+                  (!isSquareFormat && media?.type === 'video') ||
+                  busy
+                    ? styles.headerFormatButtonDisabled
+                    : null,
+                ]}
+                disabled={busy || (!isSquareFormat && media?.type === 'video')}
+              >
+                <Text style={styles.headerFormatText}>
+                  {isSquareFormat ? '1:1' : '9:16'}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  if (busy) return;
+                  triggerExport();
+                }}
+                hitSlop={8}
+                style={styles.headerExportButton}
+              >
+                <Text style={styles.headerExportText}>
+                  {busy ? '...' : 'Export'}
+                </Text>
+              </Pressable>
+            </View>
           ),
         }}
       />
       <View style={styles.container}>
         <PreviewEditorCanvas
           exportRef={exportRef}
+          isSquareFormat={isSquareFormat}
           panelOpen={panelOpen}
           onCanvasTouch={() => {
             if (panelOpen) setPanelOpen(false);
@@ -654,7 +717,6 @@ export default function PreviewScreen() {
           onClearBackground={clearBackgroundMedia}
           onAddImageOverlay={addImageOverlay}
           isSquareFormat={isSquareFormat}
-          onToggleSquareFormat={() => setIsSquareFormat((prev) => !prev)}
           layerEntries={layerEntries}
           routeMode={routeMode}
           visibleLayers={visibleLayers}
@@ -741,6 +803,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0E0F12',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerFormatButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#232833',
+    borderWidth: 1,
+    borderColor: '#2F3644',
+  },
+  headerFormatButtonDisabled: {
+    opacity: 0.5,
+  },
+  headerFormatText: {
+    color: '#F3F4F6',
+    fontWeight: '800',
+    fontSize: 13,
   },
   headerExportButton: {
     paddingHorizontal: 8,

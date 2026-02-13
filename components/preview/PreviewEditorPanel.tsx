@@ -17,7 +17,7 @@ import type {
   StatsTemplate,
 } from '@/types/preview';
 
-export type PreviewPanelTab = 'background' | 'stats' | 'layers' | 'help';
+export type PreviewPanelTab = 'content' | 'style' | 'data' | 'help';
 
 type Props = {
   panelOpen: boolean;
@@ -31,7 +31,6 @@ type Props = {
   onClearBackground: () => void;
   onAddImageOverlay: () => void;
   isSquareFormat: boolean;
-  onToggleSquareFormat: () => void;
   layerEntries: [LayerId, string][];
   routeMode: RouteMode;
   visibleLayers: Partial<Record<LayerId, boolean>>;
@@ -66,7 +65,6 @@ export function PreviewEditorPanel({
   onClearBackground,
   onAddImageOverlay,
   isSquareFormat,
-  onToggleSquareFormat,
   layerEntries,
   routeMode,
   visibleLayers,
@@ -92,61 +90,13 @@ export function PreviewEditorPanel({
     <View style={styles.panelShell}>
       {panelOpen ? (
         <View style={styles.panelBody}>
-          {activePanel === 'background' ? (
-            <View style={styles.controls}>
-              <View style={styles.mediaPickRow}>
-                <View style={styles.mediaPickCell}>
-                  <PrimaryButton
-                    label={
-                      isExtracting ? 'Processing image...' : 'Choose image'
-                    }
-                    onPress={onPickImage}
-                    variant="secondary"
-                    disabled={busy || isExtracting}
-                  />
-                </View>
-                <View style={styles.mediaPickCell}>
-                  <PrimaryButton
-                    label="Choose video"
-                    onPress={onPickVideo}
-                    variant="secondary"
-                    disabled={busy}
-                  />
-                </View>
-              </View>
-              <View style={styles.mediaPickRow}>
-                <View style={styles.mediaPickCell}>
-                  <PrimaryButton
-                    label="Clear background"
-                    onPress={onClearBackground}
-                    variant="secondary"
-                    disabled={busy}
-                  />
-                </View>
-                <View style={styles.mediaPickCell}>
-                  <PrimaryButton
-                    label="Add image overlay"
-                    onPress={onAddImageOverlay}
-                    variant="secondary"
-                    disabled={busy}
-                  />
-                </View>
-              </View>
-              <PrimaryButton
-                label={isSquareFormat ? 'Passer en Story (9:16)' : 'Redimensionner en carré (1:1)'}
-                onPress={onToggleSquareFormat}
-                variant="secondary"
-                disabled={busy}
-              />
-            </View>
-          ) : null}
-
-          {activePanel === 'layers' ? (
+          {activePanel === 'content' ? (
             <ScrollView
               style={styles.panelScroll}
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.controls}>
+                <Text style={styles.sectionTitle}>Blocks</Text>
                 {layerEntries.map(([id, label]) => {
                   const isRouteLayer = id === 'route';
                   const switchValue = isRouteLayer
@@ -194,11 +144,50 @@ export function PreviewEditorPanel({
                     </View>
                   );
                 })}
+                <Text style={styles.sectionTitle}>Background</Text>
+                <View style={styles.mediaPickRow}>
+                  <View style={styles.mediaPickCell}>
+                    <PrimaryButton
+                      label={
+                        isExtracting ? 'Processing image...' : 'Choose image'
+                      }
+                      onPress={onPickImage}
+                      variant="secondary"
+                      disabled={busy || isExtracting}
+                    />
+                  </View>
+                  <View style={styles.mediaPickCell}>
+                    <PrimaryButton
+                      label="Choose video"
+                      onPress={onPickVideo}
+                      variant="secondary"
+                      disabled={busy || isSquareFormat}
+                    />
+                  </View>
+                </View>
+                <View style={styles.mediaPickRow}>
+                  <View style={styles.mediaPickCell}>
+                    <PrimaryButton
+                      label="Clear background"
+                      onPress={onClearBackground}
+                      variant="secondary"
+                      disabled={busy}
+                    />
+                  </View>
+                </View>
+
+                <Text style={styles.sectionTitle}>Overlay</Text>
+                <PrimaryButton
+                  label="Add image overlay"
+                  onPress={onAddImageOverlay}
+                  variant="secondary"
+                  disabled={busy}
+                />
               </View>
             </ScrollView>
           ) : null}
 
-          {activePanel === 'stats' ? (
+          {activePanel === 'style' ? (
             <ScrollView
               style={styles.panelScroll}
               showsVerticalScrollIndicator={false}
@@ -252,28 +241,6 @@ export function PreviewEditorPanel({
                   })}
                 </ScrollView>
 
-                <Text style={styles.sectionTitle}>Visible Infos</Text>
-                <View style={styles.controls}>
-                  {(
-                    [
-                      ['time', 'Time'],
-                      ['pace', 'Pace'],
-                      ['elev', 'Elevation gain'],
-                    ] as [FieldId, string][]
-                  ).map(([id, label]) => (
-                    <View key={id} style={styles.switchRow}>
-                      <Text style={styles.controlLabel}>{label}</Text>
-                      <Switch
-                        value={effectiveVisible[id]}
-                        disabled={
-                          !supportsFullStatsPreview || id === 'distance'
-                        }
-                        onValueChange={(value) => onToggleField(id, value)}
-                      />
-                    </View>
-                  ))}
-                </View>
-
                 <Text style={styles.sectionTitle}>Unit</Text>
                 <View style={styles.mediaPickRow}>
                   {(
@@ -297,6 +264,37 @@ export function PreviewEditorPanel({
                       </Pressable>
                     );
                   })}
+                </View>
+              </View>
+            </ScrollView>
+          ) : null}
+
+          {activePanel === 'data' ? (
+            <ScrollView
+              style={styles.panelScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.controls}>
+                <Text style={styles.sectionTitle}>Visible Infos</Text>
+                <View style={styles.controls}>
+                  {(
+                    [
+                      ['time', 'Time'],
+                      ['pace', 'Pace'],
+                      ['elev', 'Elevation gain'],
+                    ] as [FieldId, string][]
+                  ).map(([id, label]) => (
+                    <View key={id} style={styles.switchRow}>
+                      <Text style={styles.controlLabel}>{label}</Text>
+                      <Switch
+                        value={effectiveVisible[id]}
+                        disabled={
+                          !supportsFullStatsPreview || id === 'distance'
+                        }
+                        onValueChange={(value) => onToggleField(id, value)}
+                      />
+                    </View>
+                  ))}
                 </View>
               </View>
             </ScrollView>
@@ -330,9 +328,9 @@ export function PreviewEditorPanel({
       <View style={styles.panelTabs}>
         {(
           [
-            { id: 'background', label: 'Media', type: 'panel' },
-            { id: 'stats', label: 'Data', type: 'panel' },
-            { id: 'layers', label: 'Layers', type: 'panel' },
+            { id: 'content', label: 'Content', type: 'panel' },
+            { id: 'style', label: 'Style', type: 'panel' },
+            { id: 'data', label: 'Data', type: 'panel' },
             { id: 'help', label: 'Help', type: 'panel' },
           ] as {
             id: PreviewPanelTab;

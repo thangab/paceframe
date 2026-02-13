@@ -23,6 +23,7 @@ type GuideState = {
 
 type Props = {
   exportRef: RefObject<View | null>;
+  isSquareFormat: boolean;
   panelOpen: boolean;
   onCanvasTouch: () => void;
   canvasDisplayWidth: number;
@@ -70,6 +71,7 @@ type Props = {
 
 export function PreviewEditorCanvas({
   exportRef,
+  isSquareFormat,
   panelOpen,
   onCanvasTouch,
   canvasDisplayWidth,
@@ -115,7 +117,12 @@ export function PreviewEditorCanvas({
   onRotationGuideChange,
 }: Props) {
   return (
-    <View style={styles.stageWrap}>
+    <View
+      style={[
+        styles.stageWrap,
+        isSquareFormat ? styles.stageWrapCentered : styles.stageWrapTop,
+      ]}
+    >
       <View
         style={[
           styles.canvasScaleWrap,
@@ -130,7 +137,8 @@ export function PreviewEditorCanvas({
             styles.storyCanvas,
             { width: canvasDisplayWidth, height: canvasDisplayHeight },
             (isCapturingOverlay || isExportingPng) && styles.storyCanvasSquare,
-            (isCapturingOverlay || isExportingPng) && styles.storyCanvasNoBorder,
+            (isCapturingOverlay || isExportingPng) &&
+              styles.storyCanvasNoBorder,
             (isCapturingOverlay || (isExportingPng && pngTransparentOnly)) &&
               styles.storyCanvasTransparent,
           ]}
@@ -142,7 +150,9 @@ export function PreviewEditorCanvas({
                   key={tile.key}
                   style={[
                     styles.checkerTile,
-                    tile.dark ? styles.checkerTileDark : styles.checkerTileLight,
+                    tile.dark
+                      ? styles.checkerTileDark
+                      : styles.checkerTileLight,
                     { left: tile.left, top: tile.top },
                   ]}
                 />
@@ -167,7 +177,8 @@ export function PreviewEditorCanvas({
               source={{ uri: media.uri }}
               style={[
                 styles.media,
-                (isCapturingOverlay || (isExportingPng && pngTransparentOnly)) &&
+                (isCapturingOverlay ||
+                  (isExportingPng && pngTransparentOnly)) &&
                   styles.hiddenForCapture,
               ]}
               shouldPlay
@@ -188,14 +199,18 @@ export function PreviewEditorCanvas({
 
           {autoSubjectUri ? (
             <View pointerEvents="none" style={styles.autoSubjectLayer}>
-              <Image source={{ uri: autoSubjectUri }} style={styles.media} resizeMode="cover" />
+              <Image
+                source={{ uri: autoSubjectUri }}
+                style={styles.media}
+                resizeMode="cover"
+              />
             </View>
           ) : null}
 
           {visibleLayers.meta ? (
             <DraggableBlock
               key="meta-layer"
-              initialX={Math.round(42 * canvasScaleX)}
+              initialX={Math.max(0, Math.round((canvasDisplayWidth - 240) / 2))}
               initialY={Math.round(44 * canvasScaleY)}
               selected={activeLayer === 'meta'}
               outlineRadius={0}
@@ -204,7 +219,9 @@ export function PreviewEditorCanvas({
               onDragGuideChange={onDragGuideChange}
               onRotationGuideChange={onRotationGuideChange}
               onSelect={() => setSelectedLayer('meta')}
-              onInteractionChange={(active) => setActiveLayer(active ? 'meta' : null)}
+              onInteractionChange={(active) =>
+                setActiveLayer(active ? 'meta' : null)
+              }
               style={[
                 styles.metaBlock,
                 { zIndex: baseLayerZ('meta'), elevation: baseLayerZ('meta') },
@@ -228,7 +245,9 @@ export function PreviewEditorCanvas({
               onRotationGuideChange={onRotationGuideChange}
               onSelect={() => setSelectedLayer('stats')}
               onTap={cycleStatsTemplate}
-              onInteractionChange={(active) => setActiveLayer(active ? 'stats' : null)}
+              onInteractionChange={(active) =>
+                setActiveLayer(active ? 'stats' : null)
+              }
               style={[
                 styles.statsBlock,
                 {
@@ -267,7 +286,9 @@ export function PreviewEditorCanvas({
               onRotationGuideChange={onRotationGuideChange}
               onSelect={() => setSelectedLayer('route')}
               onTap={cycleRouteMode}
-              onInteractionChange={(active) => setActiveLayer(active ? 'route' : null)}
+              onInteractionChange={(active) =>
+                setActiveLayer(active ? 'route' : null)
+              }
               style={[
                 styles.routeBlock,
                 { zIndex: baseLayerZ('route'), elevation: baseLayerZ('route') },
@@ -299,19 +320,29 @@ export function PreviewEditorCanvas({
                 onRotationGuideChange={onRotationGuideChange}
                 rotationDeg={overlay.rotationDeg}
                 onSelect={() => setSelectedLayer(layerId)}
-                onInteractionChange={(active) => setActiveLayer(active ? layerId : null)}
+                onInteractionChange={(active) =>
+                  setActiveLayer(active ? layerId : null)
+                }
                 style={[
                   styles.imageOverlayBlock,
                   {
-                    width: Math.round((overlay.width ?? imageOverlayMaxInitial) * canvasScaleX),
-                    height: Math.round((overlay.height ?? imageOverlayMaxInitial) * canvasScaleY),
+                    width: Math.round(
+                      (overlay.width ?? imageOverlayMaxInitial) * canvasScaleX,
+                    ),
+                    height: Math.round(
+                      (overlay.height ?? imageOverlayMaxInitial) * canvasScaleY,
+                    ),
                     zIndex: baseLayerZ(layerId),
                     elevation: baseLayerZ(layerId),
                     opacity: overlay.opacity,
                   },
                 ]}
               >
-                <Image source={{ uri: overlay.uri }} style={styles.imageOverlayImage} resizeMode="contain" />
+                <Image
+                  source={{ uri: overlay.uri }}
+                  style={styles.imageOverlayImage}
+                  resizeMode="contain"
+                />
               </DraggableBlock>
             );
           })}
@@ -326,11 +357,18 @@ export function PreviewEditorCanvas({
 const styles = StyleSheet.create({
   stageWrap: {
     flex: 1,
-    justifyContent: 'flex-start',
     alignItems: 'center',
     paddingHorizontal: 0,
-    paddingTop: 2,
     paddingBottom: 0,
+  },
+  stageWrapTop: {
+    justifyContent: 'flex-start',
+    paddingTop: 2,
+  },
+  stageWrapCentered: {
+    justifyContent: 'center',
+    paddingTop: 0,
+    paddingBottom: 120,
   },
   canvasScaleWrap: {
     overflow: 'hidden',

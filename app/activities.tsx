@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     marginBottom: spacing.sm,
   },
   title: {
@@ -142,6 +142,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#D2D8E6',
     letterSpacing: 0.8,
+    textAlign: 'center',
+    width: '100%',
   },
   headerActions: {
     flexDirection: 'row',
