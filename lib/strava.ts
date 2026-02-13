@@ -49,6 +49,7 @@ export async function exchangeCodeWithSupabase({
     refreshToken: data.refresh_token,
     expiresAt: data.expires_at,
     athleteId: data.athlete?.id,
+    athleteFirstName: data.athlete?.firstname ?? null,
     athleteProfileUrl: data.athlete?.profile_medium ?? data.athlete?.profile ?? null,
   };
 }
@@ -87,6 +88,7 @@ export async function refreshTokensWithSupabase({
     refreshToken: data.refresh_token,
     expiresAt: data.expires_at,
     athleteId: data.athlete?.id,
+    athleteFirstName: data.athlete?.firstname ?? null,
     athleteProfileUrl: data.athlete?.profile_medium ?? data.athlete?.profile ?? null,
   };
 }
@@ -134,6 +136,7 @@ export function getMockTokens(): AuthTokens {
     refreshToken: 'mock-refresh-token',
     expiresAt: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30,
     athleteId: 999999,
+    athleteFirstName: 'Runner',
   };
 }
 
@@ -155,7 +158,7 @@ async function fetchActivityPhotoUrl(
 ): Promise<string | null> {
   try {
     const response = await fetch(
-      `${STRAVA_BASE}/activities/${activityId}/photos?size=600`,
+      `${STRAVA_BASE}/activities/${activityId}/photos?size=2048`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -170,8 +173,16 @@ async function fetchActivityPhotoUrl(
     const first = photos[0];
     if (!first?.urls) return null;
 
+    const directBest =
+      first.urls['2048'] ?? first.urls['1024'] ?? first.urls['600'];
+    if (directBest) return directBest;
+
+    const numericBest = Object.entries(first.urls)
+      .filter(([key, value]) => Number.isFinite(Number(key)) && Boolean(value))
+      .sort((a, b) => Number(b[0]) - Number(a[0]))[0]?.[1];
+    if (numericBest) return numericBest;
+
     return (
-      first.urls['600'] ??
       first.urls['100'] ??
       Object.values(first.urls).find((value) => typeof value === 'string') ??
       null

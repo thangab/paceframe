@@ -2,14 +2,15 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radius, spacing } from '@/constants/theme';
 
-const BUTTON_LABEL_COLOR = '#111500';
-
 type Props = {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   variant?: 'primary' | 'secondary' | 'danger';
   icon?: keyof typeof MaterialCommunityIcons.glyphMap;
+  colorScheme?: 'default' | 'panel';
+  iconPosition?: 'left' | 'top';
+  compact?: boolean;
 };
 
 export function PrimaryButton({
@@ -18,14 +19,30 @@ export function PrimaryButton({
   disabled,
   variant = 'primary',
   icon,
+  colorScheme = 'default',
+  iconPosition = 'left',
+  compact = false,
 }: Props) {
+  const isPanelScheme = colorScheme === 'panel';
+  const labelColor =
+    variant === 'primary'
+      ? '#111500'
+      : variant === 'danger'
+        ? '#FFFFFF'
+        : isPanelScheme
+          ? '#E5E7EB'
+          : colors.text;
+
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
         styles.button,
+        compact ? styles.buttonCompact : null,
+        iconPosition === 'top' ? styles.buttonVertical : null,
         styles[variant],
+        isPanelScheme && variant === 'secondary' && styles.secondaryPanel,
         pressed && !disabled && styles.pressed,
         disabled && styles.disabled,
       ]}
@@ -33,12 +50,24 @@ export function PrimaryButton({
       {icon ? (
         <MaterialCommunityIcons
           name={icon}
-          size={16}
-          color={BUTTON_LABEL_COLOR}
-          style={styles.icon}
+          size={compact ? 14 : 16}
+          color={labelColor}
+          style={[
+            iconPosition === 'top' ? styles.iconTop : styles.iconLeft,
+            compact ? styles.iconCompact : null,
+          ]}
         />
       ) : null}
-      <Text style={styles.label}>{label}</Text>
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.label,
+          compact ? styles.labelCompact : null,
+          { color: labelColor },
+        ]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -52,6 +81,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
   },
+  buttonCompact: {
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+  },
+  buttonVertical: {
+    flexDirection: 'column',
+  },
   primary: {
     backgroundColor: colors.primary,
   },
@@ -59,6 +95,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  secondaryPanel: {
+    backgroundColor: '#242935',
+    borderColor: '#2F3644',
   },
   danger: {
     backgroundColor: colors.danger,
@@ -70,11 +110,21 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   label: {
-    color: BUTTON_LABEL_COLOR,
     fontWeight: '400',
     fontSize: 16,
+    textAlign: 'center',
   },
-  icon: {
+  labelCompact: {
+    fontSize: 11,
+    lineHeight: 13,
+  },
+  iconLeft: {
     marginRight: 8,
+  },
+  iconTop: {
+    marginBottom: 4,
+  },
+  iconCompact: {
+    marginRight: 0,
   },
 });

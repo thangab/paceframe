@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { PrimaryButton } from '@/components/PrimaryButton';
@@ -31,6 +31,8 @@ type Props = {
   isExtracting: boolean;
   onPickImage: () => void;
   onPickVideo: () => void;
+  activityPhotoUri?: string | null;
+  onUseActivityPhotoBackground: () => void;
   onClearBackground: () => void;
   onGenerateGradient: () => void;
   onAddImageOverlay: () => void;
@@ -38,7 +40,7 @@ type Props = {
   layerEntries: { id: LayerId; label: string; isBehind: boolean }[];
   routeMode: RouteMode;
   visibleLayers: Partial<Record<LayerId, boolean>>;
-  selectedLayer: LayerId;
+  selectedLayer: LayerId | null;
   setSelectedLayer: (layer: LayerId) => void;
   onToggleLayer: (layer: LayerId, value: boolean) => void;
   onReorderLayers: (
@@ -71,6 +73,8 @@ export function PreviewEditorPanel({
   isExtracting,
   onPickImage,
   onPickVideo,
+  activityPhotoUri,
+  onUseActivityPhotoBackground,
   onClearBackground,
   onGenerateGradient,
   onAddImageOverlay,
@@ -102,8 +106,8 @@ export function PreviewEditorPanel({
   const mainTabs = [
     { id: 'background', label: 'Background', icon: 'image-area-close' },
     { id: 'content', label: 'Content', icon: 'layers-outline' },
-    { id: 'style', label: 'Style', icon: 'palette-outline' },
     { id: 'data', label: 'Data', icon: 'chart-box-outline' },
+    { id: 'style', label: 'Style', icon: 'palette-outline' },
   ] as {
     id: PreviewPanelTab;
     label: string;
@@ -138,42 +142,101 @@ export function PreviewEditorPanel({
             >
               <View style={styles.controls}>
                 <Text style={styles.sectionTitle}>Background</Text>
-                <View style={styles.mediaPickRow}>
-                  <View style={styles.mediaPickCell}>
+                <View style={styles.activityPhotoRow}>
+                  {activityPhotoUri ? (
+                    <Pressable
+                      onPress={onUseActivityPhotoBackground}
+                      style={({ pressed }) => [
+                        styles.activityPhotoCard,
+                        pressed ? styles.activityPhotoCardPressed : null,
+                      ]}
+                      disabled={busy}
+                    >
+                      <Image
+                        source={{ uri: activityPhotoUri }}
+                        style={styles.activityPhotoThumb}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.activityPhotoCopy}>
+                        <Text style={styles.activityPhotoTitle}>
+                          Activity photo
+                        </Text>
+                        <Text style={styles.activityPhotoSubtitle}>
+                          Use as background
+                        </Text>
+                      </View>
+                      <MaterialCommunityIcons
+                        name="image-sync-outline"
+                        size={18}
+                        color="#E5E7EB"
+                      />
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    disabled
+                    style={[
+                      styles.premiumBtn,
+                      !activityPhotoUri && styles.premiumBtnFullWidth,
+                      styles.premiumBtnDisabled,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Premium"
+                  >
+                    <MaterialCommunityIcons
+                      name="crown-outline"
+                      size={14}
+                      color="#9CA3AF"
+                      style={styles.premiumBtnIcon}
+                    />
+                    <Text style={styles.premiumBtnText}>Premium</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.backgroundActionsRow}>
+                  <View style={styles.backgroundActionCell}>
                     <PrimaryButton
-                      label={isExtracting ? 'Processing image...' : 'Image'}
+                      label={isExtracting ? 'Extract' : 'Image'}
                       icon="image-outline"
                       onPress={onPickImage}
                       variant="secondary"
+                      colorScheme="panel"
+                      iconPosition="top"
+                      compact
                       disabled={busy || isExtracting}
                     />
                   </View>
-                  <View style={styles.mediaPickCell}>
+                  <View style={styles.backgroundActionCell}>
                     <PrimaryButton
                       label="Video"
                       icon="video-outline"
                       onPress={onPickVideo}
                       variant="secondary"
+                      colorScheme="panel"
+                      iconPosition="top"
+                      compact
                       disabled={busy || isSquareFormat}
                     />
                   </View>
-                  <View style={styles.mediaPickCell}>
+                  <View style={styles.backgroundActionCell}>
+                    <PrimaryButton
+                      label="Color"
+                      icon="gradient-horizontal"
+                      onPress={onGenerateGradient}
+                      variant="secondary"
+                      colorScheme="panel"
+                      iconPosition="top"
+                      compact
+                      disabled={busy}
+                    />
+                  </View>
+                  <View style={styles.backgroundActionCell}>
                     <PrimaryButton
                       label="Reset"
                       icon="dots-square"
                       onPress={onClearBackground}
                       variant="secondary"
-                      disabled={busy}
-                    />
-                  </View>
-                </View>
-                <View style={styles.mediaPickRow}>
-                  <View style={styles.mediaPickCell}>
-                    <PrimaryButton
-                      label="Gradient"
-                      icon="gradient-horizontal"
-                      onPress={onGenerateGradient}
-                      variant="secondary"
+                      colorScheme="panel"
+                      iconPosition="top"
+                      compact
                       disabled={busy}
                     />
                   </View>
@@ -222,8 +285,12 @@ export function PreviewEditorPanel({
                     <Text style={styles.sectionTitle}>Overlay</Text>
                     <PrimaryButton
                       label="Add image overlay"
+                      icon="image-plus"
                       onPress={onAddImageOverlay}
                       variant="secondary"
+                      colorScheme="panel"
+                      iconPosition="top"
+                      compact
                       disabled={busy}
                     />
                   </View>
@@ -710,6 +777,71 @@ const styles = StyleSheet.create({
   controls: {
     gap: spacing.sm,
   },
+  activityPhotoRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 8,
+  },
+  activityPhotoCard: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333A47',
+    backgroundColor: '#202632',
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  activityPhotoCardPressed: {
+    opacity: 0.88,
+  },
+  activityPhotoThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#2A3140',
+  },
+  activityPhotoCopy: {
+    flex: 1,
+  },
+  activityPhotoTitle: {
+    color: '#F3F4F6',
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  activityPhotoSubtitle: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    fontWeight: '400',
+    marginTop: 2,
+  },
+  premiumBtn: {
+    minWidth: 92,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2F3644',
+    backgroundColor: '#242935',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  premiumBtnFullWidth: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 68,
+  },
+  premiumBtnDisabled: {
+    opacity: 0.62,
+  },
+  premiumBtnIcon: {
+    marginBottom: 4,
+  },
+  premiumBtnText: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    fontWeight: '400',
+  },
   panelShell: {
     position: 'absolute',
     left: 0,
@@ -788,8 +920,14 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     alignItems: 'stretch',
   },
-  mediaPickCell: {
-    flex: 1,
+  backgroundActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'stretch',
+  },
+  backgroundActionCell: {
+    width: '23%',
+    minWidth: 0,
   },
   orderHint: {
     color: '#A0A8B8',

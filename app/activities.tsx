@@ -28,6 +28,8 @@ export default function ActivitiesScreen() {
   const setActivities = useActivityStore((s) => s.setActivities);
   const selectActivity = useActivityStore((s) => s.selectActivity);
   const isHealthKitSource = source === 'healthkit';
+  const firstName = tokens?.athleteFirstName?.trim();
+  const welcomeTitle = firstName ? `Welcome ${firstName} !` : 'Welcome !';
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,7 +140,7 @@ export default function ActivitiesScreen() {
       />
       <View style={styles.container}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>Select an activity</Text>
+          <Text style={styles.title}>{welcomeTitle}</Text>
           <View style={styles.headerAvatarSpacer} />
         </View>
 
@@ -261,10 +263,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 30 / 1.5,
-    fontWeight: '800',
+    fontWeight: '500',
     color: '#D2D8E6',
     letterSpacing: 0.8,
-    textAlign: 'center',
+    textAlign: 'left',
     flex: 1,
   },
   headerActions: {

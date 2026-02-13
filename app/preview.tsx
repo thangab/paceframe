@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -7,7 +7,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import ImageCropPicker from 'react-native-image-crop-picker';
@@ -55,8 +55,16 @@ const IMAGE_OVERLAY_MAX_INITIAL = 180;
 const IMAGE_OVERLAY_MIN_INITIAL = 90;
 const EXPORT_PNG_WIDTH = 1080;
 
+type ApplyImageBackgroundOptions = {
+  silent?: boolean;
+  successMessage?: string;
+  failurePrefix?: string;
+};
+
 function normalizeLocalUri(path: string) {
   if (
+    path.startsWith('https://') ||
+    path.startsWith('http://') ||
     path.startsWith('file://') ||
     path.startsWith('content://') ||
     path.startsWith('ph://') ||
@@ -117,11 +125,11 @@ export default function PreviewScreen() {
   const [behindSubjectLayers, setBehindSubjectLayers] = useState<
     Partial<Record<LayerId, boolean>>
   >({});
-  const [selectedLayer, setSelectedLayer] = useState<LayerId>('stats');
-  const [outlinedLayer, setOutlinedLayer] = useState<LayerId | null>('stats');
+  const [selectedLayer, setSelectedLayer] = useState<LayerId | null>(null);
+  const [outlinedLayer, setOutlinedLayer] = useState<LayerId | null>(null);
   const [activeLayer, setActiveLayer] = useState<LayerId | null>(null);
-  const [activePanel, setActivePanel] = useState<PreviewPanelTab>('content');
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [activePanel, setActivePanel] = useState<PreviewPanelTab>('background');
+  const [panelOpen, setPanelOpen] = useState(false);
   const [isSquareFormat, setIsSquareFormat] = useState(false);
   const [resolvedLocationText, setResolvedLocationText] = useState('');
 
@@ -150,6 +158,7 @@ export default function PreviewScreen() {
   );
   const elevText = `${Math.round(activity?.total_elevation_gain ?? 0)} m`;
   const dateText = activity ? formatDate(activity.start_date) : '';
+  const activityPhotoUri = activity?.photoUrl ? normalizeLocalUri(activity.photoUrl) : null;
   const locationText = useMemo(() => {
     return (
       [
@@ -297,6 +306,16 @@ export default function PreviewScreen() {
     return tiles;
   }, [canvasDisplayHeight, canvasDisplayWidth]);
 
+  useFocusEffect(
+    useCallback(() => {
+      setActivePanel('background');
+      setPanelOpen(false);
+      setSelectedLayer(null);
+      setOutlinedLayer(null);
+      setActiveLayer(null);
+    }, []),
+  );
+
   function selectLayer(layer: LayerId) {
     setSelectedLayer(layer);
     setOutlinedLayer(layer);
@@ -339,6 +358,17 @@ export default function PreviewScreen() {
   }, [activity]);
 
   useEffect(() => {
+    if (!activityPhotoUri) return;
+    const asset: ImagePicker.ImagePickerAsset = {
+      uri: activityPhotoUri,
+      width: STORY_WIDTH,
+      height: STORY_HEIGHT,
+      type: 'image',
+    };
+    void applyImageBackground(asset, { silent: true });
+  }, [activity?.id, activityPhotoUri]);
+
+  useEffect(() => {
     const allHeaderFieldsHidden =
       !headerVisible.title && !headerVisible.date && !headerVisible.location;
     if (!allHeaderFieldsHidden || !visibleLayers.meta) return;
@@ -374,6 +404,35 @@ export default function PreviewScreen() {
     return true;
   }
 
+  async function applyImageBackground(
+    asset: ImagePicker.ImagePickerAsset,
+    options: ApplyImageBackgroundOptions = {},
+  ) {
+    setMedia(asset);
+    setBackgroundGradient(null);
+    setAutoSubjectUri(null);
+
+    try {
+      setIsExtracting(true);
+      if (!options.silent) {
+        setMessage('Extracting subject...');
+      }
+      const cutoutUri = await removeBackgroundOnDevice(asset.uri);
+      setAutoSubjectUri(cutoutUri);
+      if (!options.silent) {
+        setMessage(options.successMessage ?? 'Subject extracted automatically.');
+      }
+    } catch (err) {
+      if (!options.silent) {
+        const details = err instanceof Error ? ` (${err.message})` : '';
+        const prefix = options.failurePrefix ?? 'Image loaded.';
+        setMessage(`${prefix} Subject extraction unavailable${details}.`);
+      }
+    } finally {
+      setIsExtracting(false);
+    }
+  }
+
   async function pickImageMedia() {
     const allowed = await ensureMediaPermission();
     if (!allowed) return;
@@ -400,23 +459,7 @@ export default function PreviewScreen() {
         base64: null,
         exif: null,
       };
-
-      setMedia(asset);
-      setBackgroundGradient(null);
-      setAutoSubjectUri(null);
-
-      try {
-        setIsExtracting(true);
-        setMessage('Extracting subject...');
-        const cutoutUri = await removeBackgroundOnDevice(asset.uri);
-        setAutoSubjectUri(cutoutUri);
-        setMessage('Subject extracted automatically.');
-      } catch (err) {
-        const details = err instanceof Error ? ` (${err.message})` : '';
-        setMessage(`Image loaded. Subject extraction unavailable${details}.`);
-      } finally {
-        setIsExtracting(false);
-      }
+      await applyImageBackground(asset);
     } catch (err: any) {
       if (err?.code === 'E_PICKER_CANCELLED') return;
       setMessage(
@@ -681,6 +724,23 @@ export default function PreviewScreen() {
     setMessage('Transparent background selected.');
   }
 
+  async function useActivityPhotoAsBackground() {
+    if (!activityPhotoUri) {
+      setMessage('This activity has no photo.');
+      return;
+    }
+    const asset: ImagePicker.ImagePickerAsset = {
+      uri: activityPhotoUri,
+      width: STORY_WIDTH,
+      height: STORY_HEIGHT,
+      type: 'image',
+    };
+    await applyImageBackground(asset, {
+      successMessage: 'Activity photo applied. Subject extracted automatically.',
+      failurePrefix: 'Activity photo applied.',
+    });
+  }
+
   function generateRandomGradientBackground() {
     setMedia(null);
     setAutoSubjectUri(null);
@@ -814,6 +874,8 @@ export default function PreviewScreen() {
           isExtracting={isExtracting}
           onPickImage={pickImageMedia}
           onPickVideo={pickVideoMedia}
+          activityPhotoUri={activityPhotoUri}
+          onUseActivityPhotoBackground={useActivityPhotoAsBackground}
           onClearBackground={clearBackgroundMedia}
           onGenerateGradient={generateRandomGradientBackground}
           onAddImageOverlay={addImageOverlay}
