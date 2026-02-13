@@ -10,6 +10,7 @@ import {
 import { router, Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import ImageCropPicker from 'react-native-image-crop-picker';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { PrimaryButton } from '@/components/PrimaryButton';
@@ -108,6 +109,7 @@ export default function PreviewScreen() {
     Partial<Record<LayerId, boolean>>
   >({});
   const [selectedLayer, setSelectedLayer] = useState<LayerId>('stats');
+  const [outlinedLayer, setOutlinedLayer] = useState<LayerId | null>('stats');
   const [activeLayer, setActiveLayer] = useState<LayerId | null>(null);
   const [activePanel, setActivePanel] = useState<PreviewPanelTab>('content');
   const [panelOpen, setPanelOpen] = useState(true);
@@ -269,9 +271,15 @@ export default function PreviewScreen() {
     return tiles;
   }, [canvasDisplayHeight, canvasDisplayWidth]);
 
+  function selectLayer(layer: LayerId) {
+    setSelectedLayer(layer);
+    setOutlinedLayer(layer);
+  }
+
   useEffect(() => {
     if (routeMode === 'off' && selectedLayer === 'route') {
       setSelectedLayer('stats');
+      setOutlinedLayer('stats');
     }
   }, [routeMode, selectedLayer]);
 
@@ -409,7 +417,7 @@ export default function PreviewScreen() {
     ]);
     setVisibleLayers((prev) => ({ ...prev, [layerId]: true }));
     setLayerOrder((prev) => [...prev, layerId]);
-    setSelectedLayer(layerId);
+    selectLayer(layerId);
   }
 
   function toggleField(field: FieldId, value: boolean) {
@@ -474,13 +482,13 @@ export default function PreviewScreen() {
         setRouteMode((prev) => (prev === 'off' ? 'trace' : prev));
         setVisibleLayers((prev) => ({ ...prev, route: true }));
         setBehindSubjectLayers((prev) => ({ ...prev, route: false }));
-        setSelectedLayer('route');
+        selectLayer('route');
       } else {
         setVisibleLayers((prev) => ({ ...prev, route: false }));
         setBehindSubjectLayers((prev) => ({ ...prev, route: false }));
         setRouteMode('off');
         if (selectedLayer === 'route') {
-          setSelectedLayer('stats');
+          selectLayer('stats');
         }
       }
       return;
@@ -500,7 +508,7 @@ export default function PreviewScreen() {
       setLayerOrder((prev) => prev.filter((item) => item !== layerId));
     }
     if (selectedLayer === layerId) {
-      setSelectedLayer('stats');
+      selectLayer('stats');
     }
   }
 
@@ -633,10 +641,16 @@ export default function PreviewScreen() {
                     : null,
                 ]}
                 disabled={busy || (!isSquareFormat && media?.type === 'video')}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  isSquareFormat ? 'Square format (1:1)' : 'Portrait format (9:16)'
+                }
               >
-                <Text style={styles.headerFormatText}>
-                  {isSquareFormat ? '1:1' : '9:16'}
-                </Text>
+                <MaterialCommunityIcons
+                  name={isSquareFormat ? 'crop-square' : 'cellphone'}
+                  size={18}
+                  color="#F3F4F6"
+                />
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -645,10 +659,14 @@ export default function PreviewScreen() {
                 }}
                 hitSlop={8}
                 style={styles.headerExportButton}
+                accessibilityRole="button"
+                accessibilityLabel="Export"
               >
-                <Text style={styles.headerExportText}>
-                  {busy ? '...' : 'Export'}
-                </Text>
+                <MaterialCommunityIcons
+                  name={busy ? 'dots-horizontal' : 'export-variant'}
+                  size={20}
+                  color="#0E0F12"
+                />
               </Pressable>
             </View>
           ),
@@ -661,6 +679,7 @@ export default function PreviewScreen() {
           panelOpen={panelOpen}
           onCanvasTouch={() => {
             if (panelOpen) setPanelOpen(false);
+            setOutlinedLayer(null);
           }}
           canvasDisplayWidth={canvasDisplayWidth}
           canvasDisplayHeight={canvasDisplayHeight}
@@ -673,9 +692,10 @@ export default function PreviewScreen() {
           media={media}
           autoSubjectUri={autoSubjectUri}
           visibleLayers={visibleLayers}
+          selectedLayer={outlinedLayer}
           activeLayer={activeLayer}
           setActiveLayer={setActiveLayer}
-          setSelectedLayer={setSelectedLayer}
+          setSelectedLayer={selectLayer}
           baseLayerZ={baseLayerZ}
           activityName={activity.name}
           dateText={dateText}
@@ -721,7 +741,7 @@ export default function PreviewScreen() {
           routeMode={routeMode}
           visibleLayers={visibleLayers}
           selectedLayer={selectedLayer}
-          setSelectedLayer={setSelectedLayer}
+          setSelectedLayer={selectLayer}
           onToggleLayer={toggleLayer}
           onMoveLayer={moveLayer}
           onRemoveLayer={removeLayer}
@@ -820,19 +840,9 @@ const styles = StyleSheet.create({
   headerFormatButtonDisabled: {
     opacity: 0.5,
   },
-  headerFormatText: {
-    color: '#F3F4F6',
-    fontWeight: '800',
-    fontSize: 13,
-  },
   headerExportButton: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-  },
-  headerExportText: {
-    color: '#0E0F12',
-    fontWeight: '800',
-    fontSize: 16,
   },
   centered: {
     flex: 1,

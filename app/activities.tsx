@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActivityCard } from '@/components/ActivityCard';
 import { spacing } from '@/constants/theme';
 import { fetchActivities } from '@/lib/strava';
@@ -67,8 +68,18 @@ export default function ActivitiesScreen() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <Pressable onPress={handleLogout} style={styles.logoutBtn}>
-              <Text style={styles.logoutText}>Logout</Text>
+            <Pressable
+              onPress={handleLogout}
+              style={styles.logoutBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Logout"
+            >
+              <MaterialCommunityIcons
+                name="logout"
+                size={20}
+                color="#131313"
+                style={{ transform: [{ scaleX: -1 }] }}
+              />
             </Pressable>
           ),
         }}
@@ -162,10 +173,6 @@ const styles = StyleSheet.create({
   logoutBtn: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-  },
-  logoutText: {
-    color: '#8A93A5',
-    fontWeight: '700',
   },
   centered: {
     flex: 1,

@@ -1,4 +1,5 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StravaActivity } from '@/types/strava';
 import {
   formatDate,
@@ -23,6 +24,10 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
   const icon = activityTypeIcon(activity.type);
   const detailedMetrics = shouldShowDetailedMetrics(activity.type);
 
+  function renderActivityIcon(size: number, color: string) {
+    return <MaterialCommunityIcons name={icon} size={size} color={color} />;
+  }
+
   return (
     <Pressable
       onPress={onPress}
@@ -37,17 +42,17 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
           <Image source={{ uri: activity.photoUrl }} style={styles.thumbnail} />
         ) : (
           <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
-            <Text style={styles.placeholderText}>{icon}</Text>
+            {renderActivityIcon(30, '#A7B0C0')}
           </View>
         )}
-        <View style={styles.thumbBadge}>
-          <Text style={styles.thumbBadgeText}>{icon}</Text>
-        </View>
 
         <View style={styles.content}>
-          <Text style={styles.title} numberOfLines={1}>
-            {activity.name} {icon}
-          </Text>
+          <View style={styles.titleRow}>
+            {renderActivityIcon(16, '#D4FF54')}
+            <Text style={styles.title} numberOfLines={1}>
+              {activity.name}
+            </Text>
+          </View>
           <Text style={styles.date}>{whenText}</Text>
           {detailedMetrics ? (
             <>
@@ -76,7 +81,7 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
 
         {selected ? (
           <View style={styles.selectedBadge}>
-            <Text style={styles.selectedBadgeText}>✓</Text>
+            <MaterialCommunityIcons name="check" size={16} color="#111500" />
           </View>
         ) : null}
       </View>
@@ -91,20 +96,22 @@ function normalizeDistance(distance: string) {
     .replace(/\.0+\s/, ' ');
 }
 
-function activityTypeIcon(type: string) {
-  if (type === 'Run') return '🏃';
-  if (type === 'Ride') return '🚴';
-  if (type === 'Walk') return '🚶';
-  if (type === 'Hike') return '🥾';
-  if (type === 'Swim') return '🏊';
-  if (type === 'Rowing') return '🚣';
-  if (type === 'Elliptical' || type === 'WeightTraining') return '🏋️';
-  if (type === 'Stair') return '🪜';
-  if (type === 'Strength') return '💪';
-  if (type === 'HIIT') return '⚡';
-  if (type === 'Yoga') return '🧘';
-  if (type === 'Workout') return '🏅';
-  return '';
+function activityTypeIcon(
+  type: string,
+): keyof typeof MaterialCommunityIcons.glyphMap {
+  if (type === 'Run') return 'run-fast';
+  if (type === 'Ride') return 'bike';
+  if (type === 'Walk') return 'walk';
+  if (type === 'Hike') return 'hiking';
+  if (type === 'Swim') return 'swim';
+  if (type === 'Rowing') return 'rowing';
+  if (type === 'Elliptical' || type === 'WeightTraining') return 'dumbbell';
+  if (type === 'Stair') return 'stairs';
+  if (type === 'Strength') return 'arm-flex';
+  if (type === 'HIIT') return 'flash';
+  if (type === 'Yoga') return 'yoga';
+  if (type === 'Workout') return 'medal-outline';
+  return 'dumbbell';
 }
 
 function getSecondaryMetric(activity: StravaActivity) {
@@ -194,29 +201,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  placeholderText: {
-    color: '#A7B0C0',
-    fontWeight: '700',
-    fontSize: 28,
-  },
-  thumbBadge: {
-    position: 'absolute',
-    left: 6,
-    top: 6,
-    width: 30,
-    height: 30,
-    borderRadius: 16,
-    backgroundColor: '#D4FF54',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-  },
-  thumbBadgeText: {
-    fontSize: 16,
-  },
   content: {
     flex: 1,
     paddingTop: 2,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   title: {
     color: '#F4F6FB',
@@ -271,10 +263,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#D4FF54',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  selectedBadgeText: {
-    color: '#111500',
-    fontWeight: '900',
-    fontSize: 16,
   },
 });

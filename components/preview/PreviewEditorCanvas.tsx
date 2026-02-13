@@ -1,5 +1,5 @@
 import { RefObject } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type * as ImagePicker from 'expo-image-picker';
 import { ResizeMode, Video } from 'expo-av';
 import { DraggableBlock } from '@/components/DraggableBlock';
@@ -37,6 +37,7 @@ type Props = {
   media: ImagePicker.ImagePickerAsset | null;
   autoSubjectUri: string | null;
   visibleLayers: Partial<Record<LayerId, boolean>>;
+  selectedLayer: LayerId | null;
   activeLayer: LayerId | null;
   setActiveLayer: (next: LayerId | null) => void;
   setSelectedLayer: (next: LayerId) => void;
@@ -85,6 +86,7 @@ export function PreviewEditorCanvas({
   media,
   autoSubjectUri,
   visibleLayers,
+  selectedLayer,
   activeLayer,
   setActiveLayer,
   setSelectedLayer,
@@ -132,7 +134,6 @@ export function PreviewEditorCanvas({
         <View
           collapsable={false}
           ref={exportRef}
-          onTouchStart={onCanvasTouch}
           style={[
             styles.storyCanvas,
             { width: canvasDisplayWidth, height: canvasDisplayHeight },
@@ -207,12 +208,14 @@ export function PreviewEditorCanvas({
             </View>
           ) : null}
 
+          <Pressable style={styles.canvasTapCatcher} onPress={onCanvasTouch} />
+
           {visibleLayers.meta ? (
             <DraggableBlock
               key="meta-layer"
               initialX={Math.max(0, Math.round((canvasDisplayWidth - 240) / 2))}
               initialY={Math.round(44 * canvasScaleY)}
-              selected={activeLayer === 'meta'}
+              selected={selectedLayer === 'meta'}
               outlineRadius={0}
               canvasWidth={canvasDisplayWidth}
               canvasHeight={canvasDisplayHeight}
@@ -237,7 +240,7 @@ export function PreviewEditorCanvas({
               key="stats-layer"
               initialX={centeredStatsXDisplay}
               initialY={Math.round(template.y * canvasScaleY)}
-              selected={activeLayer === 'stats'}
+              selected={selectedLayer === 'stats'}
               outlineRadius={template.radius}
               canvasWidth={canvasDisplayWidth}
               canvasHeight={canvasDisplayHeight}
@@ -278,7 +281,7 @@ export function PreviewEditorCanvas({
               key="route-layer"
               initialX={routeInitialXDisplay}
               initialY={routeInitialYDisplay}
-              selected={activeLayer === 'route'}
+              selected={selectedLayer === 'route'}
               outlineRadius={0}
               canvasWidth={canvasDisplayWidth}
               canvasHeight={canvasDisplayHeight}
@@ -312,7 +315,7 @@ export function PreviewEditorCanvas({
                 key={layerId}
                 initialX={Math.round((20 + index * 12) * canvasScaleX)}
                 initialY={Math.round((80 + index * 12) * canvasScaleY)}
-                selected={activeLayer === layerId}
+                selected={selectedLayer === layerId}
                 outlineRadius={radius.lg}
                 canvasWidth={canvasDisplayWidth}
                 canvasHeight={canvasDisplayHeight}
@@ -465,6 +468,13 @@ const styles = StyleSheet.create({
     height: '100%',
     zIndex: 5,
     elevation: 5,
+  },
+  canvasTapCatcher: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    zIndex: 1,
+    elevation: 1,
   },
   statsBlock: {
     paddingHorizontal: 14,

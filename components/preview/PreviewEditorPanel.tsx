@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { radius, spacing } from '@/constants/theme';
 import type { DistanceUnit } from '@/lib/format';
@@ -17,7 +18,12 @@ import type {
   StatsTemplate,
 } from '@/types/preview';
 
-export type PreviewPanelTab = 'content' | 'style' | 'data' | 'help';
+export type PreviewPanelTab =
+  | 'background'
+  | 'content'
+  | 'style'
+  | 'data'
+  | 'help';
 
 type Props = {
   panelOpen: boolean;
@@ -86,10 +92,72 @@ export function PreviewEditorPanel({
   message,
   onOpenPaywall,
 }: Props) {
+  const mainTabs = [
+    { id: 'background', label: 'Background', icon: 'image-area-close' },
+    { id: 'content', label: 'Content', icon: 'layers-outline' },
+    { id: 'style', label: 'Style', icon: 'palette-outline' },
+    { id: 'data', label: 'Data', icon: 'chart-box-outline' },
+  ] as {
+    id: PreviewPanelTab;
+    label: string;
+    icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  }[];
+
+  function onPressTab(tabId: PreviewPanelTab) {
+    if (panelOpen && activePanel === tabId) {
+      setPanelOpen(false);
+      return;
+    }
+    if (!panelOpen) {
+      setPanelOpen(true);
+    }
+    setActivePanel(tabId);
+  }
+
   return (
     <View style={styles.panelShell}>
       {panelOpen ? (
         <View style={styles.panelBody}>
+          {activePanel === 'background' ? (
+            <ScrollView
+              style={styles.panelScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.controls}>
+                <Text style={styles.sectionTitle}>Background</Text>
+                <View style={styles.mediaPickRow}>
+                  <View style={styles.mediaPickCell}>
+                    <PrimaryButton
+                      label={isExtracting ? 'Processing image...' : 'Image'}
+                      icon="image-outline"
+                      onPress={onPickImage}
+                      variant="secondary"
+                      disabled={busy || isExtracting}
+                    />
+                  </View>
+                  <View style={styles.mediaPickCell}>
+                    <PrimaryButton
+                      label="Video"
+                      icon="video-outline"
+                      onPress={onPickVideo}
+                      variant="secondary"
+                      disabled={busy || isSquareFormat}
+                    />
+                  </View>
+                  <View style={styles.mediaPickCell}>
+                    <PrimaryButton
+                      label="Reset"
+                      icon="dots-square"
+                      onPress={onClearBackground}
+                      variant="secondary"
+                      disabled={busy}
+                    />
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+          ) : null}
+
           {activePanel === 'content' ? (
             <ScrollView
               style={styles.panelScroll}
@@ -123,14 +191,22 @@ export function PreviewEditorPanel({
                         onPress={() => onMoveLayer(id, 'up')}
                         hitSlop={10}
                       >
-                        <Text style={styles.layerActionText}>↑</Text>
+                        <MaterialCommunityIcons
+                          name="chevron-up"
+                          size={18}
+                          color="#F3F4F6"
+                        />
                       </Pressable>
                       <Pressable
                         style={styles.layerAction}
                         onPress={() => onMoveLayer(id, 'down')}
                         hitSlop={10}
                       >
-                        <Text style={styles.layerActionText}>↓</Text>
+                        <MaterialCommunityIcons
+                          name="chevron-down"
+                          size={18}
+                          color="#F3F4F6"
+                        />
                       </Pressable>
                       {isImageLayer ? (
                         <Pressable
@@ -138,44 +214,16 @@ export function PreviewEditorPanel({
                           onPress={() => onRemoveLayer(id)}
                           hitSlop={10}
                         >
-                          <Text style={styles.layerDeleteText}>✕</Text>
+                          <MaterialCommunityIcons
+                            name="trash-can-outline"
+                            size={16}
+                            color="#DC2626"
+                          />
                         </Pressable>
                       ) : null}
                     </View>
                   );
                 })}
-                <Text style={styles.sectionTitle}>Background</Text>
-                <View style={styles.mediaPickRow}>
-                  <View style={styles.mediaPickCell}>
-                    <PrimaryButton
-                      label={
-                        isExtracting ? 'Processing image...' : 'Choose image'
-                      }
-                      onPress={onPickImage}
-                      variant="secondary"
-                      disabled={busy || isExtracting}
-                    />
-                  </View>
-                  <View style={styles.mediaPickCell}>
-                    <PrimaryButton
-                      label="Choose video"
-                      onPress={onPickVideo}
-                      variant="secondary"
-                      disabled={busy || isSquareFormat}
-                    />
-                  </View>
-                </View>
-                <View style={styles.mediaPickRow}>
-                  <View style={styles.mediaPickCell}>
-                    <PrimaryButton
-                      label="Clear background"
-                      onPress={onClearBackground}
-                      variant="secondary"
-                      disabled={busy}
-                    />
-                  </View>
-                </View>
-
                 <Text style={styles.sectionTitle}>Overlay</Text>
                 <PrimaryButton
                   label="Add image overlay"
@@ -240,31 +288,6 @@ export function PreviewEditorPanel({
                     );
                   })}
                 </ScrollView>
-
-                <Text style={styles.sectionTitle}>Unit</Text>
-                <View style={styles.mediaPickRow}>
-                  {(
-                    [
-                      { id: 'km', label: 'Kilometers' },
-                      { id: 'mi', label: 'Miles' },
-                    ] as { id: DistanceUnit; label: string }[]
-                  ).map((item) => {
-                    const selected = item.id === distanceUnit;
-                    return (
-                      <Pressable
-                        key={item.id}
-                        style={[
-                          styles.chip,
-                          selected && styles.chipSelected,
-                          styles.unitChip,
-                        ]}
-                        onPress={() => onSetDistanceUnit(item.id)}
-                      >
-                        <Text style={styles.chipText}>{item.label}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
               </View>
             </ScrollView>
           ) : null}
@@ -296,6 +319,31 @@ export function PreviewEditorPanel({
                     </View>
                   ))}
                 </View>
+
+                <Text style={styles.sectionTitle}>Unit</Text>
+                <View style={styles.mediaPickRow}>
+                  {(
+                    [
+                      { id: 'km', label: 'Kilometers' },
+                      { id: 'mi', label: 'Miles' },
+                    ] as { id: DistanceUnit; label: string }[]
+                  ).map((item) => {
+                    const selected = item.id === distanceUnit;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        style={[
+                          styles.chip,
+                          selected && styles.chipSelected,
+                          styles.unitChip,
+                        ]}
+                        onPress={() => onSetDistanceUnit(item.id)}
+                      >
+                        <Text style={styles.chipText}>{item.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
             </ScrollView>
           ) : null}
@@ -326,45 +374,51 @@ export function PreviewEditorPanel({
       ) : null}
 
       <View style={styles.panelTabs}>
-        {(
-          [
-            { id: 'content', label: 'Content', type: 'panel' },
-            { id: 'style', label: 'Style', type: 'panel' },
-            { id: 'data', label: 'Data', type: 'panel' },
-            { id: 'help', label: 'Help', type: 'panel' },
-          ] as {
-            id: PreviewPanelTab;
-            label: string;
-            type: 'panel';
-          }[]
-        ).map((tab) => {
-          const selected = activePanel === tab.id;
-          return (
-            <Pressable
-              key={tab.id}
-              onPress={() => {
-                if (panelOpen && activePanel === tab.id) {
-                  setPanelOpen(false);
-                  return;
-                }
-                if (!panelOpen) {
-                  setPanelOpen(true);
-                }
-                setActivePanel(tab.id as PreviewPanelTab);
-              }}
-              style={[styles.panelTab, selected && styles.panelTabSelected]}
-            >
-              <Text
-                style={[
-                  styles.panelTabText,
-                  selected && styles.panelTabTextSelected,
-                ]}
+        <View style={styles.mainTabsRow}>
+          {mainTabs.map((tab) => {
+            const selected = activePanel === tab.id;
+            return (
+              <Pressable
+                key={tab.id}
+                onPress={() => onPressTab(tab.id)}
+                style={[styles.panelTab, selected && styles.panelTabSelected]}
               >
-                {tab.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+                <View style={styles.panelTabContent}>
+                  <MaterialCommunityIcons
+                    name={tab.icon}
+                    size={14}
+                    color={selected ? '#111827' : '#E5E7EB'}
+                  />
+                  <Text
+                    style={[
+                      styles.panelTabText,
+                      selected && styles.panelTabTextSelected,
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Pressable
+          onPress={() => onPressTab('help')}
+          style={[
+            styles.helpFab,
+            activePanel === 'help'
+              ? styles.helpFabSelected
+              : styles.helpFabIdle,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Help"
+        >
+          <MaterialCommunityIcons
+            name="help-circle-outline"
+            size={20}
+            color={activePanel === 'help' ? '#111827' : '#E5E7EB'}
+          />
+        </Pressable>
       </View>
     </View>
   );
@@ -425,8 +479,14 @@ const styles = StyleSheet.create({
   },
   panelTabs: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
+    gap: 10,
+  },
+  mainTabsRow: {
+    flex: 1,
+    flexDirection: 'row',
     gap: 8,
   },
   panelTab: {
@@ -434,18 +494,42 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 10,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#242935',
+  },
+  panelTabContent: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
   },
   panelTabSelected: {
     backgroundColor: '#D9F04A',
   },
   panelTabText: {
     color: '#E5E7EB',
-    fontWeight: '700',
+    fontWeight: '400',
+    fontSize: 12,
   },
   panelTabTextSelected: {
     color: '#111827',
-    fontWeight: '800',
+    fontWeight: '500',
+  },
+  helpFab: {
+    width: 42,
+    height: 42,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -6,
+  },
+  helpFabIdle: {
+    backgroundColor: '#242935',
+    borderWidth: 1,
+    borderColor: '#2F3644',
+  },
+  helpFabSelected: {
+    backgroundColor: '#D9F04A',
   },
   mediaPickRow: {
     flexDirection: 'row',
@@ -483,10 +567,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#202632',
   },
-  layerActionText: {
-    color: '#F3F4F6',
-    fontWeight: '800',
-  },
   layerDelete: {
     width: 32,
     height: 32,
@@ -496,10 +576,6 @@ const styles = StyleSheet.create({
     borderColor: '#EF4444',
     borderRadius: 8,
     backgroundColor: '#FEE2E2',
-  },
-  layerDeleteText: {
-    color: '#DC2626',
-    fontWeight: '800',
   },
   switchRow: {
     flexDirection: 'row',

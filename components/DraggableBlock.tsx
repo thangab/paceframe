@@ -268,7 +268,8 @@ export function DraggableBlock({
       if (onSelect) {
         runOnJS(onSelect)();
       }
-      if (onTap) {
+      // Only trigger tap action when the block was already selected before this tap.
+      if (onTap && selected) {
         runOnJS(onTap)();
       }
     });
