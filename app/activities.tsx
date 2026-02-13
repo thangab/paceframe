@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import {
   ActivityIndicator,
   FlatList,
@@ -63,58 +63,64 @@ export default function ActivitiesScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>
-          {activities.length} activit{activities.length !== 1 ? 'ies' : 'y'}
-        </Text>
-        <View style={styles.headerActions}>
-          <Pressable onPress={handleLogout} style={styles.logoutBtn}>
-            <Text style={styles.logoutText}>Logout</Text>
+    <>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <Pressable onPress={handleLogout} style={styles.logoutBtn}>
+              <Text style={styles.logoutText}>Logout</Text>
+            </Pressable>
+          ),
+        }}
+      />
+      <View style={styles.container}>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>
+            {activities.length} activit{activities.length !== 1 ? 'ies' : 'y'}
+          </Text>
+        </View>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        {loading && activities.length === 0 ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color="#D4FF54" />
+          </View>
+        ) : (
+          <FlatList
+            data={activities}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl refreshing={loading} onRefresh={loadActivities} />
+            }
+            renderItem={({ item }) => (
+              <ActivityCard
+                activity={item}
+                selected={selectedActivityId === item.id}
+                onPress={() => selectActivity(item.id)}
+              />
+            )}
+            ListEmptyComponent={
+              <Text style={styles.empty}>No run activities found.</Text>
+            }
+          />
+        )}
+
+        <View style={styles.bottomBar}>
+          <Pressable
+            style={[
+              styles.generateBtn,
+              !selectedActivityId ? styles.generateBtnDisabled : null,
+            ]}
+            onPress={() => router.push('/preview')}
+            disabled={!selectedActivityId}
+          >
+            <Text style={styles.generateBtnText}>Generate Visual ✨</Text>
           </Pressable>
         </View>
       </View>
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      {loading && activities.length === 0 ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#D4FF54" />
-        </View>
-      ) : (
-        <FlatList
-          data={activities}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={loadActivities} />
-          }
-          renderItem={({ item }) => (
-            <ActivityCard
-              activity={item}
-              selected={selectedActivityId === item.id}
-              onPress={() => selectActivity(item.id)}
-            />
-          )}
-          ListEmptyComponent={
-            <Text style={styles.empty}>No run activities found.</Text>
-          }
-        />
-      )}
-
-      <View style={styles.bottomBar}>
-        <Pressable
-          style={[
-            styles.generateBtn,
-            !selectedActivityId ? styles.generateBtnDisabled : null,
-          ]}
-          onPress={() => router.push('/preview')}
-          disabled={!selectedActivityId}
-        >
-          <Text style={styles.generateBtnText}>Generate Visual ✨</Text>
-        </Pressable>
-      </View>
-    </View>
+    </>
   );
 }
 
