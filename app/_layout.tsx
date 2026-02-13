@@ -33,10 +33,7 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ title: 'PaceFrame' }} />
-        <Stack.Screen
-          name="activities"
-          options={{ title: 'Choose Activity' }}
-        />
+        <Stack.Screen name="activities" options={{ title: 'Activities' }} />
         <Stack.Screen name="preview" options={{ title: 'Preview' }} />
         <Stack.Screen name="paywall" options={{ title: 'PaceFrame Premium' }} />
       </Stack>

@@ -1,9 +1,8 @@
 import { corsHeaders } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-type ExchangeRequest = {
-  code: string;
-  redirectUri: string;
+type RefreshRequest = {
+  refreshToken: string;
 };
 
 Deno.serve(async (req) => {
@@ -12,10 +11,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { code, redirectUri } = (await req.json()) as ExchangeRequest;
-
-    if (!code || !redirectUri) {
-      return new Response('Missing code or redirectUri', {
+    const { refreshToken } = (await req.json()) as RefreshRequest;
+    if (!refreshToken) {
+      return new Response('Missing refreshToken', {
         status: 400,
         headers: corsHeaders,
       });
@@ -23,7 +21,6 @@ Deno.serve(async (req) => {
 
     const clientId = Deno.env.get('STRAVA_CLIENT_ID');
     const clientSecret = Deno.env.get('STRAVA_CLIENT_SECRET');
-
     if (!clientId || !clientSecret) {
       return new Response('Missing STRAVA_CLIENT_ID or STRAVA_CLIENT_SECRET', {
         status: 500,
@@ -39,11 +36,11 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         client_id: clientId,
         client_secret: clientSecret,
-        code,
-        grant_type: 'authorization_code',
-        redirect_uri: redirectUri,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
       }),
     });
+
     const data = await response.json();
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -87,3 +84,4 @@ Deno.serve(async (req) => {
     });
   }
 });
+

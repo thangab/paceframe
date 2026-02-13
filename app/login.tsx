@@ -133,14 +133,6 @@ export default function LoginScreen() {
     }
   }
 
-  async function openIosSettings() {
-    try {
-      await Linking.openSettings();
-    } catch {
-      setError('Unable to open iOS settings. Please open Settings manually.');
-    }
-  }
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>PaceFrame</Text>

@@ -37,4 +37,5 @@ export type AuthTokens = {
   refreshToken: string;
   expiresAt: number;
   athleteId?: number;
+  athleteProfileUrl?: string | null;
 };

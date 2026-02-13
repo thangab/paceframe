@@ -9,6 +9,10 @@ export type ExchangeCodeParams = {
   redirectUri: string;
 };
 
+type RefreshTokensParams = {
+  refreshToken: string;
+};
+
 export async function exchangeCodeWithSupabase({
   code,
   redirectUri,
@@ -45,6 +49,45 @@ export async function exchangeCodeWithSupabase({
     refreshToken: data.refresh_token,
     expiresAt: data.expires_at,
     athleteId: data.athlete?.id,
+    athleteProfileUrl: data.athlete?.profile_medium ?? data.athlete?.profile ?? null,
+  };
+}
+
+export async function refreshTokensWithSupabase({
+  refreshToken,
+}: RefreshTokensParams): Promise<AuthTokens> {
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error('Missing EXPO_PUBLIC_SUPABASE_URL');
+  }
+  if (!supabaseAnonKey) {
+    throw new Error('Missing EXPO_PUBLIC_SUPABASE_ANON_KEY');
+  }
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/strava-refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${supabaseAnonKey}`,
+    },
+    body: JSON.stringify({ refreshToken }),
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || 'Failed to refresh Strava tokens.');
+  }
+
+  const data = await response.json();
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    expiresAt: data.expires_at,
+    athleteId: data.athlete?.id,
+    athleteProfileUrl: data.athlete?.profile_medium ?? data.athlete?.profile ?? null,
   };
 }
 

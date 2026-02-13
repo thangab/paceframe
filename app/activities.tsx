@@ -3,21 +3,23 @@ import { router, Stack } from 'expo-router';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, FontAwesome6 } from '@expo/vector-icons';
 import { ActivityCard } from '@/components/ActivityCard';
 import { spacing } from '@/constants/theme';
-import { fetchActivities } from '@/lib/strava';
+import { fetchActivities, refreshTokensWithSupabase } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
 
 export default function ActivitiesScreen() {
   const tokens = useAuthStore((s) => s.tokens);
+  const login = useAuthStore((s) => s.login);
   const logout = useAuthStore((s) => s.logout);
   const activities = useActivityStore((s) => s.activities);
   const source = useActivityStore((s) => s.source);
@@ -25,6 +27,7 @@ export default function ActivitiesScreen() {
   const selectedActivityId = useActivityStore((s) => s.selectedActivityId);
   const setActivities = useActivityStore((s) => s.setActivities);
   const selectActivity = useActivityStore((s) => s.selectActivity);
+  const isHealthKitSource = source === 'healthkit';
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +45,22 @@ export default function ActivitiesScreen() {
     try {
       setLoading(true);
       setError(null);
-      const rows = await fetchActivities(tokens.accessToken);
+      let activeTokens = tokens;
+      const nowSec = Math.floor(Date.now() / 1000);
+      const refreshBufferSec = 120;
+      const shouldRefresh =
+        !tokens.accessToken.startsWith('mock-') &&
+        Boolean(tokens.refreshToken) &&
+        tokens.expiresAt <= nowSec + refreshBufferSec;
+
+      if (shouldRefresh && tokens.refreshToken) {
+        activeTokens = await refreshTokensWithSupabase({
+          refreshToken: tokens.refreshToken,
+        });
+        await login(activeTokens);
+      }
+
+      const rows = await fetchActivities(activeTokens.accessToken);
       setActivities(rows, 'strava');
     } catch (err) {
       setError(
@@ -51,7 +69,7 @@ export default function ActivitiesScreen() {
     } finally {
       setLoading(false);
     }
-  }, [source, activities.length, tokens?.accessToken, setActivities]);
+  }, [source, activities.length, tokens, setActivities, login]);
 
   useEffect(() => {
     loadActivities();
@@ -67,6 +85,20 @@ export default function ActivitiesScreen() {
     <>
       <Stack.Screen
         options={{
+          headerTitle: () => (
+            <View style={styles.navTitleWrap}>
+              {isHealthKitSource ? (
+                <MaterialCommunityIcons
+                  name="heart-pulse"
+                  size={18}
+                  color="#131313"
+                />
+              ) : (
+                <FontAwesome6 name="strava" size={18} color="#131313" />
+              )}
+              <Text style={styles.navTitleText}>Activities</Text>
+            </View>
+          ),
           headerRight: () => (
             <Pressable
               onPress={handleLogout}
@@ -82,13 +114,32 @@ export default function ActivitiesScreen() {
               />
             </Pressable>
           ),
+          headerLeft: () => (
+            <View style={styles.navAvatarContainer}>
+              <View style={styles.navAvatarWrap}>
+                {tokens?.athleteProfileUrl ? (
+                  <Image
+                    source={{ uri: tokens.athleteProfileUrl }}
+                    style={styles.navAvatar}
+                  />
+                ) : (
+                  <View style={styles.navAvatarFallback}>
+                    <MaterialCommunityIcons
+                      name="account-outline"
+                      size={16}
+                      color="#A0A8B8"
+                    />
+                  </View>
+                )}
+              </View>
+            </View>
+          ),
         }}
       />
       <View style={styles.container}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>
-            {activities.length} activit{activities.length !== 1 ? 'ies' : 'y'}
-          </Text>
+          <Text style={styles.title}>Select an activity</Text>
+          <View style={styles.headerAvatarSpacer} />
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -152,8 +203,61 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     marginBottom: spacing.sm,
+  },
+  headerAvatarWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#2A2E38',
+    backgroundColor: '#161B25',
+  },
+  headerAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  headerAvatarFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarSpacer: {
+    width: 36,
+    height: 36,
+  },
+  navAvatarWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 999,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#2A2E38',
+    backgroundColor: '#161B25',
+  },
+  navAvatarContainer: {
+    marginLeft: 12,
+  },
+  navAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  navAvatarFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  navTitleText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#131313',
   },
   title: {
     fontSize: 30 / 1.5,
@@ -161,7 +265,7 @@ const styles = StyleSheet.create({
     color: '#D2D8E6',
     letterSpacing: 0.8,
     textAlign: 'center',
-    width: '100%',
+    flex: 1,
   },
   headerActions: {
     flexDirection: 'row',
