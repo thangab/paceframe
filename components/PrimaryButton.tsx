@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: BUTTON_LABEL_COLOR,
-    fontWeight: '700',
+    fontWeight: '400',
     fontSize: 16,
   },
   icon: {

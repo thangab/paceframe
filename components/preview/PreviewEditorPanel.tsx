@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PrimaryButton } from '@/components/PrimaryButton';
+import { StatsLayerContent } from '@/components/StatsLayerContent';
 import { colors, radius, spacing } from '@/constants/theme';
 import type { DistanceUnit } from '@/lib/format';
 import { FONT_PRESETS, TEMPLATES } from '@/lib/previewConfig';
@@ -271,10 +272,14 @@ export function PreviewEditorPanel({
                     return (
                       <Pressable
                         key={item.id}
-                        style={[styles.chip, selected && styles.chipSelected]}
+                        style={[
+                          styles.templateCard,
+                          selected && styles.templateCardSelected,
+                        ]}
                         onPress={() => onSelectTemplate(item)}
+                        accessibilityLabel={item.name}
                       >
-                        <Text style={styles.chipText}>{item.name}</Text>
+                        <TemplateLayoutPreview template={item} />
                         {isLocked ? (
                           <Text style={styles.chipSub}>Premium</Text>
                         ) : null}
@@ -497,10 +502,77 @@ export function PreviewEditorPanel({
   );
 }
 
+function TemplateLayoutPreview({ template }: { template: StatsTemplate }) {
+  const rawWidth = template.width;
+  const rawHeight = getTemplatePreviewHeight(template.layout);
+  const scale = Math.min(92 / rawWidth, 52 / rawHeight);
+
+  return (
+    <View style={styles.previewFrame}>
+      <View style={styles.previewSurface}>
+        <View
+          style={[
+            styles.previewScaledWrap,
+            {
+              width: rawWidth,
+              height: rawHeight,
+              transform: [{ scale }],
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.previewStatsCard,
+              {
+                width: rawWidth,
+                backgroundColor: template.backgroundColor,
+                borderColor: template.borderColor,
+                borderWidth: template.borderWidth,
+                borderRadius: template.radius,
+              },
+            ]}
+          >
+            <StatsLayerContent
+              template={template}
+              fontPreset={FONT_PRESETS[0]}
+              visible={{
+                distance: true,
+                time: true,
+                pace: true,
+                elev: true,
+              }}
+              distanceText="10.3 km"
+              durationText="50:20"
+              paceText="4:52 /km"
+              elevText="42 m"
+            />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function getTemplatePreviewHeight(layout: StatsTemplate['layout']) {
+  switch (layout) {
+    case 'row':
+      return 190;
+    case 'stack':
+      return 244;
+    case 'inline':
+      return 132;
+    case 'right':
+      return 146;
+    case 'grid':
+    default:
+      return 186;
+  }
+}
+
 const styles = StyleSheet.create({
   sectionTitle: {
     color: '#F3F4F6',
-    fontWeight: '800',
+    fontWeight: '400',
     fontSize: 14,
   },
   chipRow: {
@@ -521,12 +593,49 @@ const styles = StyleSheet.create({
   },
   chipText: {
     color: '#F3F4F6',
-    fontWeight: '700',
+    fontWeight: '400',
   },
   chipSub: {
-    color: '#A0A8B8',
+    color: '#D9F04A',
     fontSize: 12,
     marginTop: 2,
+    textAlign: 'center',
+    alignSelf: 'center',
+  },
+  templateCard: {
+    width: 108,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2F3644',
+    backgroundColor: '#232833',
+    padding: 0,
+    overflow: 'hidden',
+  },
+  templateCardSelected: {
+    borderColor: '#D9F04A',
+    borderWidth: 2,
+  },
+  previewFrame: {
+    height: 54,
+    borderRadius: 8,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+    padding: 1,
+    overflow: 'hidden',
+  },
+  previewSurface: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewScaledWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewStatsCard: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   controls: {
     gap: spacing.sm,
@@ -586,7 +695,7 @@ const styles = StyleSheet.create({
   },
   panelTabTextSelected: {
     color: '#111827',
-    fontWeight: '500',
+    fontWeight: '400',
   },
   helpFab: {
     width: 42,
@@ -682,7 +791,7 @@ const styles = StyleSheet.create({
   },
   statsPillText: {
     color: '#D1D5DB',
-    fontWeight: '500',
+    fontWeight: '400',
     fontSize: 13,
   },
   statsPillTextSelected: {
@@ -690,7 +799,7 @@ const styles = StyleSheet.create({
   },
   controlLabel: {
     color: '#F3F4F6',
-    fontWeight: '700',
+    fontWeight: '400',
   },
   note: {
     color: '#A0A8B8',

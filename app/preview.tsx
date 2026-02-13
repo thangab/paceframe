@@ -151,13 +151,15 @@ export default function PreviewScreen() {
   const elevText = `${Math.round(activity?.total_elevation_gain ?? 0)} m`;
   const dateText = activity ? formatDate(activity.start_date) : '';
   const locationText = useMemo(() => {
-    return [
-      activity?.location_city,
-      activity?.location_state,
-      activity?.location_country,
-    ]
-      .filter((part): part is string => Boolean(part && part.trim()))
-      .join(', ') || resolvedLocationText;
+    return (
+      [
+        activity?.location_city,
+        activity?.location_state,
+        activity?.location_country,
+      ]
+        .filter((part): part is string => Boolean(part && part.trim()))
+        .join(', ') || resolvedLocationText
+    );
   }, [activity, resolvedLocationText]);
   const supportsFullStatsPreview = useMemo(() => {
     const t = (activity?.type || '').toLowerCase();
@@ -205,8 +207,8 @@ export default function PreviewScreen() {
     () =>
       [
         ['meta', 'Header'],
-        ['stats', 'Stats block'],
-        ['route', 'Route block'],
+        ['stats', 'Stats'],
+        ['route', 'Route'],
         ...imageOverlays.map(
           (item) =>
             [`image:${item.id}` as LayerId, item.name] as [LayerId, string],

@@ -7,7 +7,7 @@ export const CHECKER_SIZE = 20;
 
 export const TEMPLATES: StatsTemplate[] = [
   {
-    id: 'row',
+    id: 'hero',
     name: 'Hero',
     layout: 'row',
     x: 16,
@@ -19,7 +19,7 @@ export const TEMPLATES: StatsTemplate[] = [
     radius: 0,
   },
   {
-    id: 'stack',
+    id: 'vertical',
     name: 'Vertical',
     layout: 'stack',
     premium: false,
@@ -32,7 +32,7 @@ export const TEMPLATES: StatsTemplate[] = [
     radius: 0,
   },
   {
-    id: 'inline',
+    id: 'compact',
     name: 'Compact',
     layout: 'inline',
     premium: false,
@@ -45,7 +45,7 @@ export const TEMPLATES: StatsTemplate[] = [
     radius: 0,
   },
   {
-    id: 'right',
+    id: 'columns',
     name: 'Columns',
     layout: 'right',
     premium: false,
@@ -58,10 +58,10 @@ export const TEMPLATES: StatsTemplate[] = [
     radius: 0,
   },
   {
-    id: 'grid',
+    id: 'grid-2x2',
     name: 'Grid 2x2',
     layout: 'grid',
-    premium: false,
+    premium: true,
     x: 18,
     y: 290,
     width: 284,
