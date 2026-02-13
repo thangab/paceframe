@@ -24,6 +24,7 @@ export type PreviewPanelTab =
   | 'style'
   | 'data'
   | 'help';
+type HeaderFieldId = 'title' | 'date' | 'location';
 
 type Props = {
   panelOpen: boolean;
@@ -53,6 +54,8 @@ type Props = {
   effectiveVisible: Record<FieldId, boolean>;
   supportsFullStatsPreview: boolean;
   onToggleField: (field: FieldId, value: boolean) => void;
+  headerVisible: Record<HeaderFieldId, boolean>;
+  onToggleHeaderField: (field: HeaderFieldId, value: boolean) => void;
   distanceUnit: DistanceUnit;
   onSetDistanceUnit: (unit: DistanceUnit) => void;
   isPremium: boolean;
@@ -88,6 +91,8 @@ export function PreviewEditorPanel({
   effectiveVisible,
   supportsFullStatsPreview,
   onToggleField,
+  headerVisible,
+  onToggleHeaderField,
   distanceUnit,
   onSetDistanceUnit,
   isPremium,
@@ -311,7 +316,7 @@ export function PreviewEditorPanel({
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.controls}>
-                <Text style={styles.sectionTitle}>Visible Infos</Text>
+                <Text style={styles.sectionTitle}>Stats Infos</Text>
                 <View style={styles.statsPillsWrap}>
                   {(
                     [
@@ -331,6 +336,43 @@ export function PreviewEditorPanel({
                           styles.statsPill,
                           selected && styles.statsPillSelected,
                           disabled && styles.statsPillDisabled,
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name="check"
+                          size={14}
+                          color={selected ? '#111500' : '#9CA3AF'}
+                        />
+                        <Text
+                          style={[
+                            styles.statsPillText,
+                            selected && styles.statsPillTextSelected,
+                          ]}
+                        >
+                          {label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.sectionTitle}>Header infos</Text>
+                <View style={styles.statsPillsWrap}>
+                  {(
+                    [
+                      ['title', 'Title'],
+                      ['date', 'Date'],
+                      ['location', 'Location'],
+                    ] as [HeaderFieldId, string][]
+                  ).map(([id, label]) => {
+                    const selected = headerVisible[id];
+                    return (
+                      <Pressable
+                        key={id}
+                        onPress={() => onToggleHeaderField(id, !selected)}
+                        style={[
+                          styles.statsPill,
+                          selected && styles.statsPillSelected,
                         ]}
                       >
                         <MaterialCommunityIcons

@@ -22,6 +22,11 @@ type GuideState = {
   showVertical: boolean;
   showHorizontal: boolean;
 };
+type HeaderVisibility = {
+  title: boolean;
+  date: boolean;
+  location: boolean;
+};
 
 type Props = {
   exportRef: RefObject<View | null>;
@@ -47,6 +52,8 @@ type Props = {
   baseLayerZ: (id: LayerId) => number;
   activityName: string;
   dateText: string;
+  locationText: string;
+  headerVisible: HeaderVisibility;
   template: StatsTemplate;
   fontPreset: FontPreset;
   effectiveVisible: Record<FieldId, boolean>;
@@ -97,6 +104,8 @@ export function PreviewEditorCanvas({
   baseLayerZ,
   activityName,
   dateText,
+  locationText,
+  headerVisible,
   template,
   fontPreset,
   effectiveVisible,
@@ -123,6 +132,10 @@ export function PreviewEditorCanvas({
   onRotationGuideChange,
 }: Props) {
   const showSelectionOutline = !isCapturingOverlay && !isExportingPng;
+  const hasHeaderContent =
+    (headerVisible.title && activityName.length > 0) ||
+    (headerVisible.date && dateText.length > 0) ||
+    (headerVisible.location && locationText.length > 0);
 
   return (
     <View
@@ -236,7 +249,7 @@ export function PreviewEditorCanvas({
 
           <Pressable style={styles.canvasTapCatcher} onPress={onCanvasTouch} />
 
-          {visibleLayers.meta ? (
+          {visibleLayers.meta && hasHeaderContent ? (
             <DraggableBlock
               key="meta-layer"
               initialX={Math.max(0, Math.round((canvasDisplayWidth - 240) / 2))}
@@ -256,8 +269,15 @@ export function PreviewEditorCanvas({
                 { zIndex: baseLayerZ('meta'), elevation: baseLayerZ('meta') },
               ]}
             >
-              <Text style={styles.metaTitle}>{activityName}</Text>
-              <Text style={styles.metaSubtitle}>{dateText}</Text>
+              {headerVisible.title ? (
+                <Text style={styles.metaTitle}>{activityName}</Text>
+              ) : null}
+              {headerVisible.date ? (
+                <Text style={styles.metaSubtitle}>{dateText}</Text>
+              ) : null}
+              {headerVisible.location ? (
+                <Text style={styles.metaLocation}>{locationText}</Text>
+              ) : null}
             </DraggableBlock>
           ) : null}
 
@@ -527,6 +547,11 @@ const styles = StyleSheet.create({
   },
   metaSubtitle: {
     color: '#E5E7EB',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  metaLocation: {
+    color: '#D1D5DB',
     fontSize: 12,
     marginTop: 2,
   },

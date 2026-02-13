@@ -10,7 +10,10 @@ export const mockActivities: StravaActivity[] = [
     total_elevation_gain: 42,
     type: 'Run',
     start_date: '2026-02-08T06:20:00Z',
+    start_latlng: [48.8566, 2.3522],
     average_speed: 3.42,
+    location_city: 'Paris',
+    location_country: 'France',
     map: {
       summary_polyline: 'gfo}EtohhUxD@bAxJmGF',
     },
@@ -25,7 +28,10 @@ export const mockActivities: StravaActivity[] = [
     total_elevation_gain: 18,
     type: 'Run',
     start_date: '2026-02-06T18:20:00Z',
+    start_latlng: [45.764, 4.8357],
     average_speed: 2.9,
+    location_city: 'Lyon',
+    location_country: 'France',
     map: {
       summary_polyline: 'o~ocF~kbkVfS~@vCjBvD',
     },
@@ -40,7 +46,10 @@ export const mockActivities: StravaActivity[] = [
     total_elevation_gain: 120,
     type: 'Run',
     start_date: '2026-02-02T05:15:00Z',
+    start_latlng: [45.8992, 6.1294],
     average_speed: 3.07,
+    location_city: 'Annecy',
+    location_country: 'France',
     map: {
       summary_polyline: 'mfp_Ix~vpAqCwAqBsBqCaC',
     },

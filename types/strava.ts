@@ -21,7 +21,12 @@ export type StravaActivity = {
   total_elevation_gain: number;
   type: string;
   start_date: string;
+  start_latlng?: [number, number] | null;
+  timezone?: string | null;
   average_speed: number;
+  location_city?: string | null;
+  location_state?: string | null;
+  location_country?: string | null;
   map: StravaPolylineMap;
   photos?: StravaActivityPhotos;
   photoUrl?: string | null;

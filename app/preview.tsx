@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { router, Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import ImageCropPicker from 'react-native-image-crop-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { captureRef } from 'react-native-view-shot';
@@ -96,6 +97,11 @@ export default function PreviewScreen() {
     pace: true,
     elev: true,
   });
+  const [headerVisible, setHeaderVisible] = useState({
+    title: true,
+    date: true,
+    location: true,
+  });
   const [layerOrder, setLayerOrder] = useState<LayerId[]>([
     'meta',
     'stats',
@@ -117,6 +123,7 @@ export default function PreviewScreen() {
   const [activePanel, setActivePanel] = useState<PreviewPanelTab>('content');
   const [panelOpen, setPanelOpen] = useState(true);
   const [isSquareFormat, setIsSquareFormat] = useState(false);
+  const [resolvedLocationText, setResolvedLocationText] = useState('');
 
   const exportRef = useRef<View>(null);
 
@@ -143,6 +150,15 @@ export default function PreviewScreen() {
   );
   const elevText = `${Math.round(activity?.total_elevation_gain ?? 0)} m`;
   const dateText = activity ? formatDate(activity.start_date) : '';
+  const locationText = useMemo(() => {
+    return [
+      activity?.location_city,
+      activity?.location_state,
+      activity?.location_country,
+    ]
+      .filter((part): part is string => Boolean(part && part.trim()))
+      .join(', ') || resolvedLocationText;
+  }, [activity, resolvedLocationText]);
   const supportsFullStatsPreview = useMemo(() => {
     const t = (activity?.type || '').toLowerCase();
     return (
@@ -286,6 +302,47 @@ export default function PreviewScreen() {
     }
   }, [routeMode, selectedLayer]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function resolveLocationFromLatLng() {
+      setResolvedLocationText('');
+      if (!activity?.start_latlng || activity.start_latlng.length < 2) return;
+
+      const [latitude, longitude] = activity.start_latlng;
+      try {
+        const [result] = await Location.reverseGeocodeAsync({
+          latitude,
+          longitude,
+        });
+        if (cancelled || !result) return;
+
+        const resolved = [result.city, result.region, result.country]
+          .filter((part): part is string => Boolean(part && part.trim()))
+          .join(', ');
+        setResolvedLocationText(resolved);
+      } catch {
+        if (!cancelled) setResolvedLocationText('');
+      }
+    }
+
+    void resolveLocationFromLatLng();
+    return () => {
+      cancelled = true;
+    };
+  }, [activity]);
+
+  useEffect(() => {
+    const allHeaderFieldsHidden =
+      !headerVisible.title && !headerVisible.date && !headerVisible.location;
+    if (!allHeaderFieldsHidden || !visibleLayers.meta) return;
+
+    setVisibleLayers((prev) => ({ ...prev, meta: false }));
+    setBehindSubjectLayers((prev) => ({ ...prev, meta: false }));
+    if (selectedLayer === 'meta') {
+      selectLayer('stats');
+    }
+  }, [headerVisible, selectedLayer, visibleLayers.meta]);
+
   if (!activity) {
     return (
       <View style={styles.centered}>
@@ -355,7 +412,9 @@ export default function PreviewScreen() {
       }
     } catch (err: any) {
       if (err?.code === 'E_PICKER_CANCELLED') return;
-      setMessage(err instanceof Error ? err.message : 'Could not choose image.');
+      setMessage(
+        err instanceof Error ? err.message : 'Could not choose image.',
+      );
     }
   }
 
@@ -430,6 +489,13 @@ export default function PreviewScreen() {
       return;
     }
     setVisible((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function toggleHeaderField(
+    field: 'title' | 'date' | 'location',
+    value: boolean,
+  ) {
+    setHeaderVisible((prev) => ({ ...prev, [field]: value }));
   }
 
   function selectTemplate(next: StatsTemplate) {
@@ -649,15 +715,16 @@ export default function PreviewScreen() {
                 hitSlop={8}
                 style={[
                   styles.headerFormatButton,
-                  (!isSquareFormat && media?.type === 'video') ||
-                  busy
+                  (!isSquareFormat && media?.type === 'video') || busy
                     ? styles.headerFormatButtonDisabled
                     : null,
                 ]}
                 disabled={busy || (!isSquareFormat && media?.type === 'video')}
                 accessibilityRole="button"
                 accessibilityLabel={
-                  isSquareFormat ? 'Square format (1:1)' : 'Portrait format (9:16)'
+                  isSquareFormat
+                    ? 'Square format (1:1)'
+                    : 'Portrait format (9:16)'
                 }
               >
                 <MaterialCommunityIcons
@@ -714,6 +781,8 @@ export default function PreviewScreen() {
           baseLayerZ={baseLayerZ}
           activityName={activity.name}
           dateText={dateText}
+          locationText={locationText}
+          headerVisible={headerVisible}
           template={template}
           fontPreset={fontPreset}
           effectiveVisible={effectiveVisible}
@@ -768,6 +837,8 @@ export default function PreviewScreen() {
           effectiveVisible={effectiveVisible}
           supportsFullStatsPreview={supportsFullStatsPreview}
           onToggleField={toggleField}
+          headerVisible={headerVisible}
+          onToggleHeaderField={toggleHeaderField}
           distanceUnit={distanceUnit}
           onSetDistanceUnit={setDistanceUnit}
           isPremium={isPremium}
