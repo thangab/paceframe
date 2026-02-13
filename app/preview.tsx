@@ -213,26 +213,11 @@ export default function PreviewScreen() {
       imageOverlays.forEach((item) => {
         labelMap.set(`image:${item.id}`, item.name);
       });
-
-      const front = layerOrder
-        .filter((id) => !behindSubjectLayers[id])
-        .slice()
-        .reverse()
-        .map((id) => ({
-          id,
-          label: labelMap.get(id) ?? id,
-          isBehind: false,
-        }));
-      const behind = layerOrder
-        .filter((id) => behindSubjectLayers[id])
-        .slice()
-        .reverse()
-        .map((id) => ({
-          id,
-          label: labelMap.get(id) ?? id,
-          isBehind: true,
-        }));
-      return [...front, ...behind];
+      return layerOrder.slice().reverse().map((id) => ({
+        id,
+        label: labelMap.get(id) ?? id,
+        isBehind: Boolean(behindSubjectLayers[id]),
+      }));
     },
     [behindSubjectLayers, imageOverlays, layerOrder],
   );
@@ -540,33 +525,22 @@ export default function PreviewScreen() {
     setRouteMode((prev) => (prev === 'map' ? 'trace' : 'map'));
   }
 
-  function moveLayer(layerId: LayerId, direction: 'up' | 'down') {
-    const current = layerOrder.indexOf(layerId);
-    if (current === -1) return;
+  function reorderLayers(
+    entries: { id: LayerId; label: string; isBehind: boolean }[],
+  ) {
+    // entries are displayed front -> back, while layerOrder stores back -> front
+    setLayerOrder(entries.map((entry) => entry.id).slice().reverse());
+    setBehindSubjectLayers(
+      entries.reduce(
+        (acc, entry) =>
+          entry.isBehind ? { ...acc, [entry.id]: true } : acc,
+        {} as Partial<Record<LayerId, boolean>>,
+      ),
+    );
+  }
 
-    // One extra step down from bottom sends the layer behind auto-subject.
-    if (direction === 'down' && current === 0) {
-      setBehindSubjectLayers((prev) => ({ ...prev, [layerId]: true }));
-      return;
-    }
-
-    // One step up brings it back in front of auto-subject.
-    if (direction === 'up' && behindSubjectLayers[layerId]) {
-      setBehindSubjectLayers((prev) => ({ ...prev, [layerId]: false }));
-      return;
-    }
-
-    setBehindSubjectLayers((prev) => ({ ...prev, [layerId]: false }));
-    setLayerOrder((prev) => {
-      const i = prev.indexOf(layerId);
-      if (i === -1) return prev;
-      const target = direction === 'up' ? i + 1 : i - 1;
-      if (target < 0 || target >= prev.length) return prev;
-
-      const next = [...prev];
-      [next[i], next[target]] = [next[target], next[i]];
-      return next;
-    });
+  function setLayerBehindSubject(layerId: LayerId, value: boolean) {
+    setBehindSubjectLayers((prev) => ({ ...prev, [layerId]: value }));
   }
 
   function toggleLayer(layerId: LayerId, value: boolean) {
@@ -850,7 +824,8 @@ export default function PreviewScreen() {
           selectedLayer={selectedLayer}
           setSelectedLayer={selectLayer}
           onToggleLayer={toggleLayer}
-          onMoveLayer={moveLayer}
+          onReorderLayers={reorderLayers}
+          onSetLayerBehindSubject={setLayerBehindSubject}
           onRemoveLayer={removeLayer}
           template={template}
           onSelectTemplate={selectTemplate}

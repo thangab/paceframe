@@ -1,15 +1,10 @@
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import DraggableFlatList from 'react-native-draggable-flatlist';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { StatsLayerContent } from '@/components/StatsLayerContent';
-import { colors, radius, spacing } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import type { DistanceUnit } from '@/lib/format';
 import { FONT_PRESETS, TEMPLATES } from '@/lib/previewConfig';
 import type {
@@ -46,7 +41,10 @@ type Props = {
   selectedLayer: LayerId;
   setSelectedLayer: (layer: LayerId) => void;
   onToggleLayer: (layer: LayerId, value: boolean) => void;
-  onMoveLayer: (layer: LayerId, direction: 'up' | 'down') => void;
+  onReorderLayers: (
+    entries: { id: LayerId; label: string; isBehind: boolean }[],
+  ) => void;
+  onSetLayerBehindSubject: (layer: LayerId, value: boolean) => void;
   onRemoveLayer: (layer: LayerId) => void;
   template: StatsTemplate;
   onSelectTemplate: (t: StatsTemplate) => void;
@@ -83,7 +81,8 @@ export function PreviewEditorPanel({
   selectedLayer,
   setSelectedLayer,
   onToggleLayer,
-  onMoveLayer,
+  onReorderLayers,
+  onSetLayerBehindSubject,
   onRemoveLayer,
   template,
   onSelectTemplate,
@@ -110,6 +109,12 @@ export function PreviewEditorPanel({
     label: string;
     icon: keyof typeof MaterialCommunityIcons.glyphMap;
   }[];
+  const [orderedLayerEntries, setOrderedLayerEntries] = useState(layerEntries);
+  const [draggingLayerId, setDraggingLayerId] = useState<LayerId | null>(null);
+
+  useEffect(() => {
+    setOrderedLayerEntries(layerEntries);
+  }, [layerEntries]);
 
   function onPressTab(tabId: PreviewPanelTab) {
     if (panelOpen && activePanel === tabId) {
@@ -178,61 +183,114 @@ export function PreviewEditorPanel({
           ) : null}
 
           {activePanel === 'content' ? (
-            <ScrollView
-              style={styles.panelScroll}
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={styles.controls}>
-                <Text style={styles.sectionTitle}>Blocks</Text>
-                {layerEntries.map((entry, index) => {
-                  const { id, label, isBehind } = entry;
+            <View style={styles.panelScroll}>
+              <DraggableFlatList
+                data={orderedLayerEntries}
+                keyExtractor={(item) => item.id}
+                containerStyle={styles.blocksList}
+                contentContainerStyle={styles.blocksListContent}
+                showsVerticalScrollIndicator={false}
+                activationDistance={16}
+                autoscrollThreshold={30}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+                onDragBegin={(index) =>
+                  setDraggingLayerId(orderedLayerEntries[index]?.id ?? null)
+                }
+                onDragEnd={({ data }) => {
+                  setDraggingLayerId(null);
+                  setOrderedLayerEntries(data);
+                  onReorderLayers(data);
+                }}
+                ListHeaderComponent={
+                  <View style={styles.blocksHeader}>
+                    <Text style={styles.sectionTitle}>Blocks</Text>
+                    <Text style={styles.orderHint}>
+                      Front {'>'} Back (drag)
+                    </Text>
+                    <Text style={styles.orderLegend}>
+                      Eye = visible • Front/Behind = subject depth • Handle =
+                      drag
+                    </Text>
+                  </View>
+                }
+                ItemSeparatorComponent={() => (
+                  <View style={styles.layerRowSpacer} />
+                )}
+                ListFooterComponent={
+                  <View style={styles.blocksFooter}>
+                    <Text style={styles.sectionTitle}>Overlay</Text>
+                    <PrimaryButton
+                      label="Add image overlay"
+                      onPress={onAddImageOverlay}
+                      variant="secondary"
+                      disabled={busy}
+                    />
+                  </View>
+                }
+                renderItem={({ item, drag, isActive, getIndex }) => {
+                  const { id, label, isBehind } = item;
+                  const index = (getIndex?.() ?? 0) + 1;
                   const isRouteLayer = id === 'route';
                   const switchValue = isRouteLayer
                     ? routeMode !== 'off' && Boolean(visibleLayers.route)
                     : Boolean(visibleLayers[id]);
                   const isImageLayer = id.startsWith('image:');
                   return (
-                    <View key={id} style={styles.layerRow}>
+                    <View
+                      style={[
+                        styles.layerRowCard,
+                        selectedLayer === id && styles.layerRowCardSelected,
+                        (isActive || draggingLayerId === id) &&
+                          styles.layerRowCardDragging,
+                      ]}
+                    >
+                      <Pressable
+                        onPress={() => onToggleLayer(id, !switchValue)}
+                        style={styles.layerVisibilityBtn}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          switchValue ? 'Hide layer' : 'Show layer'
+                        }
+                      >
+                        <MaterialCommunityIcons
+                          name={switchValue ? 'eye' : 'eye-off'}
+                          size={20}
+                          color={switchValue ? '#E5E7EB' : '#7B8495'}
+                        />
+                      </Pressable>
                       <Pressable
                         onPress={() => setSelectedLayer(id)}
-                        style={[
-                          styles.layerNameBtn,
-                          selectedLayer === id && styles.layerNameBtnSelected,
-                        ]}
+                        style={styles.layerMainBtn}
                       >
-                        <View style={styles.layerNameWrap}>
-                          <Text style={styles.orderBadge}>{index + 1}</Text>
+                        <View style={styles.layerMainTextWrap}>
                           <Text style={styles.controlLabel}>{label}</Text>
-                          {isBehind ? (
-                            <Text style={styles.behindTag}>Behind subject</Text>
-                          ) : null}
+                          <Text style={styles.orderPositionText}>#{index}</Text>
                         </View>
                       </Pressable>
-                      <Switch
-                        value={switchValue}
-                        onValueChange={(value) => onToggleLayer(id, value)}
-                      />
                       <Pressable
-                        style={styles.layerAction}
-                        onPress={() => onMoveLayer(id, 'up')}
-                        hitSlop={10}
+                        style={[
+                          styles.behindToggleBtn,
+                          isBehind && styles.behindToggleBtnActive,
+                        ]}
+                        onPress={() => onSetLayerBehindSubject(id, !isBehind)}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          isBehind
+                            ? 'Set layer in front of subject'
+                            : 'Send layer behind subject'
+                        }
                       >
-                        <MaterialCommunityIcons
-                          name="chevron-up"
-                          size={18}
-                          color="#F3F4F6"
-                        />
-                      </Pressable>
-                      <Pressable
-                        style={styles.layerAction}
-                        onPress={() => onMoveLayer(id, 'down')}
-                        hitSlop={10}
-                      >
-                        <MaterialCommunityIcons
-                          name="chevron-down"
-                          size={18}
-                          color="#F3F4F6"
-                        />
+                        <Text
+                          style={[
+                            styles.behindToggleText,
+                            isBehind && styles.behindToggleTextActive,
+                          ]}
+                        >
+                          {isBehind ? 'Behind' : 'Front'}
+                        </Text>
                       </Pressable>
                       {isImageLayer ? (
                         <Pressable
@@ -247,18 +305,23 @@ export function PreviewEditorPanel({
                           />
                         </Pressable>
                       ) : null}
+                      <Pressable
+                        style={styles.layerHandleBtn}
+                        onLongPress={drag}
+                        delayLongPress={140}
+                        hitSlop={8}
+                      >
+                        <MaterialCommunityIcons
+                          name="drag-horizontal-variant"
+                          size={20}
+                          color="#94A3B8"
+                        />
+                      </Pressable>
                     </View>
                   );
-                })}
-                <Text style={styles.sectionTitle}>Overlay</Text>
-                <PrimaryButton
-                  label="Add image overlay"
-                  onPress={onAddImageOverlay}
-                  variant="secondary"
-                  disabled={busy}
-                />
-              </View>
-            </ScrollView>
+                }}
+              />
+            </View>
           ) : null}
 
           {activePanel === 'style' ? (
@@ -728,49 +791,107 @@ const styles = StyleSheet.create({
   mediaPickCell: {
     flex: 1,
   },
-  layerRow: {
+  orderHint: {
+    color: '#A0A8B8',
+    fontSize: 11,
+    marginTop: -2,
+  },
+  orderLegend: {
+    color: '#A0A8B8',
+    fontSize: 10,
+    marginTop: -1,
+    marginBottom: 2,
+  },
+  blocksList: {
+    flex: 1,
+  },
+  blocksListContent: {
+    paddingBottom: 4,
+  },
+  blocksHeader: {
+    gap: 4,
+    marginBottom: 6,
+  },
+  blocksFooter: {
+    gap: 8,
+    marginTop: 10,
+  },
+  layerRowSpacer: {
+    height: 6,
+  },
+  layerRowCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  layerNameBtn: {
-    flex: 1,
+    gap: 6,
     borderWidth: 1,
     borderColor: '#2F3644',
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 8,
     backgroundColor: '#202632',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
-  layerNameWrap: {
+  layerRowCardSelected: {
+    borderColor: '#D9F04A',
+  },
+  layerRowCardDragging: {
+    opacity: 0.75,
+  },
+  layerVisibilityBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#2F3644',
+    backgroundColor: '#242935',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  layerMainBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    minHeight: 44,
   },
-  orderBadge: {
-    minWidth: 20,
-    textAlign: 'center',
-    color: '#9FB1D2',
-    fontSize: 12,
+  layerMainTextWrap: {
+    flex: 1,
   },
-  behindTag: {
-    marginLeft: 'auto',
+  orderPositionText: {
     color: '#A0A8B8',
     fontSize: 11,
   },
-  layerNameBtnSelected: {
-    borderColor: '#D9F04A',
-    borderWidth: 2,
-  },
-  layerAction: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
+  behindToggleBtn: {
+    minWidth: 62,
+    height: 34,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#2F3644',
-    borderRadius: 8,
-    backgroundColor: '#202632',
+    backgroundColor: '#242935',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  behindToggleBtnActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  behindToggleText: {
+    color: '#DDE6F5',
+    fontSize: 12,
+    fontWeight: '400',
+  },
+  behindToggleTextActive: {
+    color: '#111500',
+  },
+  layerHandleBtn: {
+    width: 46,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2F3644',
+    backgroundColor: '#242935',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   layerDelete: {
     width: 32,
@@ -778,9 +899,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#EF4444',
+    borderColor: '#7F1D1D',
     borderRadius: 8,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#2A1F24',
   },
   statsPillsWrap: {
     flexDirection: 'row',

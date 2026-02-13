@@ -127,7 +127,14 @@ export default function ActivitiesScreen() {
             onPress={() => router.push('/preview')}
             disabled={!selectedActivityId}
           >
-            <Text style={styles.generateBtnText}>Generate Visual ✨</Text>
+            <View style={styles.generateBtnContent}>
+              <Text style={styles.generateBtnText}>Make it pop</Text>
+              <MaterialCommunityIcons
+                name="star-four-points-outline"
+                size={18}
+                color="#111500"
+              />
+            </View>
           </Pressable>
         </View>
       </View>
@@ -213,5 +220,10 @@ const styles = StyleSheet.create({
     color: '#111500',
     fontSize: 38 / 2,
     fontWeight: '900',
+  },
+  generateBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });
