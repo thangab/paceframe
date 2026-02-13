@@ -40,7 +40,7 @@ type Props = {
   onGenerateGradient: () => void;
   onAddImageOverlay: () => void;
   isSquareFormat: boolean;
-  layerEntries: [LayerId, string][];
+  layerEntries: { id: LayerId; label: string; isBehind: boolean }[];
   routeMode: RouteMode;
   visibleLayers: Partial<Record<LayerId, boolean>>;
   selectedLayer: LayerId;
@@ -184,7 +184,8 @@ export function PreviewEditorPanel({
             >
               <View style={styles.controls}>
                 <Text style={styles.sectionTitle}>Blocks</Text>
-                {layerEntries.map(([id, label]) => {
+                {layerEntries.map((entry, index) => {
+                  const { id, label, isBehind } = entry;
                   const isRouteLayer = id === 'route';
                   const switchValue = isRouteLayer
                     ? routeMode !== 'off' && Boolean(visibleLayers.route)
@@ -199,7 +200,13 @@ export function PreviewEditorPanel({
                           selectedLayer === id && styles.layerNameBtnSelected,
                         ]}
                       >
-                        <Text style={styles.controlLabel}>{label}</Text>
+                        <View style={styles.layerNameWrap}>
+                          <Text style={styles.orderBadge}>{index + 1}</Text>
+                          <Text style={styles.controlLabel}>{label}</Text>
+                          {isBehind ? (
+                            <Text style={styles.behindTag}>Behind subject</Text>
+                          ) : null}
+                        </View>
                       </Pressable>
                       <Switch
                         value={switchValue}
@@ -734,6 +741,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 8,
     backgroundColor: '#202632',
+  },
+  layerNameWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  orderBadge: {
+    minWidth: 20,
+    textAlign: 'center',
+    color: '#9FB1D2',
+    fontSize: 12,
+  },
+  behindTag: {
+    marginLeft: 'auto',
+    color: '#A0A8B8',
+    fontSize: 11,
   },
   layerNameBtnSelected: {
     borderColor: '#D9F04A',

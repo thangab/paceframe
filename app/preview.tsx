@@ -204,17 +204,37 @@ export default function PreviewScreen() {
   const baseLayerZ = (id: LayerId) =>
     behindSubjectLayers[id] ? 2 : (layerZ[id] ?? 1) * 10 + 10;
   const layerEntries = useMemo(
-    () =>
-      [
+    () => {
+      const labelMap = new Map<LayerId, string>([
         ['meta', 'Header'],
         ['stats', 'Stats'],
         ['route', 'Route'],
-        ...imageOverlays.map(
-          (item) =>
-            [`image:${item.id}` as LayerId, item.name] as [LayerId, string],
-        ),
-      ] as [LayerId, string][],
-    [imageOverlays],
+      ]);
+      imageOverlays.forEach((item) => {
+        labelMap.set(`image:${item.id}`, item.name);
+      });
+
+      const front = layerOrder
+        .filter((id) => !behindSubjectLayers[id])
+        .slice()
+        .reverse()
+        .map((id) => ({
+          id,
+          label: labelMap.get(id) ?? id,
+          isBehind: false,
+        }));
+      const behind = layerOrder
+        .filter((id) => behindSubjectLayers[id])
+        .slice()
+        .reverse()
+        .map((id) => ({
+          id,
+          label: labelMap.get(id) ?? id,
+          isBehind: true,
+        }));
+      return [...front, ...behind];
+    },
+    [behindSubjectLayers, imageOverlays, layerOrder],
   );
   const canvasDisplaySize = useMemo(() => {
     // Keep exact target ratio while fitting visible space above the bottom overlay.
