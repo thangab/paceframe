@@ -43,6 +43,9 @@ export function StatsLayerContent({
                 fontPreset={fontPreset}
                 valueStyle={styles.heroDistanceValue}
                 unitStyle={styles.heroUnit}
+                numberOfLines={1}
+                autoFit
+                minimumFontScale={0.55}
               />
             </View>
           ) : null}
@@ -212,34 +215,27 @@ export function StatsLayerContent({
 
       {template.layout === 'grid' ? (
         <View style={styles.gridRows}>
-          <View style={styles.gridRow}>
+          {(() => {
+            const metrics = [
+              visible.distance
+                ? { id: 'distance', label: 'Distance', value: distanceText }
+                : null,
+              visible.pace ? { id: 'pace', label: 'Pace', value: paceText } : null,
+              visible.time ? { id: 'time', label: 'Time', value: durationText } : null,
+              visible.elev ? { id: 'elev', label: 'Elev Gain', value: elevText } : null,
+            ].filter(Boolean) as { id: string; label: string; value: string }[];
+
+            const singleMetric = metrics.length === 1;
+            return metrics.map((metric) => (
             <GridMetric
-              visible={visible.distance}
-              label="Distance"
-              value={distanceText}
+              key={metric.id}
+              label={metric.label}
+              value={metric.value}
               fontPreset={fontPreset}
+              singleMetric={singleMetric}
             />
-            <GridMetric
-              visible={visible.pace}
-              label="Pace"
-              value={paceText}
-              fontPreset={fontPreset}
-            />
-          </View>
-          <View style={styles.gridRow}>
-            <GridMetric
-              visible={visible.time}
-              label="Time"
-              value={durationText}
-              fontPreset={fontPreset}
-            />
-            <GridMetric
-              visible={visible.elev}
-              label="Elev Gain"
-              value={elevText}
-              fontPreset={fontPreset}
-            />
-          </View>
+            ));
+          })()}
         </View>
       ) : null}
     </>
@@ -326,22 +322,19 @@ function ColumnMetric({
 }
 
 function GridMetric({
-  visible,
   label,
   value,
   fontPreset,
+  singleMetric,
 }: {
-  visible: boolean;
   label: string;
   value: string;
   fontPreset: FontPreset;
+  singleMetric?: boolean;
 }) {
-  if (!visible) {
-    return <View style={styles.gridItem} />;
-  }
-
+  const allowsShrink = /\/km|\/mi|km|mi/i.test(value);
   return (
-    <View style={styles.gridItem}>
+    <View style={[styles.gridItem, singleMetric && styles.gridItemSingle]}>
       <Text style={[styles.gridLabel, { fontFamily: fontPreset.family }]}>
         {label}
       </Text>
@@ -351,7 +344,8 @@ function GridMetric({
         valueStyle={styles.gridValue}
         unitStyle={styles.gridUnit}
         numberOfLines={1}
-        autoFit={false}
+        autoFit={!singleMetric && allowsShrink}
+        minimumFontScale={0.84}
       />
     </View>
   );
@@ -364,6 +358,7 @@ function ValueWithUnit({
   unitStyle,
   numberOfLines,
   autoFit = true,
+  minimumFontScale = 0.8,
 }: {
   value: string;
   fontPreset: FontPreset;
@@ -371,13 +366,14 @@ function ValueWithUnit({
   unitStyle: any;
   numberOfLines?: number;
   autoFit?: boolean;
+  minimumFontScale?: number;
 }) {
   const { main, unit } = splitMetricValue(value);
   return (
     <Text
       numberOfLines={numberOfLines}
       adjustsFontSizeToFit={Boolean(numberOfLines) && autoFit}
-      minimumFontScale={0.8}
+      minimumFontScale={minimumFontScale}
       style={[
         valueStyle,
         { fontFamily: fontPreset.family, fontWeight: fontPreset.weightValue },
@@ -523,19 +519,19 @@ const styles = StyleSheet.create({
   },
   gridRows: {
     width: '100%',
-    gap: 18,
-    alignItems: 'center',
-  },
-  gridRow: {
-    width: 'auto',
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
+    rowGap: 18,
     gap: 10,
     alignItems: 'flex-start',
   },
   gridItem: {
     width: '48%',
     alignItems: 'center',
+  },
+  gridItemSingle: {
+    width: '100%',
   },
   gridLabel: {
     color: '#D1D5DB',

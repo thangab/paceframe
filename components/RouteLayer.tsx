@@ -15,7 +15,6 @@ type Props = {
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
 const MAPBOX_STYLE = 'mapbox/streets-v12';
-const IOS_TRACE_ZOOM_OFFSET = 0.85;
 const TRACE_STROKE_WIDTH = 4;
 
 export function RouteLayer({
@@ -50,18 +49,13 @@ export function RouteLayer({
   }, [latLngs, width, height]);
   const routePath = useMemo(() => {
     if (!latLngs.length || !viewport) return null;
-    const traceZoom =
-      Platform.OS === 'ios'
-        ? viewport.zoom + IOS_TRACE_ZOOM_OFFSET
-        : viewport.zoom;
-
     const points = latLngs.map((p) =>
       projectPointToViewport({
         lat: p.lat,
         lng: p.lng,
         centerLat: viewport.centerLat,
         centerLng: viewport.centerLng,
-        zoom: traceZoom,
+        zoom: viewport.zoom,
         width,
         height,
       }),
@@ -119,7 +113,7 @@ export function RouteLayer({
       polyline,
       width,
       height,
-      strokeColorHex: '#F97316',
+      strokeColorHex: '#D4FF54',
     })
       .then((uri) => {
         if (!cancelled) {
@@ -182,7 +176,7 @@ export function RouteLayer({
         path={routePath.path}
         style="stroke"
         strokeWidth={TRACE_STROKE_WIDTH}
-        color="#F97316"
+        color="#D4FF54"
         strokeJoin="round"
         strokeCap="round"
       />
@@ -241,7 +235,8 @@ function fitZoom(
   height: number,
 ) {
   const WORLD_SIZE = 256;
-  const paddingRatio = 0.82;
+  // Keep route footprint close to native iOS snapshot region expansion (1.35x span).
+  const paddingRatio = 1 / 1.35;
 
   const lngToX = (lng: number) => (lng + 180) / 360;
   const latToY = (lat: number) => {
@@ -254,7 +249,7 @@ function fitZoom(
 
   const zoomX = Math.log2((width * paddingRatio) / (WORLD_SIZE * dx));
   const zoomY = Math.log2((height * paddingRatio) / (WORLD_SIZE * dy));
-  const zoom = Math.floor(Math.min(zoomX, zoomY));
+  const zoom = Math.min(zoomX, zoomY);
   return Math.max(1, Math.min(18, zoom));
 }
 

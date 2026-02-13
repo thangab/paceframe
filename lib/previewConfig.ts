@@ -1,7 +1,7 @@
 import { FontPreset, StatsTemplate } from '@/types/preview';
 
-export const STORY_WIDTH = 320;
-export const STORY_HEIGHT = 568;
+export const STORY_WIDTH = 360;
+export const STORY_HEIGHT = 640;
 export const MAX_VIDEO_DURATION_SECONDS = 30;
 export const CHECKER_SIZE = 20;
 

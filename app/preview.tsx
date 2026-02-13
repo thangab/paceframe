@@ -1,24 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Image,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
-  Switch,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Video, ResizeMode } from 'expo-av';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
-import { DraggableBlock } from '@/components/DraggableBlock';
-import { RouteLayer } from '@/components/RouteLayer';
-import { StatsLayerContent } from '@/components/StatsLayerContent';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { colors, radius, spacing } from '@/constants/theme';
+import { colors } from '@/constants/theme';
+import { PreviewEditorCanvas } from '@/components/preview/PreviewEditorCanvas';
+import {
+  PreviewEditorPanel,
+  type PreviewPanelTab,
+} from '@/components/preview/PreviewEditorPanel';
 import {
   CHECKER_SIZE,
   FONT_PRESETS,
@@ -48,16 +47,13 @@ import {
 
 const ROUTE_LAYER_WIDTH = 280;
 const ROUTE_LAYER_HEIGHT = 180;
-const ROUTE_LAYER_INITIAL_X = (STORY_WIDTH - ROUTE_LAYER_WIDTH) / 2;
-const ROUTE_LAYER_INITIAL_Y = (STORY_HEIGHT - ROUTE_LAYER_HEIGHT) / 2;
 const IMAGE_OVERLAY_MAX_INITIAL = 180;
 const IMAGE_OVERLAY_MIN_INITIAL = 90;
 const EXPORT_PNG_WIDTH = 1080;
-const EXPORT_PNG_HEIGHT = Math.round(
-  (EXPORT_PNG_WIDTH * STORY_HEIGHT) / STORY_WIDTH,
-);
+const EXPORT_PNG_HEIGHT = 1920;
 
 export default function PreviewScreen() {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const activity = useActivityStore((s) => s.selectedActivity());
   const isPremium = useSubscriptionStore((s) => s.isPremium);
   const [busy, setBusy] = useState(false);
@@ -101,6 +97,8 @@ export default function PreviewScreen() {
   >({});
   const [selectedLayer, setSelectedLayer] = useState<LayerId>('stats');
   const [activeLayer, setActiveLayer] = useState<LayerId | null>(null);
+  const [activePanel, setActivePanel] = useState<PreviewPanelTab>('background');
+  const [panelOpen, setPanelOpen] = useState(true);
 
   const exportRef = useRef<View>(null);
 
@@ -140,7 +138,7 @@ export default function PreviewScreen() {
   const effectiveVisible = useMemo<Record<FieldId, boolean>>(
     () =>
       supportsFullStatsPreview
-        ? visible
+        ? { ...visible, distance: true }
         : {
             distance: false,
             time: true,
@@ -148,6 +146,18 @@ export default function PreviewScreen() {
             elev: false,
           },
     [supportsFullStatsPreview, visible],
+  );
+  const visibleStatsCount = useMemo(
+    () =>
+      (effectiveVisible.distance ? 1 : 0) +
+      (effectiveVisible.time ? 1 : 0) +
+      (effectiveVisible.pace ? 1 : 0) +
+      (effectiveVisible.elev ? 1 : 0),
+    [effectiveVisible],
+  );
+  const dynamicStatsWidth = useMemo(
+    () => getDynamicStatsWidth(template, visibleStatsCount),
+    [template, visibleStatsCount],
   );
   const layerZ = useMemo(() => {
     return layerOrder.reduce(
@@ -157,9 +167,73 @@ export default function PreviewScreen() {
   }, [layerOrder]);
   const baseLayerZ = (id: LayerId) =>
     behindSubjectLayers[id] ? 2 : (layerZ[id] ?? 1) * 10 + 10;
+  const layerEntries = useMemo(
+    () =>
+      [
+        ['meta', 'Header'],
+        ['stats', 'Stats block'],
+        ['route', 'Route block'],
+        ...imageOverlays.map(
+          (item) =>
+            [`image:${item.id}` as LayerId, item.name] as [LayerId, string],
+        ),
+      ] as [LayerId, string][],
+    [imageOverlays],
+  );
+  const canvasDisplaySize = useMemo(() => {
+    // Keep exact story ratio while fitting visible space above the bottom overlay.
+    const ratio = STORY_WIDTH / STORY_HEIGHT;
+    const canvasShrinkFactor = 0.94;
+    const reservedBottom = 120;
+    const maxWidth = Math.max(220, screenWidth);
+    const maxHeight = Math.max(220, screenHeight - reservedBottom);
+
+    let width = maxWidth;
+    let height = width / ratio;
+
+    if (height > maxHeight) {
+      height = maxHeight;
+      width = height * ratio;
+    }
+
+    return {
+      width: Math.round(width * canvasShrinkFactor),
+      height: Math.round(height * canvasShrinkFactor),
+    };
+  }, [screenHeight, screenWidth]);
+  const canvasDisplayWidth = canvasDisplaySize.width;
+  const canvasDisplayHeight = canvasDisplaySize.height;
+  const canvasRelativeScale = useMemo(
+    () => canvasDisplayWidth / STORY_WIDTH,
+    [canvasDisplayWidth],
+  );
+  const dynamicStatsWidthDisplay = useMemo(
+    () => Math.round(dynamicStatsWidth * canvasRelativeScale),
+    [canvasRelativeScale, dynamicStatsWidth],
+  );
+  const centeredStatsXDisplay = useMemo(
+    () => Math.round((canvasDisplayWidth - dynamicStatsWidthDisplay) / 2),
+    [canvasDisplayWidth, dynamicStatsWidthDisplay],
+  );
+  const routeLayerWidthDisplay = useMemo(
+    () => Math.round(ROUTE_LAYER_WIDTH * canvasRelativeScale),
+    [canvasRelativeScale],
+  );
+  const routeLayerHeightDisplay = useMemo(
+    () => Math.round(ROUTE_LAYER_HEIGHT * canvasRelativeScale),
+    [canvasRelativeScale],
+  );
+  const routeInitialXDisplay = useMemo(
+    () => Math.round((canvasDisplayWidth - routeLayerWidthDisplay) / 2),
+    [canvasDisplayWidth, routeLayerWidthDisplay],
+  );
+  const routeInitialYDisplay = useMemo(
+    () => Math.round((canvasDisplayHeight - routeLayerHeightDisplay) / 2),
+    [canvasDisplayHeight, routeLayerHeightDisplay],
+  );
   const checkerTiles = useMemo(() => {
-    const cols = Math.ceil(STORY_WIDTH / CHECKER_SIZE);
-    const rows = Math.ceil(STORY_HEIGHT / CHECKER_SIZE);
+    const cols = Math.ceil(canvasDisplayWidth / CHECKER_SIZE);
+    const rows = Math.ceil(canvasDisplayHeight / CHECKER_SIZE);
     const tiles: { key: string; left: number; top: number; dark: boolean }[] =
       [];
 
@@ -174,7 +248,7 @@ export default function PreviewScreen() {
       }
     }
     return tiles;
-  }, []);
+  }, [canvasDisplayHeight, canvasDisplayWidth]);
 
   useEffect(() => {
     if (routeMode === 'off' && selectedLayer === 'route') {
@@ -298,6 +372,9 @@ export default function PreviewScreen() {
   }
 
   function toggleField(field: FieldId, value: boolean) {
+    if (field === 'distance' && !value) {
+      return;
+    }
     setVisible((prev) => ({ ...prev, [field]: value }));
   }
 
@@ -384,14 +461,6 @@ export default function PreviewScreen() {
     if (selectedLayer === layerId) {
       setSelectedLayer('stats');
     }
-  }
-
-  function updateImageLayer(layerId: LayerId, patch: Partial<ImageOverlay>) {
-    if (!layerId.startsWith('image:')) return;
-    const id = layerId.replace('image:', '');
-    setImageOverlays((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    );
   }
 
   async function exportAndShare() {
@@ -493,513 +562,113 @@ export default function PreviewScreen() {
     setMessage('Transparent background selected.');
   }
 
+  function triggerExport() {
+    void (media?.type === 'video' ? exportVideo() : exportAndShare());
+  }
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.editorWrap}>
-        <View
-          collapsable={false}
-          ref={exportRef}
-          style={[
-            styles.storyCanvas,
-            (isCapturingOverlay || isExportingPng) && styles.storyCanvasSquare,
-            (isCapturingOverlay || isExportingPng) &&
-              styles.storyCanvasNoBorder,
-            (isCapturingOverlay || (isExportingPng && pngTransparentOnly)) &&
-              styles.storyCanvasTransparent,
-          ]}
-        >
-          {!isExportingPng && !isCapturingOverlay ? (
-            <View pointerEvents="none" style={styles.checkerboardBase}>
-              {checkerTiles.map((tile) => (
-                <View
-                  key={tile.key}
-                  style={[
-                    styles.checkerTile,
-                    tile.dark
-                      ? styles.checkerTileDark
-                      : styles.checkerTileLight,
-                    { left: tile.left, top: tile.top },
-                  ]}
-                />
-              ))}
-            </View>
-          ) : null}
-          {centerGuides.showVertical ? (
-            <View pointerEvents="none" style={styles.centerGuideVertical} />
-          ) : null}
-          {centerGuides.showHorizontal ? (
-            <View pointerEvents="none" style={styles.centerGuideHorizontal} />
-          ) : null}
-          {showRotationGuide ? (
-            <View pointerEvents="none" style={styles.rotationGuideBadge}>
-              <Text style={styles.rotationGuideBadgeText}>0°</Text>
-            </View>
-          ) : null}
-
-          {media?.type === 'video' ? (
-            <Video
-              source={{ uri: media.uri }}
-              style={[
-                styles.media,
-                (isCapturingOverlay ||
-                  (isExportingPng && pngTransparentOnly)) &&
-                  styles.hiddenForCapture,
-              ]}
-              shouldPlay
-              isLooping
-              isMuted={false}
-              resizeMode={ResizeMode.COVER}
-            />
-          ) : media?.uri ? (
-            <Image
-              source={{ uri: media.uri }}
-              style={[
-                styles.media,
-                isExportingPng && pngTransparentOnly && styles.hiddenForCapture,
-              ]}
-              resizeMode="cover"
-            />
-          ) : null}
-          {autoSubjectUri ? (
-            <View pointerEvents="none" style={styles.autoSubjectLayer}>
-              <Image
-                source={{ uri: autoSubjectUri }}
-                style={styles.media}
-                resizeMode="cover"
-              />
-            </View>
-          ) : null}
-
-          {visibleLayers.meta ? (
-            <DraggableBlock
-              key="meta-layer"
-              initialX={42}
-              initialY={44}
-              selected={activeLayer === 'meta'}
-              outlineRadius={0}
-              canvasWidth={STORY_WIDTH}
-              canvasHeight={STORY_HEIGHT}
-              onDragGuideChange={setCenterGuides}
-              onRotationGuideChange={setShowRotationGuide}
-              onSelect={() => setSelectedLayer('meta')}
-              onInteractionChange={(active) =>
-                setActiveLayer(active ? 'meta' : null)
-              }
-              style={[
-                styles.metaBlock,
-                {
-                  zIndex: baseLayerZ('meta'),
-                  elevation: baseLayerZ('meta'),
-                },
-              ]}
-            >
-              <Text style={styles.metaTitle}>{activity.name}</Text>
-              <Text style={styles.metaSubtitle}>{dateText}</Text>
-            </DraggableBlock>
-          ) : null}
-
-          {visibleLayers.stats ? (
-            <DraggableBlock
-              key={template.id}
-              initialX={template.x}
-              initialY={template.y}
-              selected={activeLayer === 'stats'}
-              outlineRadius={template.radius}
-              canvasWidth={STORY_WIDTH}
-              canvasHeight={STORY_HEIGHT}
-              onDragGuideChange={setCenterGuides}
-              onRotationGuideChange={setShowRotationGuide}
-              onSelect={() => setSelectedLayer('stats')}
-              onTap={cycleStatsTemplate}
-              onInteractionChange={(active) =>
-                setActiveLayer(active ? 'stats' : null)
-              }
-              style={[
-                styles.statsBlock,
-                {
-                  width: template.width,
-                  backgroundColor: template.backgroundColor,
-                  borderColor: template.borderColor,
-                  borderWidth: template.borderWidth,
-                  borderRadius: template.radius,
-                  zIndex: baseLayerZ('stats'),
-                  elevation: baseLayerZ('stats'),
-                },
-              ]}
-            >
-              <StatsLayerContent
-                template={template}
-                fontPreset={fontPreset}
-                visible={effectiveVisible}
-                distanceText={distanceText}
-                durationText={durationText}
-                paceText={paceText}
-                elevText={elevText}
-              />
-            </DraggableBlock>
-          ) : null}
-
-          {routeMode !== 'off' && visibleLayers.route ? (
-            <DraggableBlock
-              key="route-layer"
-              initialX={ROUTE_LAYER_INITIAL_X}
-              initialY={ROUTE_LAYER_INITIAL_Y}
-              selected={activeLayer === 'route'}
-              outlineRadius={0}
-              canvasWidth={STORY_WIDTH}
-              canvasHeight={STORY_HEIGHT}
-              onDragGuideChange={setCenterGuides}
-              onRotationGuideChange={setShowRotationGuide}
-              onSelect={() => setSelectedLayer('route')}
-              onTap={cycleRouteMode}
-              onInteractionChange={(active) =>
-                setActiveLayer(active ? 'route' : null)
-              }
-              style={[
-                styles.routeBlock,
-                {
-                  zIndex: baseLayerZ('route'),
-                  elevation: baseLayerZ('route'),
-                },
-              ]}
-            >
-              <RouteLayer
-                polyline={activity.map.summary_polyline}
-                mode={routeMode === 'map' ? 'map' : 'trace'}
-                width={ROUTE_LAYER_WIDTH}
-                height={ROUTE_LAYER_HEIGHT}
-              />
-            </DraggableBlock>
-          ) : null}
-
-          {imageOverlays.map((overlay, index) => {
-            const layerId: LayerId = `image:${overlay.id}`;
-            if (!visibleLayers[layerId]) return null;
-
-            return (
-              <DraggableBlock
-                key={layerId}
-                initialX={20 + index * 12}
-                initialY={80 + index * 12}
-                selected={activeLayer === layerId}
-                outlineRadius={radius.lg}
-                canvasWidth={STORY_WIDTH}
-                canvasHeight={STORY_HEIGHT}
-                onDragGuideChange={setCenterGuides}
-                onRotationGuideChange={setShowRotationGuide}
-                rotationDeg={overlay.rotationDeg}
-                onSelect={() => setSelectedLayer(layerId)}
-                onInteractionChange={(active) =>
-                  setActiveLayer(active ? layerId : null)
-                }
-                style={[
-                  styles.imageOverlayBlock,
-                  {
-                    width: overlay.width ?? IMAGE_OVERLAY_MAX_INITIAL,
-                    height: overlay.height ?? IMAGE_OVERLAY_MAX_INITIAL,
-                    zIndex: baseLayerZ(layerId),
-                    elevation: baseLayerZ(layerId),
-                    opacity: overlay.opacity,
-                  },
-                ]}
-              >
-                <Image
-                  source={{ uri: overlay.uri }}
-                  style={styles.imageOverlayImage}
-                  resizeMode="contain"
-                />
-              </DraggableBlock>
-            );
-          })}
-
-          {!isPremium ? <Text style={styles.watermark}>PACEFRAME</Text> : null}
-        </View>
-      </View>
-
-      <View style={styles.mediaPickRow}>
-        <View style={styles.mediaPickCell}>
-          <PrimaryButton
-            label={isExtracting ? 'Processing image...' : 'Choose image'}
-            onPress={pickImageMedia}
-            variant="secondary"
-            disabled={busy || isExtracting}
-          />
-        </View>
-        <View style={styles.mediaPickCell}>
-          <PrimaryButton
-            label="Choose video"
-            onPress={pickVideoMedia}
-            variant="secondary"
-            disabled={busy}
-          />
-        </View>
-        <View style={styles.mediaPickCell}>
-          <PrimaryButton
-            label="Clear background"
-            onPress={clearBackgroundMedia}
-            variant="secondary"
-            disabled={busy}
-          />
-        </View>
-      </View>
-      <PrimaryButton
-        label="Add image overlay"
-        onPress={addImageOverlay}
-        variant="secondary"
-      />
-
-      <Text style={styles.sectionTitle}>Layers</Text>
-      <View style={styles.controls}>
-        {(
-          [
-            ['meta', 'Header'],
-            ['stats', 'Stats block'],
-            ['route', 'Route block'],
-            ...imageOverlays.map(
-              (item) =>
-                [`image:${item.id}` as LayerId, item.name] as [LayerId, string],
-            ),
-          ] as [LayerId, string][]
-        ).map(([id, label]) => {
-          const isRouteLayer = id === 'route';
-          const switchValue = isRouteLayer
-            ? routeMode !== 'off' && Boolean(visibleLayers.route)
-            : Boolean(visibleLayers[id]);
-          const isImageLayer = id.startsWith('image:');
-          return (
-            <View key={id} style={styles.layerRow}>
-              <Pressable
-                onPress={() => setSelectedLayer(id)}
-                style={[
-                  styles.layerNameBtn,
-                  selectedLayer === id && styles.layerNameBtnSelected,
-                ]}
-              >
-                <Text style={styles.controlLabel}>{label}</Text>
-              </Pressable>
-              <Switch
-                value={switchValue}
-                onValueChange={(value) => toggleLayer(id, value)}
-              />
-              <Pressable
-                style={styles.layerAction}
-                onPress={() => moveLayer(id, 'up')}
-                hitSlop={10}
-              >
-                <Text style={styles.layerActionText}>↑</Text>
-              </Pressable>
-              <Pressable
-                style={styles.layerAction}
-                onPress={() => moveLayer(id, 'down')}
-                hitSlop={10}
-              >
-                <Text style={styles.layerActionText}>↓</Text>
-              </Pressable>
-              {isImageLayer ? (
-                <Pressable
-                  style={styles.layerDelete}
-                  onPress={() => removeLayer(id)}
-                  hitSlop={10}
-                >
-                  <Text style={styles.layerDeleteText}>✕</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          );
-        })}
-      </View>
-
-      {selectedLayer.startsWith('image:') ? (
-        <View style={styles.controls}>
-          <Text style={styles.sectionTitle}>Image Layer Settings</Text>
-          <View style={styles.layerAdjustRow}>
-            <Text style={styles.controlLabel}>Opacity</Text>
+    <>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
             <Pressable
-              style={styles.layerAction}
               onPress={() => {
-                const id = selectedLayer;
-                const layer = imageOverlays.find((x) => `image:${x.id}` === id);
-                if (!layer) return;
-                updateImageLayer(id, {
-                  opacity: Math.max(0.1, layer.opacity - 0.1),
-                });
+                if (busy) return;
+                triggerExport();
               }}
+              hitSlop={8}
+              style={styles.headerExportButton}
             >
-              <Text style={styles.layerActionText}>-</Text>
-            </Pressable>
-            <Text style={styles.adjustValue}>
-              {Math.round(
-                (imageOverlays.find((x) => `image:${x.id}` === selectedLayer)
-                  ?.opacity ?? 1) * 100,
-              )}
-              %
-            </Text>
-            <Pressable
-              style={styles.layerAction}
-              onPress={() => {
-                const id = selectedLayer;
-                const layer = imageOverlays.find((x) => `image:${x.id}` === id);
-                if (!layer) return;
-                updateImageLayer(id, {
-                  opacity: Math.min(1, layer.opacity + 0.1),
-                });
-              }}
-            >
-              <Text style={styles.layerActionText}>+</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.layerAdjustRow}>
-            <Text style={styles.controlLabel}>Rotation</Text>
-            <Pressable
-              style={styles.layerAction}
-              onPress={() => {
-                const id = selectedLayer;
-                const layer = imageOverlays.find((x) => `image:${x.id}` === id);
-                if (!layer) return;
-                updateImageLayer(id, { rotationDeg: layer.rotationDeg - 5 });
-              }}
-            >
-              <Text style={styles.layerActionText}>-5°</Text>
-            </Pressable>
-            <Text style={styles.adjustValue}>
-              {Math.round(
-                imageOverlays.find((x) => `image:${x.id}` === selectedLayer)
-                  ?.rotationDeg ?? 0,
-              )}
-              °
-            </Text>
-            <Pressable
-              style={styles.layerAction}
-              onPress={() => {
-                const id = selectedLayer;
-                const layer = imageOverlays.find((x) => `image:${x.id}` === id);
-                if (!layer) return;
-                updateImageLayer(id, { rotationDeg: layer.rotationDeg + 5 });
-              }}
-            >
-              <Text style={styles.layerActionText}>+5°</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
-
-      <Text style={styles.sectionTitle}>Template Block</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipRow}
-      >
-        {TEMPLATES.map((item) => {
-          const isLocked = item.premium && !isPremium;
-          const selected = item.id === template.id;
-          return (
-            <Pressable
-              key={item.id}
-              style={[styles.chip, selected && styles.chipSelected]}
-              onPress={() => selectTemplate(item)}
-            >
-              <Text style={styles.chipText}>{item.name}</Text>
-              {isLocked ? <Text style={styles.chipSub}>Premium</Text> : null}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      <Text style={styles.sectionTitle}>Font</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipRow}
-      >
-        {FONT_PRESETS.map((item) => {
-          const selected = item.id === fontPreset.id;
-          return (
-            <Pressable
-              key={item.id}
-              style={[styles.chip, selected && styles.chipSelected]}
-              onPress={() => setSelectedFontId(item.id)}
-            >
-              <Text style={[styles.chipText, { fontFamily: item.family }]}>
-                {item.name}
+              <Text style={styles.headerExportText}>
+                {busy ? '...' : 'Export'}
               </Text>
             </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      <Text style={styles.sectionTitle}>Visible Infos</Text>
-      <View style={styles.controls}>
-        {(
-          [
-            ['distance', 'Distance'],
-            ['time', 'Time'],
-            ['pace', 'Pace'],
-            ['elev', 'Elevation gain'],
-          ] as [FieldId, string][]
-        ).map(([id, label]) => (
-          <View key={id} style={styles.switchRow}>
-            <Text style={styles.controlLabel}>{label}</Text>
-            <Switch
-              value={effectiveVisible[id]}
-              disabled={!supportsFullStatsPreview}
-              onValueChange={(value) => toggleField(id, value)}
-            />
-          </View>
-        ))}
-      </View>
-      {!supportsFullStatsPreview ? (
-        <Text style={styles.note}>
-          For this activity type, preview shows Time only.
-        </Text>
-      ) : null}
-
-      <Text style={styles.sectionTitle}>Unit</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipRow}
-      >
-        {(
-          [
-            { id: 'km', label: 'Kilometers' },
-            { id: 'mi', label: 'Miles' },
-          ] as { id: DistanceUnit; label: string }[]
-        ).map((item) => {
-          const selected = item.id === distanceUnit;
-          return (
-            <Pressable
-              key={item.id}
-              style={[styles.chip, selected && styles.chipSelected]}
-              onPress={() => setDistanceUnit(item.id)}
-            >
-              <Text style={styles.chipText}>{item.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      <Text style={styles.note}>
-        Pinch and drag blocks to resize and place them. Center guide lines
-        appear when aligned. Press ↓ at the bottom to place a layer behind the
-        auto subject. Tap the route layer to switch between trace and map.
-      </Text>
-      {message ? <Text style={styles.note}>{message}</Text> : null}
-
-      {!isPremium ? (
-        <PrimaryButton
-          label="Unlock Premium Templates"
-          onPress={() => router.push('/paywall')}
-          variant="secondary"
-        />
-      ) : null}
-
-      <PrimaryButton
-        label={busy ? 'Exporting...' : 'Export'}
-        onPress={media?.type === 'video' ? exportVideo : exportAndShare}
-        disabled={busy}
+          ),
+        }}
       />
-    </ScrollView>
+      <View style={styles.container}>
+        <PreviewEditorCanvas
+          exportRef={exportRef}
+          panelOpen={panelOpen}
+          onCanvasTouch={() => {
+            if (panelOpen) setPanelOpen(false);
+          }}
+          canvasDisplayWidth={canvasDisplayWidth}
+          canvasDisplayHeight={canvasDisplayHeight}
+          isCapturingOverlay={isCapturingOverlay}
+          isExportingPng={isExportingPng}
+          pngTransparentOnly={pngTransparentOnly}
+          checkerTiles={checkerTiles}
+          centerGuides={centerGuides}
+          showRotationGuide={showRotationGuide}
+          media={media}
+          autoSubjectUri={autoSubjectUri}
+          visibleLayers={visibleLayers}
+          activeLayer={activeLayer}
+          setActiveLayer={setActiveLayer}
+          setSelectedLayer={setSelectedLayer}
+          baseLayerZ={baseLayerZ}
+          activityName={activity.name}
+          dateText={dateText}
+          template={template}
+          fontPreset={fontPreset}
+          effectiveVisible={effectiveVisible}
+          distanceText={distanceText}
+          durationText={durationText}
+          paceText={paceText}
+          elevText={elevText}
+          centeredStatsXDisplay={centeredStatsXDisplay}
+          dynamicStatsWidthDisplay={dynamicStatsWidthDisplay}
+          canvasRelativeScale={canvasRelativeScale}
+          cycleStatsTemplate={cycleStatsTemplate}
+          routeMode={routeMode}
+          routeInitialXDisplay={routeInitialXDisplay}
+          routeInitialYDisplay={routeInitialYDisplay}
+          routeLayerWidthDisplay={routeLayerWidthDisplay}
+          routeLayerHeightDisplay={routeLayerHeightDisplay}
+          activityPolyline={activity.map.summary_polyline}
+          cycleRouteMode={cycleRouteMode}
+          imageOverlays={imageOverlays}
+          imageOverlayMaxInitial={IMAGE_OVERLAY_MAX_INITIAL}
+          isPremium={isPremium}
+          onDragGuideChange={setCenterGuides}
+          onRotationGuideChange={setShowRotationGuide}
+        />
+
+        <PreviewEditorPanel
+          panelOpen={panelOpen}
+          setPanelOpen={setPanelOpen}
+          activePanel={activePanel}
+          setActivePanel={setActivePanel}
+          busy={busy}
+          isExtracting={isExtracting}
+          onPickImage={pickImageMedia}
+          onPickVideo={pickVideoMedia}
+          onClearBackground={clearBackgroundMedia}
+          onAddImageOverlay={addImageOverlay}
+          layerEntries={layerEntries}
+          routeMode={routeMode}
+          visibleLayers={visibleLayers}
+          selectedLayer={selectedLayer}
+          setSelectedLayer={setSelectedLayer}
+          onToggleLayer={toggleLayer}
+          onMoveLayer={moveLayer}
+          onRemoveLayer={removeLayer}
+          template={template}
+          onSelectTemplate={selectTemplate}
+          selectedFontId={selectedFontId}
+          onSelectFont={setSelectedFontId}
+          effectiveVisible={effectiveVisible}
+          supportsFullStatsPreview={supportsFullStatsPreview}
+          onToggleField={toggleField}
+          distanceUnit={distanceUnit}
+          onSetDistanceUnit={setDistanceUnit}
+          isPremium={isPremium}
+          message={message}
+          onOpenPaywall={() => router.push('/paywall')}
+        />
+      </View>
+    </>
   );
 }
 
@@ -1033,289 +702,54 @@ function getInitialOverlaySize(
   };
 }
 
+function getDynamicStatsWidth(template: StatsTemplate, visibleCount: number) {
+  const count = Math.max(1, Math.min(4, visibleCount));
+
+  switch (template.layout) {
+    case 'row': {
+      // Hero: distance + bottom row; keep wider when many metrics are visible.
+      if (count >= 4) return template.width;
+      if (count === 3) return Math.max(220, template.width - 24);
+      if (count === 2) return Math.max(170, template.width - 78);
+      return 140;
+    }
+    case 'inline':
+      return Math.max(150, Math.round(template.width * (0.45 + count * 0.14)));
+    case 'right':
+      return Math.max(160, Math.round(template.width * (0.42 + count * 0.145)));
+    case 'grid':
+      if (count >= 4) return template.width;
+      if (count === 3) return Math.max(220, template.width - 28);
+      if (count === 2) return Math.max(160, template.width - 110);
+      return 130;
+    case 'stack':
+    default:
+      return Math.max(130, Math.round(template.width * (0.42 + count * 0.145)));
+  }
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#0E0F12',
   },
-  content: {
-    padding: spacing.md,
-    gap: spacing.md,
+  headerExportButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  headerExportText: {
+    color: '#0E0F12',
+    fontWeight: '800',
+    fontSize: 16,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
-    padding: spacing.md,
-    gap: spacing.md,
+    padding: 16,
+    gap: 16,
     backgroundColor: colors.background,
   },
-  title: {
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: '800',
-  },
-  editorWrap: {
-    alignItems: 'center',
-  },
-  storyCanvas: {
-    width: STORY_WIDTH,
-    height: STORY_HEIGHT,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    backgroundColor: '#0B0B0B',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  storyCanvasSquare: {
-    borderRadius: 0,
-  },
-  storyCanvasNoBorder: {
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  storyCanvasTransparent: {
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  media: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    zIndex: 0,
-    elevation: 0,
-  },
-  checkerboardBase: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    overflow: 'hidden',
-    opacity: 1,
-  },
-  checkerTile: {
-    position: 'absolute',
-    width: CHECKER_SIZE,
-    height: CHECKER_SIZE,
-  },
-  checkerTileDark: {
-    backgroundColor: '#060606',
-  },
-  checkerTileLight: {
-    backgroundColor: '#111111',
-  },
-  centerGuideVertical: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: '50%',
-    width: 1,
-    marginLeft: -0.5,
-    backgroundColor: 'rgba(34,211,238,0.95)',
-    zIndex: 999,
-    elevation: 999,
-  },
-  centerGuideHorizontal: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: '50%',
-    height: 1,
-    marginTop: -0.5,
-    backgroundColor: 'rgba(34,211,238,0.95)',
-    zIndex: 999,
-    elevation: 999,
-  },
-  rotationGuideBadge: {
-    position: 'absolute',
-    top: 12,
-    alignSelf: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(34,211,238,0.95)',
-    zIndex: 1000,
-    elevation: 1000,
-  },
-  rotationGuideBadgeText: {
-    color: '#00131A',
-    fontWeight: '800',
-    fontSize: 12,
-  },
-  hiddenForCapture: {
-    opacity: 0,
-  },
-  autoSubjectLayer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    zIndex: 5,
-    elevation: 5,
-  },
-  statsBlock: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    alignItems: 'stretch',
-  },
-  metaBlock: {
-    width: 240,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 0,
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    borderColor: 'transparent',
-    alignItems: 'center',
-  },
-  metaSubtitle: {
-    color: '#E5E7EB',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  metaTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  routeBlock: {
-    padding: 0,
-    borderRadius: 0,
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  imageOverlayBlock: {
-    borderRadius: 0,
-    overflow: 'hidden',
-    backgroundColor: 'transparent',
-  },
-  imageOverlayImage: {
-    width: '100%',
-    height: '100%',
-  },
-  sectionTitle: {
-    color: colors.text,
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  chipRow: {
-    gap: spacing.sm,
-  },
-  chip: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    minWidth: 116,
-  },
-  chipSelected: {
-    borderColor: colors.primary,
-    borderWidth: 2,
-  },
-  chipText: {
-    color: colors.text,
-    fontWeight: '700',
-  },
-  chipSub: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  controls: {
-    gap: spacing.sm,
-  },
-  mediaPickRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'stretch',
-  },
-  mediaPickCell: {
-    flex: 1,
-  },
-  layerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  layerNameBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 8,
-    backgroundColor: colors.surface,
-  },
-  layerNameBtnSelected: {
-    borderColor: colors.primary,
-    borderWidth: 2,
-  },
-  layerAction: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    backgroundColor: colors.surface,
-  },
-  layerActionText: {
-    color: colors.text,
-    fontWeight: '800',
-  },
-  layerDelete: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#EF4444',
-    borderRadius: 8,
-    backgroundColor: '#FEE2E2',
-  },
-  layerDeleteText: {
-    color: '#DC2626',
-    fontWeight: '800',
-  },
-  layerAdjustRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  adjustValue: {
-    minWidth: 56,
-    textAlign: 'center',
-    color: colors.text,
-    fontWeight: '700',
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 8,
-  },
-  controlLabel: {
-    color: colors.text,
-    fontWeight: '700',
-  },
   note: {
-    color: colors.textMuted,
-  },
-  watermark: {
-    position: 'absolute',
-    right: 14,
-    bottom: 16,
-    color: 'rgba(255,255,255,0.84)',
-    fontWeight: '800',
-    letterSpacing: 1,
-    zIndex: 5000,
-    elevation: 5000,
+    color: '#A0A8B8',
   },
 });
