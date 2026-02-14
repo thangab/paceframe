@@ -218,7 +218,7 @@ export function PreviewEditorPanel({
                   </View>
                   <View style={styles.backgroundActionCell}>
                     <PrimaryButton
-                      label="Color"
+                      label="Gradient"
                       icon="gradient-horizontal"
                       onPress={onGenerateGradient}
                       variant="secondary"
@@ -230,7 +230,7 @@ export function PreviewEditorPanel({
                   </View>
                   <View style={styles.backgroundActionCell}>
                     <PrimaryButton
-                      label="Reset"
+                      label="Transparent"
                       icon="dots-square"
                       onPress={onClearBackground}
                       variant="secondary"

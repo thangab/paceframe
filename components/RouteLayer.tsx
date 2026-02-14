@@ -5,21 +5,23 @@ import { generateMapSnapshot } from '@/lib/nativeMapSnapshot';
 import { decodePolyline } from '@/lib/polyline';
 
 type RouteMode = 'map' | 'trace';
+type RouteMapVariant = 'standard' | 'dark' | 'satellite';
 
 type Props = {
   polyline: string | null;
   mode: RouteMode;
+  mapVariant?: RouteMapVariant;
   width?: number;
   height?: number;
 };
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
-const MAPBOX_STYLE = 'mapbox/streets-v12';
 const TRACE_STROKE_WIDTH = 4;
 
 export function RouteLayer({
   polyline,
   mode,
+  mapVariant = 'standard',
   width = 250,
   height = 150,
 }: Props) {
@@ -77,23 +79,29 @@ export function RouteLayer({
     if (Platform.OS === 'ios') return null;
     if (!MAPBOX_TOKEN) return null;
 
+    const mapboxStyle =
+      mapVariant === 'satellite'
+        ? 'mapbox/satellite-v9'
+        : mapVariant === 'dark'
+          ? 'mapbox/dark-v11'
+          : 'mapbox/streets-v12';
     const sampled = sampleForStaticMap(latLngs, 50);
     const encodedPolyline = encodeURIComponent(encodePolyline(sampled));
-    const overlay = `path-4+ff6b00-0.95(${encodedPolyline})`;
+    const overlay = `path-4+d4ff54-0.95(${encodedPolyline})`;
     const pixelRatioSuffix = '@2x';
 
     return (
-      `https://api.mapbox.com/styles/v1/${MAPBOX_STYLE}/static/` +
+      `https://api.mapbox.com/styles/v1/${mapboxStyle}/static/` +
       `${overlay}/` +
       `${viewport.centerLng.toFixed(5)},${viewport.centerLat.toFixed(5)},${viewport.zoom},0/` +
       `${Math.round(width)}x${Math.round(height)}${pixelRatioSuffix}` +
       `?access_token=${encodeURIComponent(MAPBOX_TOKEN)}`
     );
-  }, [polyline, latLngs, viewport, width, height]);
+  }, [polyline, latLngs, viewport, width, height, mapVariant]);
 
   useEffect(() => {
     setMapLoadFailed(false);
-  }, [mapImageUrl, mode, polyline]);
+  }, [mapImageUrl, mode, polyline, mapVariant]);
 
   useEffect(() => {
     if (Platform.OS !== 'ios' || !polyline) {
@@ -101,7 +109,7 @@ export function RouteLayer({
       iosSnapshotKeyRef.current = null;
       return;
     }
-    const snapshotKey = `${polyline}|${Math.round(width)}x${Math.round(height)}`;
+    const snapshotKey = `${polyline}|${Math.round(width)}x${Math.round(height)}|${mapVariant}`;
     const hasMatchingSnapshot =
       iosSnapshotKeyRef.current === snapshotKey && Boolean(iosMapUri);
     if (hasMatchingSnapshot) return;
@@ -114,6 +122,7 @@ export function RouteLayer({
       width,
       height,
       strokeColorHex: '#D4FF54',
+      mapVariant,
     })
       .then((uri) => {
         if (!cancelled) {
@@ -132,7 +141,7 @@ export function RouteLayer({
     return () => {
       cancelled = true;
     };
-  }, [polyline, width, height, iosMapUri]);
+  }, [polyline, width, height, iosMapUri, mapVariant]);
 
   if (!routePath) {
     return (

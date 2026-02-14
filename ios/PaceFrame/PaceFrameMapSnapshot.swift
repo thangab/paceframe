@@ -32,12 +32,20 @@ class PaceFrameMapSnapshot: NSObject {
 
     let colorHex = (params["strokeColorHex"] as? String) ?? "#F97316"
     let strokeColor = UIColor(hex: colorHex) ?? UIColor(red: 0.976, green: 0.451, blue: 0.086, alpha: 1)
+    let mapVariant = (params["mapVariant"] as? String) ?? "standard"
 
     let size = CGSize(width: max(1, CGFloat(truncating: width)), height: max(1, CGFloat(truncating: height)))
 
     let options = MKMapSnapshotter.Options()
     options.size = size
-    options.mapType = .standard
+    if mapVariant == "satellite" {
+      options.mapType = .satellite
+    } else {
+      options.mapType = .standard
+      if mapVariant == "dark", #available(iOS 13.0, *) {
+        options.traitCollection = UITraitCollection(userInterfaceStyle: .dark)
+      }
+    }
     options.region = regionFitting(coordinates: coordinates)
     options.showsBuildings = false
     options.pointOfInterestFilter = .excludingAll
