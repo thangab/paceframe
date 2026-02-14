@@ -34,7 +34,17 @@ export function StatsLayerContent({
   paceText,
   elevText,
 }: Props) {
+  const metrics = [
+    visible.distance
+      ? { id: 'distance', label: 'Distance', value: distanceText }
+      : null,
+    visible.time ? { id: 'time', label: 'Time', value: durationText } : null,
+    visible.pace ? { id: 'pace', label: 'Pace', value: paceText } : null,
+    visible.elev ? { id: 'elev', label: 'Elev Gain', value: elevText } : null,
+  ].filter(Boolean) as { id: string; label: string; value: string }[];
+
   const layoutKind = resolveLayoutKind(template.layout);
+
   return (
     <>
       {layoutKind === 'row' ? (
@@ -131,109 +141,31 @@ export function StatsLayerContent({
           ) : null}
           <View style={styles.compactRow}>
             {visible.time ? (
-              <View style={styles.inlineMetric}>
-                <MaterialCommunityIcons
-                  name="clock-outline"
-                  size={14}
-                  color="#FFFFFF"
-                  style={styles.inlineMetricIcon}
-                />
-                <Text
-                  style={[
-                    styles.inlineText,
-                    TEXT_SHADOW_STYLE,
-                    { fontFamily: fontPreset.family },
-                  ]}
-                >
-                  {durationText}
-                </Text>
-              </View>
+              <InlineMetric
+                icon="clock-outline"
+                value={durationText}
+                fontPreset={fontPreset}
+              />
             ) : null}
             {visible.time && (visible.pace || visible.elev) ? (
-              <Text
-                style={[
-                  styles.separator,
-                  TEXT_SHADOW_STYLE,
-                  { fontFamily: fontPreset.family },
-                ]}
-              >
-                |
-              </Text>
+              <Text style={styles.separator}>|</Text>
             ) : null}
             {visible.pace ? (
-              <View style={styles.inlineMetric}>
-                <MaterialCommunityIcons
-                  name="speedometer"
-                  size={14}
-                  color="#FFFFFF"
-                  style={styles.inlineMetricIcon}
-                />
-                <Text
-                  style={[
-                    styles.inlineText,
-                    TEXT_SHADOW_STYLE,
-                    {
-                      fontFamily: fontPreset.family,
-                      fontWeight: fontPreset.weightValue,
-                    },
-                  ]}
-                >
-                  {splitMetricValue(paceText).main}
-                  <Text
-                    style={[
-                      styles.inlineUnit,
-                      TEXT_SHADOW_STYLE,
-                      { fontFamily: fontPreset.family },
-                    ]}
-                  >
-                    {' '}
-                    {splitMetricValue(paceText).unit}
-                  </Text>
-                </Text>
-              </View>
+              <InlineMetric
+                icon="speedometer"
+                value={paceText}
+                fontPreset={fontPreset}
+              />
             ) : null}
             {visible.pace && visible.elev ? (
-              <Text
-                style={[
-                  styles.separator,
-                  TEXT_SHADOW_STYLE,
-                  { fontFamily: fontPreset.family },
-                ]}
-              >
-                |
-              </Text>
+              <Text style={styles.separator}>|</Text>
             ) : null}
             {visible.elev ? (
-              <View style={styles.inlineMetric}>
-                <MaterialCommunityIcons
-                  name="arrow-up-bold"
-                  size={14}
-                  color="#FFFFFF"
-                  style={styles.inlineMetricIcon}
-                />
-                <Text
-                  style={[
-                    styles.inlineText,
-                    TEXT_SHADOW_STYLE,
-                    {
-                      fontFamily: fontPreset.family,
-                      fontWeight: fontPreset.weightValue,
-                    },
-                  ]}
-                >
-                  {splitMetricValue(elevText).main}
-                  <Text
-                    style={[
-                      styles.inlineUnit,
-                      TEXT_SHADOW_STYLE,
-                      { fontFamily: fontPreset.family },
-                    ]}
-                  >
-                    {' '}
-                    {splitMetricValue(elevText).unit}
-                  </Text>
-                </Text>
-              </View>
+              <InlineMetric
+                icon="arrow-up-bold"
+                value={elevText}
+                fontPreset={fontPreset}
+              />
             ) : null}
           </View>
         </View>
@@ -274,26 +206,15 @@ export function StatsLayerContent({
 
       {layoutKind === 'grid' ? (
         <View style={styles.gridRows}>
-          {(() => {
-            const metrics = [
-              visible.distance
-                ? { id: 'distance', label: 'Distance', value: distanceText }
-                : null,
-              visible.pace ? { id: 'pace', label: 'Pace', value: paceText } : null,
-              visible.time ? { id: 'time', label: 'Time', value: durationText } : null,
-              visible.elev ? { id: 'elev', label: 'Elev Gain', value: elevText } : null,
-            ].filter(Boolean) as { id: string; label: string; value: string }[];
-
-            return metrics.map((metric) => (
-              <GridMetric
-                key={metric.id}
-                label={metric.label}
-                value={metric.value}
-                fontPreset={fontPreset}
-                columnCount={metrics.length >= 3 ? 2 : 1}
-              />
-            ));
-          })()}
+          {metrics.map((metric) => (
+            <GridMetric
+              key={metric.id}
+              label={metric.label}
+              value={metric.value}
+              fontPreset={fontPreset}
+              columnCount={metrics.length >= 3 ? 2 : 1}
+            />
+          ))}
         </View>
       ) : null}
     </>
@@ -321,6 +242,37 @@ function resolveLayoutKind(layout: StatsTemplate['layout']) {
   }
 }
 
+function InlineMetric({
+  icon,
+  value,
+  fontPreset,
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  value: string;
+  fontPreset: FontPreset;
+}) {
+  const { main, unit } = splitMetricValue(value);
+  return (
+    <View style={styles.inlineMetric}>
+      <MaterialCommunityIcons
+        name={icon}
+        size={14}
+        color="#FFFFFF"
+        style={styles.inlineMetricIcon}
+      />
+      <Text style={[styles.inlineText, { fontFamily: fontPreset.family }]}>
+        {main}
+        {unit ? (
+          <Text style={[styles.inlineUnit, { fontFamily: fontPreset.family }]}>
+            {' '}
+            {unit}
+          </Text>
+        ) : null}
+      </Text>
+    </View>
+  );
+}
+
 function MetricCell({
   label,
   value,
@@ -332,13 +284,7 @@ function MetricCell({
 }) {
   return (
     <View style={styles.metricCell}>
-      <Text
-        style={[
-          styles.metricLabel,
-          TEXT_SHADOW_STYLE,
-          { fontFamily: fontPreset.family },
-        ]}
-      >
+      <Text style={[styles.metricLabel, { fontFamily: fontPreset.family }]}>
         {label}
       </Text>
       <ValueWithUnit
@@ -368,13 +314,7 @@ function StackMetric({
   if (!visible) return null;
   return (
     <>
-      <Text
-        style={[
-          styles.metricLabel,
-          TEXT_SHADOW_STYLE,
-          { fontFamily: fontPreset.family },
-        ]}
-      >
+      <Text style={[styles.metricLabel, { fontFamily: fontPreset.family }]}>
         {label}
       </Text>
       <ValueWithUnit
@@ -401,13 +341,7 @@ function ColumnMetric({
 }) {
   return (
     <View style={styles.columnItem}>
-      <Text
-        style={[
-          styles.metricLabel,
-          TEXT_SHADOW_STYLE,
-          { fontFamily: fontPreset.family },
-        ]}
-      >
+      <Text style={[styles.metricLabel, { fontFamily: fontPreset.family }]}>
         {label}
       </Text>
       <ValueWithUnit
@@ -433,13 +367,7 @@ function GridMetric({
 }) {
   return (
     <View style={[styles.gridItem, columnCount === 1 && styles.gridItemSingle]}>
-      <Text
-        style={[
-          styles.gridLabel,
-          TEXT_SHADOW_STYLE,
-          { fontFamily: fontPreset.family },
-        ]}
-      >
+      <Text style={[styles.gridLabel, { fontFamily: fontPreset.family }]}>
         {label}
       </Text>
       <ValueWithUnit
@@ -479,6 +407,7 @@ function ValueWithUnit({
   const effectiveAdjustsFontSizeToFit = isTimesFamily
     ? false
     : Boolean(numberOfLines) && autoFit;
+
   return (
     <Text
       numberOfLines={numberOfLines}
@@ -493,7 +422,11 @@ function ValueWithUnit({
       {main}
       {unit ? (
         <Text
-          style={[unitStyle, TEXT_SHADOW_STYLE, { fontFamily: fontPreset.family }]}
+          style={[
+            unitStyle,
+            TEXT_SHADOW_STYLE,
+            { fontFamily: fontPreset.family },
+          ]}
         >
           {' '}
           {unit}
@@ -511,133 +444,52 @@ function splitMetricValue(value: string) {
 }
 
 const styles = StyleSheet.create({
-  heroWrap: {
-    width: '100%',
-    alignItems: 'center',
-    gap: 12,
-  },
-  heroDistanceWrap: {
-    alignItems: 'center',
-  },
-  heroLabel: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    marginBottom: 4,
-  },
-  heroDistanceValue: {
-    color: '#FFFFFF',
-    fontSize: 48,
-    lineHeight: 54,
-  },
-  heroUnit: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '600',
-  },
+  heroWrap: { width: '100%', alignItems: 'center', gap: 12 },
+  heroDistanceWrap: { alignItems: 'center' },
+  heroLabel: { color: '#FFFFFF', fontSize: 22, marginBottom: 4 },
+  heroDistanceValue: { color: '#FFFFFF', fontSize: 48, lineHeight: 54 },
+  heroUnit: { color: '#FFFFFF', fontSize: 22, fontWeight: '600' },
   heroBottomRow: {
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 10,
   },
-  verticalWrap: {
-    alignItems: 'center',
-    gap: 8,
-  },
+  verticalWrap: { alignItems: 'center', gap: 8 },
   verticalValue: {
     color: '#FFFFFF',
     fontSize: 28,
     lineHeight: 32,
     marginBottom: 4,
   },
-  verticalUnit: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  compactWrap: {
-    width: '100%',
-    alignItems: 'center',
-    gap: 8,
-  },
-  compactDistanceValue: {
-    color: '#FFFFFF',
-    fontSize: 48,
-    lineHeight: 54,
-  },
-  compactUnit: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '600',
-  },
+  verticalUnit: { color: '#FFFFFF', fontSize: 20, fontWeight: '600' },
+  compactWrap: { width: '100%', alignItems: 'center', gap: 8 },
+  compactDistanceValue: { color: '#FFFFFF', fontSize: 48, lineHeight: 54 },
+  compactUnit: { color: '#FFFFFF', fontSize: 20, fontWeight: '600' },
   compactRow: {
     flexDirection: 'row',
     gap: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  inlineMetric: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  inlineMetricIcon: {
-    marginTop: 1,
-  },
-  inlineText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  inlineUnit: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  separator: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    marginHorizontal: 2,
-  },
+  inlineMetric: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  inlineMetricIcon: { marginTop: 1 },
+  inlineText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  inlineUnit: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  separator: { color: '#FFFFFF', fontSize: 20, marginHorizontal: 2 },
   columnsWrap: {
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 8,
   },
-  metricCell: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  metricLabel: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    marginBottom: 2,
-  },
-  metricValue: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    lineHeight: 24,
-  },
-  metricUnit: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  columnItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  columnValue: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    lineHeight: 20,
-  },
-  columnUnit: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  metricCell: { flex: 1, alignItems: 'center' },
+  metricLabel: { color: '#FFFFFF', fontSize: 13, marginBottom: 2 },
+  metricValue: { color: '#FFFFFF', fontSize: 20, lineHeight: 24 },
+  metricUnit: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  columnItem: { flex: 1, alignItems: 'center' },
+  columnValue: { color: '#FFFFFF', fontSize: 16, lineHeight: 20 },
+  columnUnit: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
   gridRows: {
     width: '100%',
     flexDirection: 'row',
@@ -647,13 +499,8 @@ const styles = StyleSheet.create({
     gap: 10,
     alignItems: 'flex-start',
   },
-  gridItem: {
-    width: '48%',
-    alignItems: 'center',
-  },
-  gridItemSingle: {
-    width: '100%',
-  },
+  gridItem: { width: '48%', alignItems: 'center' },
+  gridItemSingle: { width: '100%' },
   gridLabel: {
     color: '#FFFFFF',
     fontSize: 12,
@@ -667,9 +514,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     width: '100%',
   },
-  gridUnit: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
-  },
+  gridUnit: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
 });
