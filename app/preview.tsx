@@ -59,6 +59,7 @@ import {
 
 const ROUTE_LAYER_WIDTH = 280;
 const ROUTE_LAYER_HEIGHT = 180;
+const ROUTE_DEFAULT_Y_RAISE = 130;
 const IMAGE_OVERLAY_MAX_INITIAL = 180;
 const IMAGE_OVERLAY_MIN_INITIAL = 90;
 const EXPORT_PNG_WIDTH = 1080;
@@ -130,7 +131,7 @@ export default function PreviewScreen() {
   const [selectedTemplateId, setSelectedTemplateId] = useState(TEMPLATES[0].id);
   const [selectedFontId, setSelectedFontId] = useState(FONT_PRESETS[0].id);
   const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>('km');
-  const [routeMode, setRouteMode] = useState<RouteMode>('off');
+  const [routeMode, setRouteMode] = useState<RouteMode>('trace');
   const [routeMapVariant, setRouteMapVariant] =
     useState<RouteMapVariant>('standard');
   const [visible, setVisible] = useState<Record<FieldId, boolean>>(
@@ -189,7 +190,9 @@ export default function PreviewScreen() {
   );
   const elevText = `${Math.round(activity?.total_elevation_gain ?? 0)} m`;
   const dateText = activity ? formatDate(activity.start_date) : '';
-  const activityPhotoUri = activity?.photoUrl ? normalizeLocalUri(activity.photoUrl) : null;
+  const activityPhotoUri = activity?.photoUrl
+    ? normalizeLocalUri(activity.photoUrl)
+    : null;
   const locationText = useMemo(() => {
     return (
       [
@@ -243,24 +246,24 @@ export default function PreviewScreen() {
   }, [layerOrder]);
   const baseLayerZ = (id: LayerId) =>
     behindSubjectLayers[id] ? 2 : (layerZ[id] ?? 1) * 10 + 10;
-  const layerEntries = useMemo(
-    () => {
-      const labelMap = new Map<LayerId, string>([
-        ['meta', 'Header'],
-        ['stats', 'Stats'],
-        ['route', 'Route'],
-      ]);
-      imageOverlays.forEach((item) => {
-        labelMap.set(`image:${item.id}`, item.name);
-      });
-      return layerOrder.slice().reverse().map((id) => ({
+  const layerEntries = useMemo(() => {
+    const labelMap = new Map<LayerId, string>([
+      ['meta', 'Header'],
+      ['stats', 'Stats'],
+      ['route', 'Route'],
+    ]);
+    imageOverlays.forEach((item) => {
+      labelMap.set(`image:${item.id}`, item.name);
+    });
+    return layerOrder
+      .slice()
+      .reverse()
+      .map((id) => ({
         id,
         label: labelMap.get(id) ?? id,
         isBehind: Boolean(behindSubjectLayers[id]),
       }));
-    },
-    [behindSubjectLayers, imageOverlays, layerOrder],
-  );
+  }, [behindSubjectLayers, imageOverlays, layerOrder]);
   const canvasDisplaySize = useMemo(() => {
     // Keep exact target ratio while fitting visible space above the bottom overlay.
     const targetHeight = isSquareFormat ? STORY_WIDTH : STORY_HEIGHT;
@@ -315,8 +318,15 @@ export default function PreviewScreen() {
     [canvasDisplayWidth, routeLayerWidthDisplay],
   );
   const routeInitialYDisplay = useMemo(
-    () => Math.round((canvasDisplayHeight - routeLayerHeightDisplay) / 2),
-    [canvasDisplayHeight, routeLayerHeightDisplay],
+    () =>
+      Math.max(
+        0,
+        Math.round(
+          (canvasDisplayHeight - routeLayerHeightDisplay) / 2 -
+            ROUTE_DEFAULT_Y_RAISE * canvasScaleY,
+        ),
+      ),
+    [canvasDisplayHeight, canvasScaleY, routeLayerHeightDisplay],
   );
   const checkerTiles = useMemo(() => {
     const cols = Math.ceil(canvasDisplayWidth / CHECKER_SIZE);
@@ -351,7 +361,7 @@ export default function PreviewScreen() {
     setSelectedTemplateId(TEMPLATES[0].id);
     setSelectedFontId(FONT_PRESETS[0].id);
     setDistanceUnit('km');
-    setRouteMode('off');
+    setRouteMode('trace');
     setRouteMapVariant('standard');
     setVisible(DEFAULT_VISIBLE_FIELDS);
     setHeaderVisible(DEFAULT_HEADER_VISIBLE);
@@ -373,11 +383,13 @@ export default function PreviewScreen() {
     setSelectedTemplateId(draft.selectedTemplateId ?? TEMPLATES[0].id);
     setSelectedFontId(draft.selectedFontId ?? FONT_PRESETS[0].id);
     setDistanceUnit(draft.distanceUnit ?? 'km');
-    setRouteMode(draft.routeMode ?? 'off');
+    setRouteMode(draft.routeMode ?? 'trace');
     setRouteMapVariant(draft.routeMapVariant ?? 'standard');
     setVisible(draft.visible ?? DEFAULT_VISIBLE_FIELDS);
     setHeaderVisible(draft.headerVisible ?? DEFAULT_HEADER_VISIBLE);
-    setLayerOrder(draft.layerOrder?.length ? draft.layerOrder : BASE_LAYER_ORDER);
+    setLayerOrder(
+      draft.layerOrder?.length ? draft.layerOrder : BASE_LAYER_ORDER,
+    );
     setVisibleLayers(draft.visibleLayers ?? DEFAULT_VISIBLE_LAYERS);
     setBehindSubjectLayers(draft.behindSubjectLayers ?? {});
     setLayerTransforms(draft.layerTransforms ?? {});
@@ -416,7 +428,7 @@ export default function PreviewScreen() {
               selectedTemplateId: TEMPLATES[0].id,
               selectedFontId: FONT_PRESETS[0].id,
               distanceUnit: 'km',
-              routeMode: 'off',
+              routeMode: 'trace',
               routeMapVariant: 'standard',
               visible: DEFAULT_VISIBLE_FIELDS,
               headerVisible: DEFAULT_HEADER_VISIBLE,
@@ -576,6 +588,11 @@ export default function PreviewScreen() {
     }
   }, [headerVisible, selectedLayer, visibleLayers.meta]);
 
+  useEffect(() => {
+    if (activePanel !== 'help' || !panelOpen) return;
+    void refreshAppCacheUsage();
+  }, [activePanel, panelOpen]);
+
   if (!activity) {
     return (
       <View style={styles.centered}>
@@ -659,7 +676,9 @@ export default function PreviewScreen() {
         media?.uri,
         autoSubjectUri,
         ...imageOverlays.map((item) => item.uri),
-      ].filter((uri): uri is string => Boolean(uri && uri.startsWith('file://'))),
+      ].filter((uri): uri is string =>
+        Boolean(uri && uri.startsWith('file://')),
+      ),
     );
 
     try {
@@ -673,17 +692,16 @@ export default function PreviewScreen() {
       setMessage('Cache cleared.');
     } catch (err) {
       setMessage(
-        err instanceof Error ? `Could not clear cache (${err.message}).` : 'Could not clear cache.',
+        err instanceof Error
+          ? `Could not clear cache (${err.message}).`
+          : 'Could not clear cache.',
       );
     }
   }
 
-  useEffect(() => {
-    if (activePanel !== 'help' || !panelOpen) return;
-    void refreshAppCacheUsage();
-  }, [activePanel, panelOpen]);
-
-  async function cleanupMediaIfTemp(asset: ImagePicker.ImagePickerAsset | null) {
+  async function cleanupMediaIfTemp(
+    asset: ImagePicker.ImagePickerAsset | null,
+  ) {
     if (!asset) return;
     await cleanupTempUriIfOwned(asset.uri);
   }
@@ -711,7 +729,9 @@ export default function PreviewScreen() {
       trackManagedTempUri(cutoutUri);
       setAutoSubjectUri(cutoutUri);
       if (!options.silent) {
-        setMessage(options.successMessage ?? 'Subject extracted automatically.');
+        setMessage(
+          options.successMessage ?? 'Subject extracted automatically.',
+        );
       }
     } catch (err) {
       if (!options.silent) {
@@ -941,11 +961,15 @@ export default function PreviewScreen() {
     entries: { id: LayerId; label: string; isBehind: boolean }[],
   ) {
     // entries are displayed front -> back, while layerOrder stores back -> front
-    setLayerOrder(entries.map((entry) => entry.id).slice().reverse());
+    setLayerOrder(
+      entries
+        .map((entry) => entry.id)
+        .slice()
+        .reverse(),
+    );
     setBehindSubjectLayers(
       entries.reduce(
-        (acc, entry) =>
-          entry.isBehind ? { ...acc, [entry.id]: true } : acc,
+        (acc, entry) => (entry.isBehind ? { ...acc, [entry.id]: true } : acc),
         {} as Partial<Record<LayerId, boolean>>,
       ),
     );
@@ -966,9 +990,7 @@ export default function PreviewScreen() {
     if (layerId === 'route') {
       if (value) {
         setRouteMode((prev) => (prev === 'off' ? 'trace' : prev));
-        setRouteMapVariant((prev) =>
-          routeMode === 'off' ? 'standard' : prev,
-        );
+        setRouteMapVariant((prev) => (routeMode === 'off' ? 'standard' : prev));
         setVisibleLayers((prev) => ({ ...prev, route: true }));
         setBehindSubjectLayers((prev) => ({ ...prev, route: false }));
         selectLayer('route');
@@ -1138,7 +1160,8 @@ export default function PreviewScreen() {
       type: 'image',
     };
     await applyImageBackground(asset, {
-      successMessage: 'Activity photo applied. Subject extracted automatically.',
+      successMessage:
+        'Activity photo applied. Subject extracted automatically.',
       failurePrefix: 'Activity photo applied.',
     });
   }

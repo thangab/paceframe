@@ -9,7 +9,7 @@ import type {
   RouteMode,
 } from '@/types/preview';
 
-export const BASE_LAYER_ORDER: LayerId[] = ['meta', 'stats', 'route'];
+export const BASE_LAYER_ORDER: LayerId[] = ['route', 'stats', 'meta'];
 
 export type LayerTransform = {
   x: number;
