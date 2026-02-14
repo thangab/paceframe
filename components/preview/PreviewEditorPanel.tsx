@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { PrimaryButton } from '@/components/PrimaryButton';
@@ -36,6 +43,7 @@ type Props = {
   onClearBackground: () => void;
   onGenerateGradient: () => void;
   onAddImageOverlay: () => void;
+  onCreateSticker: () => void;
   isSquareFormat: boolean;
   layerEntries: { id: LayerId; label: string; isBehind: boolean }[];
   routeMode: RouteMode;
@@ -61,6 +69,8 @@ type Props = {
   onSetDistanceUnit: (unit: DistanceUnit) => void;
   isPremium: boolean;
   message: string | null;
+  appCacheUsageLabel?: string;
+  onClearAppCache?: () => void;
   onOpenPaywall: () => void;
 };
 
@@ -78,6 +88,7 @@ export function PreviewEditorPanel({
   onClearBackground,
   onGenerateGradient,
   onAddImageOverlay,
+  onCreateSticker,
   isSquareFormat,
   layerEntries,
   routeMode,
@@ -101,6 +112,8 @@ export function PreviewEditorPanel({
   onSetDistanceUnit,
   isPremium,
   message,
+  appCacheUsageLabel,
+  onClearAppCache,
   onOpenPaywall,
 }: Props) {
   const mainTabs = [
@@ -283,16 +296,32 @@ export function PreviewEditorPanel({
                 ListFooterComponent={
                   <View style={styles.blocksFooter}>
                     <Text style={styles.sectionTitle}>Overlay</Text>
-                    <PrimaryButton
-                      label="Add image overlay"
-                      icon="image-plus"
-                      onPress={onAddImageOverlay}
-                      variant="secondary"
-                      colorScheme="panel"
-                      iconPosition="top"
-                      compact
-                      disabled={busy}
-                    />
+                    <View style={styles.overlayActionsRow}>
+                      <View style={styles.overlayActionCell}>
+                        <PrimaryButton
+                          label="Add image"
+                          icon="image-plus"
+                          onPress={onAddImageOverlay}
+                          variant="secondary"
+                          colorScheme="panel"
+                          iconPosition="top"
+                          compact
+                          disabled={busy}
+                        />
+                      </View>
+                      <View style={styles.overlayActionCell}>
+                        <PrimaryButton
+                          label="Create sticker"
+                          icon="content-cut"
+                          onPress={onCreateSticker}
+                          variant="secondary"
+                          colorScheme="panel"
+                          iconPosition="top"
+                          compact
+                          disabled={busy}
+                        />
+                      </View>
+                    </View>
                   </View>
                 }
                 renderItem={({ item, drag, isActive, getIndex }) => {
@@ -564,26 +593,44 @@ export function PreviewEditorPanel({
           ) : null}
 
           {activePanel === 'help' ? (
-            <View style={styles.controls}>
-              <Text style={styles.note}>
-                Pinch/rotate/drag blocks. Center and rotation guides appear
-                during move. Tap stats to switch template. Tap route to switch
-                map/trace.
-              </Text>
-              {message ? <Text style={styles.note}>{message}</Text> : null}
-              {!supportsFullStatsPreview ? (
+            <ScrollView
+              style={styles.panelScroll}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.helpContent}
+            >
+              <View style={styles.controls}>
                 <Text style={styles.note}>
-                  For this activity type, preview shows Time only.
+                  Pinch/rotate/drag blocks. Center and rotation guides appear
+                  during move. Tap stats to switch template. Tap route to
+                  switch map/trace.
                 </Text>
-              ) : null}
-              {!isPremium ? (
-                <PrimaryButton
-                  label="Unlock Premium Templates"
-                  onPress={onOpenPaywall}
-                  variant="secondary"
-                />
-              ) : null}
-            </View>
+                {message ? <Text style={styles.note}>{message}</Text> : null}
+                {appCacheUsageLabel ? (
+                  <Text style={styles.note}>{appCacheUsageLabel}</Text>
+                ) : null}
+                {onClearAppCache ? (
+                  <PrimaryButton
+                    label="Clear cache"
+                    icon="broom"
+                    onPress={onClearAppCache}
+                    variant="secondary"
+                    colorScheme="panel"
+                  />
+                ) : null}
+                {!supportsFullStatsPreview ? (
+                  <Text style={styles.note}>
+                    For this activity type, preview shows Time only.
+                  </Text>
+                ) : null}
+                {!isPremium ? (
+                  <PrimaryButton
+                    label="Unlock Premium Templates"
+                    onPress={onOpenPaywall}
+                    variant="secondary"
+                  />
+                ) : null}
+              </View>
+            </ScrollView>
           ) : null}
         </View>
       ) : null}
@@ -953,6 +1000,18 @@ const styles = StyleSheet.create({
   blocksFooter: {
     gap: 8,
     marginTop: 10,
+  },
+  helpContent: {
+    paddingBottom: 8,
+  },
+  overlayActionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'stretch',
+  },
+  overlayActionCell: {
+    flex: 1,
+    minWidth: 0,
   },
   layerRowSpacer: {
     height: 6,

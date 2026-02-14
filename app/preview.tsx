@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
 import ImageCropPicker from 'react-native-image-crop-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -99,6 +100,13 @@ function normalizeLocalUri(path: string) {
   return `file://${path}`;
 }
 
+function isAppOwnedCacheFile(uri: string) {
+  if (!uri.startsWith('file://')) return false;
+  const cacheDir = FileSystem.cacheDirectory;
+  if (!cacheDir) return false;
+  return uri.startsWith(cacheDir) || uri.includes('/Library/Caches/');
+}
+
 export default function PreviewScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const activity = useActivityStore((s) => s.selectedActivity());
@@ -153,8 +161,10 @@ export default function PreviewScreen() {
   const [resolvedLocationText, setResolvedLocationText] = useState('');
   const [draftReady, setDraftReady] = useState(false);
   const [isHydratingDraft, setIsHydratingDraft] = useState(false);
+  const [appCacheUsageLabel, setAppCacheUsageLabel] = useState('Cache: --');
 
   const exportRef = useRef<View>(null);
+  const managedTempUrisRef = useRef<Set<string>>(new Set());
 
   const template = useMemo(
     () =>
@@ -590,13 +600,107 @@ export default function PreviewScreen() {
     return true;
   }
 
+  function trackManagedTempUri(uri: string | null | undefined) {
+    if (!uri || !isAppOwnedCacheFile(uri)) return;
+    managedTempUrisRef.current.add(uri);
+  }
+
+  async function cleanupTempUriIfOwned(uri: string | null | undefined) {
+    if (!uri || !isAppOwnedCacheFile(uri)) {
+      return;
+    }
+
+    try {
+      const info = await FileSystem.getInfoAsync(uri);
+      if (info.exists) {
+        await FileSystem.deleteAsync(uri, { idempotent: true });
+      }
+      managedTempUrisRef.current.delete(uri);
+    } catch {
+      // Best effort cache cleanup only.
+    }
+  }
+
+  async function directorySizeBytes(dirUri: string): Promise<number> {
+    try {
+      const entries = await FileSystem.readDirectoryAsync(dirUri);
+      let total = 0;
+      for (const name of entries) {
+        const child = `${dirUri}${name}`;
+        const info = await FileSystem.getInfoAsync(child);
+        if (!info.exists) continue;
+        if (info.isDirectory) {
+          total += await directorySizeBytes(`${child}/`);
+        } else if (typeof info.size === 'number') {
+          total += info.size;
+        }
+      }
+      return total;
+    } catch {
+      return 0;
+    }
+  }
+
+  async function refreshAppCacheUsage() {
+    const cacheDir = FileSystem.cacheDirectory;
+    if (!cacheDir) {
+      setAppCacheUsageLabel('Cache: unavailable');
+      return;
+    }
+
+    const bytes = await directorySizeBytes(cacheDir);
+    const mb = bytes / (1024 * 1024);
+    setAppCacheUsageLabel(`Cache: ${mb.toFixed(mb >= 100 ? 0 : 1)} MB`);
+  }
+
+  async function clearAppCache() {
+    const keepUris = new Set(
+      [
+        media?.uri,
+        autoSubjectUri,
+        ...imageOverlays.map((item) => item.uri),
+      ].filter((uri): uri is string => Boolean(uri && uri.startsWith('file://'))),
+    );
+
+    try {
+      setMessage('Clearing cache...');
+      const candidates = Array.from(managedTempUrisRef.current);
+      for (const uri of candidates) {
+        if (keepUris.has(uri)) continue;
+        await cleanupTempUriIfOwned(uri);
+      }
+      await refreshAppCacheUsage();
+      setMessage('Cache cleared.');
+    } catch (err) {
+      setMessage(
+        err instanceof Error ? `Could not clear cache (${err.message}).` : 'Could not clear cache.',
+      );
+    }
+  }
+
+  useEffect(() => {
+    if (activePanel !== 'help' || !panelOpen) return;
+    void refreshAppCacheUsage();
+  }, [activePanel, panelOpen]);
+
+  async function cleanupMediaIfTemp(asset: ImagePicker.ImagePickerAsset | null) {
+    if (!asset) return;
+    await cleanupTempUriIfOwned(asset.uri);
+  }
+
   async function applyImageBackground(
     asset: ImagePicker.ImagePickerAsset,
     options: ApplyImageBackgroundOptions = {},
   ) {
+    const previousMedia = media;
+    const previousAutoSubjectUri = autoSubjectUri;
     setMedia(asset);
     setBackgroundGradient(null);
     setAutoSubjectUri(null);
+    void cleanupMediaIfTemp(
+      previousMedia?.uri === asset.uri ? null : previousMedia,
+    );
+    void cleanupTempUriIfOwned(previousAutoSubjectUri);
 
     try {
       setIsExtracting(true);
@@ -604,6 +708,7 @@ export default function PreviewScreen() {
         setMessage('Extracting subject...');
       }
       const cutoutUri = await removeBackgroundOnDevice(asset.uri);
+      trackManagedTempUri(cutoutUri);
       setAutoSubjectUri(cutoutUri);
       if (!options.silent) {
         setMessage(options.successMessage ?? 'Subject extracted automatically.');
@@ -645,6 +750,7 @@ export default function PreviewScreen() {
         base64: null,
         exif: null,
       };
+      trackManagedTempUri(asset.uri);
       await applyImageBackground(asset);
     } catch (err: any) {
       if (err?.code === 'E_PICKER_CANCELLED') return;
@@ -674,10 +780,17 @@ export default function PreviewScreen() {
 
     if (result.canceled) return;
 
+    const previousMedia = media;
+    const previousAutoSubjectUri = autoSubjectUri;
     const asset = result.assets[0];
+    trackManagedTempUri(asset.uri);
     setMedia(asset);
     setBackgroundGradient(null);
     setAutoSubjectUri(null);
+    void cleanupMediaIfTemp(
+      previousMedia?.uri === asset.uri ? null : previousMedia,
+    );
+    void cleanupTempUriIfOwned(previousAutoSubjectUri);
     setMessage('Video loaded.');
   }
 
@@ -698,6 +811,7 @@ export default function PreviewScreen() {
     if (result.canceled) return;
 
     const asset = result.assets[0];
+    trackManagedTempUri(asset.uri);
     const { width: overlayWidth, height: overlayHeight } =
       getInitialOverlaySize(asset.width, asset.height);
     const id = `${Date.now()}-${Math.round(Math.random() * 1000)}`;
@@ -718,6 +832,61 @@ export default function PreviewScreen() {
     setVisibleLayers((prev) => ({ ...prev, [layerId]: true }));
     setLayerOrder((prev) => [...prev, layerId]);
     selectLayer(layerId);
+  }
+
+  async function createStickerOverlay() {
+    setMessage(null);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setMessage('Media library permission is required.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'] as ImagePicker.MediaType[],
+      quality: 1,
+      allowsMultipleSelection: false,
+    });
+
+    if (result.canceled) return;
+
+    const asset = result.assets[0];
+
+    try {
+      setIsExtracting(true);
+      setMessage('Creating sticker...');
+      const stickerUri = await removeBackgroundOnDevice(asset.uri);
+      trackManagedTempUri(stickerUri);
+      const { width: overlayWidth, height: overlayHeight } =
+        getInitialOverlaySize(asset.width, asset.height);
+      const id = `${Date.now()}-${Math.round(Math.random() * 1000)}`;
+      const layerId: LayerId = `image:${id}`;
+
+      setImageOverlays((prev) => [
+        ...prev,
+        {
+          id,
+          uri: stickerUri,
+          name: `Sticker ${prev.length + 1}`,
+          opacity: 1,
+          rotationDeg: 0,
+          width: overlayWidth,
+          height: overlayHeight,
+        },
+      ]);
+      setVisibleLayers((prev) => ({ ...prev, [layerId]: true }));
+      setLayerOrder((prev) => [...prev, layerId]);
+      selectLayer(layerId);
+      setMessage('Sticker created.');
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? `Could not create sticker (${err.message}).`
+          : 'Could not create sticker.',
+      );
+    } finally {
+      setIsExtracting(false);
+    }
   }
 
   function toggleField(field: FieldId, value: boolean) {
@@ -826,7 +995,19 @@ export default function PreviewScreen() {
     }
     if (layerId.startsWith('image:')) {
       const id = layerId.replace('image:', '');
-      setImageOverlays((prev) => prev.filter((item) => item.id !== id));
+      setImageOverlays((prev) => {
+        const removed = prev.find((item) => item.id === id);
+        const next = prev.filter((item) => item.id !== id);
+        if (
+          removed?.uri &&
+          !next.some((item) => item.uri === removed.uri) &&
+          media?.uri !== removed.uri &&
+          autoSubjectUri !== removed.uri
+        ) {
+          void cleanupTempUriIfOwned(removed.uri);
+        }
+        return next;
+      });
       setLayerOrder((prev) => prev.filter((item) => item !== layerId));
       setLayerTransforms((prev) => {
         const next = { ...prev };
@@ -935,9 +1116,13 @@ export default function PreviewScreen() {
   }
 
   function clearBackgroundMedia() {
+    const previousMedia = media;
+    const previousAutoSubjectUri = autoSubjectUri;
     setMedia(null);
     setBackgroundGradient(null);
     setAutoSubjectUri(null);
+    void cleanupMediaIfTemp(previousMedia);
+    void cleanupTempUriIfOwned(previousAutoSubjectUri);
     setMessage('Transparent background selected.');
   }
 
@@ -959,16 +1144,30 @@ export default function PreviewScreen() {
   }
 
   function generateRandomGradientBackground() {
+    const previousMedia = media;
+    const previousAutoSubjectUri = autoSubjectUri;
     setMedia(null);
     setAutoSubjectUri(null);
     setBackgroundGradient(createRandomGradient());
+    void cleanupMediaIfTemp(previousMedia);
+    void cleanupTempUriIfOwned(previousAutoSubjectUri);
     setMessage('Random gradient background generated.');
   }
 
   async function resetToDefault() {
     if (busy) return;
     setMessage(null);
+    const previousMedia = media;
+    const previousAutoSubjectUri = autoSubjectUri;
+    const previousOverlayUris = imageOverlays.map((item) => item.uri);
     resetDraftStateToDefaults();
+    void cleanupMediaIfTemp(previousMedia);
+    void cleanupTempUriIfOwned(previousAutoSubjectUri);
+    previousOverlayUris.forEach((uri) => {
+      if (uri !== previousMedia?.uri && uri !== previousAutoSubjectUri) {
+        void cleanupTempUriIfOwned(uri);
+      }
+    });
 
     if (activityPhotoUri) {
       const asset: ImagePicker.ImagePickerAsset = {
@@ -1136,6 +1335,7 @@ export default function PreviewScreen() {
           onClearBackground={clearBackgroundMedia}
           onGenerateGradient={generateRandomGradientBackground}
           onAddImageOverlay={addImageOverlay}
+          onCreateSticker={createStickerOverlay}
           isSquareFormat={isSquareFormat}
           layerEntries={layerEntries}
           routeMode={routeMode}
@@ -1159,6 +1359,10 @@ export default function PreviewScreen() {
           onSetDistanceUnit={setDistanceUnit}
           isPremium={isPremium}
           message={message}
+          appCacheUsageLabel={appCacheUsageLabel}
+          onClearAppCache={() => {
+            void clearAppCache();
+          }}
           onOpenPaywall={() => router.push('/paywall')}
         />
       </View>
