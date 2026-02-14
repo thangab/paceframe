@@ -34,9 +34,10 @@ export function StatsLayerContent({
   paceText,
   elevText,
 }: Props) {
+  const layoutKind = resolveLayoutKind(template.layout);
   return (
     <>
-      {template.layout === 'row' ? (
+      {layoutKind === 'row' ? (
         <View style={styles.heroWrap}>
           {visible.distance ? (
             <View style={styles.heroDistanceWrap}>
@@ -55,7 +56,8 @@ export function StatsLayerContent({
                 valueStyle={styles.heroDistanceValue}
                 unitStyle={styles.heroUnit}
                 numberOfLines={1}
-                autoFit={false}
+                autoFit
+                minimumFontScale={0.86}
               />
             </View>
           ) : null}
@@ -85,7 +87,7 @@ export function StatsLayerContent({
         </View>
       ) : null}
 
-      {template.layout === 'stack' ? (
+      {layoutKind === 'stack' ? (
         <View style={styles.verticalWrap}>
           <StackMetric
             visible={visible.distance}
@@ -114,7 +116,7 @@ export function StatsLayerContent({
         </View>
       ) : null}
 
-      {template.layout === 'inline' ? (
+      {layoutKind === 'inline' ? (
         <View style={styles.compactWrap}>
           {visible.distance ? (
             <ValueWithUnit
@@ -122,6 +124,9 @@ export function StatsLayerContent({
               fontPreset={fontPreset}
               valueStyle={styles.compactDistanceValue}
               unitStyle={styles.compactUnit}
+              numberOfLines={1}
+              autoFit
+              minimumFontScale={0.82}
             />
           ) : null}
           <View style={styles.compactRow}>
@@ -234,7 +239,7 @@ export function StatsLayerContent({
         </View>
       ) : null}
 
-      {template.layout === 'right' ? (
+      {layoutKind === 'right' ? (
         <View style={styles.columnsWrap}>
           {visible.distance ? (
             <ColumnMetric
@@ -267,7 +272,7 @@ export function StatsLayerContent({
         </View>
       ) : null}
 
-      {template.layout === 'grid' ? (
+      {layoutKind === 'grid' ? (
         <View style={styles.gridRows}>
           {(() => {
             const metrics = [
@@ -279,21 +284,41 @@ export function StatsLayerContent({
               visible.elev ? { id: 'elev', label: 'Elev Gain', value: elevText } : null,
             ].filter(Boolean) as { id: string; label: string; value: string }[];
 
-            const singleMetric = metrics.length === 1;
             return metrics.map((metric) => (
-            <GridMetric
-              key={metric.id}
-              label={metric.label}
-              value={metric.value}
-              fontPreset={fontPreset}
-              singleMetric={singleMetric}
-            />
+              <GridMetric
+                key={metric.id}
+                label={metric.label}
+                value={metric.value}
+                fontPreset={fontPreset}
+                columnCount={metrics.length >= 3 ? 2 : 1}
+              />
             ));
           })()}
         </View>
       ) : null}
     </>
   );
+}
+
+function resolveLayoutKind(layout: StatsTemplate['layout']) {
+  switch (layout) {
+    case 'hero':
+    case 'glass-row':
+      return 'row' as const;
+    case 'vertical':
+    case 'soft-stack':
+      return 'stack' as const;
+    case 'compact':
+    case 'pill-inline':
+      return 'inline' as const;
+    case 'columns':
+    case 'card-columns':
+      return 'right' as const;
+    case 'grid-2x2':
+    case 'panel-grid':
+    default:
+      return 'grid' as const;
+  }
 }
 
 function MetricCell({
@@ -322,7 +347,8 @@ function MetricCell({
         valueStyle={styles.metricValue}
         unitStyle={styles.metricUnit}
         numberOfLines={1}
-        autoFit={false}
+        autoFit
+        minimumFontScale={0.82}
       />
     </View>
   );
@@ -357,7 +383,8 @@ function StackMetric({
         valueStyle={styles.verticalValue}
         unitStyle={styles.verticalUnit}
         numberOfLines={1}
-        autoFit={false}
+        autoFit
+        minimumFontScale={0.82}
       />
     </>
   );
@@ -397,15 +424,15 @@ function GridMetric({
   label,
   value,
   fontPreset,
-  singleMetric,
+  columnCount,
 }: {
   label: string;
   value: string;
   fontPreset: FontPreset;
-  singleMetric?: boolean;
+  columnCount: 1 | 2;
 }) {
   return (
-    <View style={[styles.gridItem, singleMetric && styles.gridItemSingle]}>
+    <View style={[styles.gridItem, columnCount === 1 && styles.gridItemSingle]}>
       <Text
         style={[
           styles.gridLabel,
@@ -420,9 +447,6 @@ function GridMetric({
         fontPreset={fontPreset}
         valueStyle={styles.gridValue}
         unitStyle={styles.gridUnit}
-        numberOfLines={1}
-        autoFit={!singleMetric}
-        minimumFontScale={0.84}
       />
     </View>
   );
@@ -446,11 +470,20 @@ function ValueWithUnit({
   minimumFontScale?: number;
 }) {
   const { main, unit } = splitMetricValue(value);
+  const isTimesFamily = (fontPreset.family ?? '')
+    .toLowerCase()
+    .includes('times');
+  const effectiveMinimumFontScale = isTimesFamily
+    ? Math.max(minimumFontScale, 0.92)
+    : minimumFontScale;
+  const effectiveAdjustsFontSizeToFit = isTimesFamily
+    ? false
+    : Boolean(numberOfLines) && autoFit;
   return (
     <Text
       numberOfLines={numberOfLines}
-      adjustsFontSizeToFit={Boolean(numberOfLines) && autoFit}
-      minimumFontScale={minimumFontScale}
+      adjustsFontSizeToFit={effectiveAdjustsFontSizeToFit}
+      minimumFontScale={effectiveMinimumFontScale}
       style={[
         valueStyle,
         TEXT_SHADOW_STYLE,
@@ -610,7 +643,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    rowGap: 18,
+    rowGap: 14,
     gap: 10,
     alignItems: 'flex-start',
   },
@@ -629,13 +662,14 @@ const styles = StyleSheet.create({
   },
   gridValue: {
     color: '#FFFFFF',
-    fontSize: 28,
-    lineHeight: 32,
+    fontSize: 24,
+    lineHeight: 28,
     textAlign: 'center',
+    width: '100%',
   },
   gridUnit: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
   },
 });

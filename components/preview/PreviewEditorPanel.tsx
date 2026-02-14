@@ -739,15 +739,20 @@ function TemplateLayoutPreview({ template }: { template: StatsTemplate }) {
 
 function getTemplatePreviewHeight(layout: StatsTemplate['layout']) {
   switch (layout) {
-    case 'row':
+    case 'hero':
+    case 'glass-row':
       return 190;
-    case 'stack':
+    case 'vertical':
+    case 'soft-stack':
       return 244;
-    case 'inline':
+    case 'compact':
+    case 'pill-inline':
       return 132;
-    case 'right':
+    case 'columns':
+    case 'card-columns':
       return 146;
-    case 'grid':
+    case 'grid-2x2':
+    case 'panel-grid':
     default:
       return 186;
   }

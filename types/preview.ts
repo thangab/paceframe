@@ -1,7 +1,17 @@
 export type FieldId = 'distance' | 'time' | 'pace' | 'elev';
 export type RouteMode = 'off' | 'map' | 'trace';
 export type RouteMapVariant = 'standard' | 'dark' | 'satellite';
-export type StatsLayout = 'row' | 'stack' | 'inline' | 'right' | 'grid';
+export type StatsLayout =
+  | 'hero'
+  | 'vertical'
+  | 'compact'
+  | 'columns'
+  | 'grid-2x2'
+  | 'glass-row'
+  | 'soft-stack'
+  | 'pill-inline'
+  | 'card-columns'
+  | 'panel-grid';
 export type BaseLayerId = 'meta' | 'stats' | 'route';
 export type LayerId = BaseLayerId | `image:${string}`;
 
