@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { FontPreset, StatsTemplate } from '@/types/preview';
 
 type VisibleFields = {
@@ -18,6 +19,12 @@ type Props = {
   elevText: string;
 };
 
+const TEXT_SHADOW_STYLE = {
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
+} as const;
+
 export function StatsLayerContent({
   template,
   fontPreset,
@@ -34,7 +41,11 @@ export function StatsLayerContent({
           {visible.distance ? (
             <View style={styles.heroDistanceWrap}>
               <Text
-                style={[styles.heroLabel, { fontFamily: fontPreset.family }]}
+                style={[
+                  styles.heroLabel,
+                  TEXT_SHADOW_STYLE,
+                  { fontFamily: fontPreset.family },
+                ]}
               >
                 Distance
               </Text>
@@ -44,8 +55,7 @@ export function StatsLayerContent({
                 valueStyle={styles.heroDistanceValue}
                 unitStyle={styles.heroUnit}
                 numberOfLines={1}
-                autoFit
-                minimumFontScale={0.55}
+                autoFit={false}
               />
             </View>
           ) : null}
@@ -116,65 +126,109 @@ export function StatsLayerContent({
           ) : null}
           <View style={styles.compactRow}>
             {visible.time ? (
-              <Text
-                style={[styles.inlineText, { fontFamily: fontPreset.family }]}
-              >
-                ◷ {durationText}
-              </Text>
+              <View style={styles.inlineMetric}>
+                <MaterialCommunityIcons
+                  name="clock-outline"
+                  size={14}
+                  color="#FFFFFF"
+                  style={styles.inlineMetricIcon}
+                />
+                <Text
+                  style={[
+                    styles.inlineText,
+                    TEXT_SHADOW_STYLE,
+                    { fontFamily: fontPreset.family },
+                  ]}
+                >
+                  {durationText}
+                </Text>
+              </View>
             ) : null}
             {visible.time && (visible.pace || visible.elev) ? (
               <Text
-                style={[styles.separator, { fontFamily: fontPreset.family }]}
+                style={[
+                  styles.separator,
+                  TEXT_SHADOW_STYLE,
+                  { fontFamily: fontPreset.family },
+                ]}
               >
                 |
               </Text>
             ) : null}
             {visible.pace ? (
-              <Text
-                style={[
-                  styles.inlineText,
-                  {
-                    fontFamily: fontPreset.family,
-                    fontWeight: fontPreset.weightValue,
-                  },
-                ]}
-              >
-                {'◔ '}
-                {splitMetricValue(paceText).main}
+              <View style={styles.inlineMetric}>
+                <MaterialCommunityIcons
+                  name="speedometer"
+                  size={14}
+                  color="#FFFFFF"
+                  style={styles.inlineMetricIcon}
+                />
                 <Text
-                  style={[styles.inlineUnit, { fontFamily: fontPreset.family }]}
+                  style={[
+                    styles.inlineText,
+                    TEXT_SHADOW_STYLE,
+                    {
+                      fontFamily: fontPreset.family,
+                      fontWeight: fontPreset.weightValue,
+                    },
+                  ]}
                 >
-                  {' '}
-                  {splitMetricValue(paceText).unit}
+                  {splitMetricValue(paceText).main}
+                  <Text
+                    style={[
+                      styles.inlineUnit,
+                      TEXT_SHADOW_STYLE,
+                      { fontFamily: fontPreset.family },
+                    ]}
+                  >
+                    {' '}
+                    {splitMetricValue(paceText).unit}
+                  </Text>
                 </Text>
-              </Text>
+              </View>
             ) : null}
             {visible.pace && visible.elev ? (
               <Text
-                style={[styles.separator, { fontFamily: fontPreset.family }]}
+                style={[
+                  styles.separator,
+                  TEXT_SHADOW_STYLE,
+                  { fontFamily: fontPreset.family },
+                ]}
               >
                 |
               </Text>
             ) : null}
             {visible.elev ? (
-              <Text
-                style={[
-                  styles.inlineText,
-                  {
-                    fontFamily: fontPreset.family,
-                    fontWeight: fontPreset.weightValue,
-                  },
-                ]}
-              >
-                {'↯ '}
-                {splitMetricValue(elevText).main}
+              <View style={styles.inlineMetric}>
+                <MaterialCommunityIcons
+                  name="arrow-up-bold"
+                  size={14}
+                  color="#FFFFFF"
+                  style={styles.inlineMetricIcon}
+                />
                 <Text
-                  style={[styles.inlineUnit, { fontFamily: fontPreset.family }]}
+                  style={[
+                    styles.inlineText,
+                    TEXT_SHADOW_STYLE,
+                    {
+                      fontFamily: fontPreset.family,
+                      fontWeight: fontPreset.weightValue,
+                    },
+                  ]}
                 >
-                  {' '}
-                  {splitMetricValue(elevText).unit}
+                  {splitMetricValue(elevText).main}
+                  <Text
+                    style={[
+                      styles.inlineUnit,
+                      TEXT_SHADOW_STYLE,
+                      { fontFamily: fontPreset.family },
+                    ]}
+                  >
+                    {' '}
+                    {splitMetricValue(elevText).unit}
+                  </Text>
                 </Text>
-              </Text>
+              </View>
             ) : null}
           </View>
         </View>
@@ -253,7 +307,13 @@ function MetricCell({
 }) {
   return (
     <View style={styles.metricCell}>
-      <Text style={[styles.metricLabel, { fontFamily: fontPreset.family }]}>
+      <Text
+        style={[
+          styles.metricLabel,
+          TEXT_SHADOW_STYLE,
+          { fontFamily: fontPreset.family },
+        ]}
+      >
         {label}
       </Text>
       <ValueWithUnit
@@ -282,7 +342,13 @@ function StackMetric({
   if (!visible) return null;
   return (
     <>
-      <Text style={[styles.metricLabel, { fontFamily: fontPreset.family }]}>
+      <Text
+        style={[
+          styles.metricLabel,
+          TEXT_SHADOW_STYLE,
+          { fontFamily: fontPreset.family },
+        ]}
+      >
         {label}
       </Text>
       <ValueWithUnit
@@ -308,7 +374,13 @@ function ColumnMetric({
 }) {
   return (
     <View style={styles.columnItem}>
-      <Text style={[styles.metricLabel, { fontFamily: fontPreset.family }]}>
+      <Text
+        style={[
+          styles.metricLabel,
+          TEXT_SHADOW_STYLE,
+          { fontFamily: fontPreset.family },
+        ]}
+      >
         {label}
       </Text>
       <ValueWithUnit
@@ -334,7 +406,13 @@ function GridMetric({
 }) {
   return (
     <View style={[styles.gridItem, singleMetric && styles.gridItemSingle]}>
-      <Text style={[styles.gridLabel, { fontFamily: fontPreset.family }]}>
+      <Text
+        style={[
+          styles.gridLabel,
+          TEXT_SHADOW_STYLE,
+          { fontFamily: fontPreset.family },
+        ]}
+      >
         {label}
       </Text>
       <ValueWithUnit
@@ -375,12 +453,15 @@ function ValueWithUnit({
       minimumFontScale={minimumFontScale}
       style={[
         valueStyle,
+        TEXT_SHADOW_STYLE,
         { fontFamily: fontPreset.family, fontWeight: fontPreset.weightValue },
       ]}
     >
       {main}
       {unit ? (
-        <Text style={[unitStyle, { fontFamily: fontPreset.family }]}>
+        <Text
+          style={[unitStyle, TEXT_SHADOW_STYLE, { fontFamily: fontPreset.family }]}
+        >
           {' '}
           {unit}
         </Text>
@@ -406,7 +487,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroLabel: {
-    color: '#D1D5DB',
+    color: '#FFFFFF',
     fontSize: 22,
     marginBottom: 4,
   },
@@ -416,7 +497,7 @@ const styles = StyleSheet.create({
     lineHeight: 54,
   },
   heroUnit: {
-    color: '#D1D5DB',
+    color: '#FFFFFF',
     fontSize: 22,
     fontWeight: '600',
   },
@@ -437,7 +518,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   verticalUnit: {
-    color: '#D1D5DB',
+    color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '600',
   },
@@ -452,7 +533,7 @@ const styles = StyleSheet.create({
     lineHeight: 54,
   },
   compactUnit: {
-    color: '#D1D5DB',
+    color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '600',
   },
@@ -462,18 +543,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  inlineMetric: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  inlineMetricIcon: {
+    marginTop: 1,
+  },
   inlineText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },
   inlineUnit: {
-    color: '#D1D5DB',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
   separator: {
-    color: 'rgba(255,255,255,0.45)',
+    color: '#FFFFFF',
     fontSize: 20,
     marginHorizontal: 2,
   },
@@ -488,7 +577,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   metricLabel: {
-    color: '#D1D5DB',
+    color: '#FFFFFF',
     fontSize: 13,
     marginBottom: 2,
   },
@@ -498,7 +587,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   metricUnit: {
-    color: '#D1D5DB',
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -512,7 +601,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   columnUnit: {
-    color: '#D1D5DB',
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -533,7 +622,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   gridLabel: {
-    color: '#D1D5DB',
+    color: '#FFFFFF',
     fontSize: 12,
     marginBottom: 4,
     textAlign: 'center',
@@ -545,7 +634,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   gridUnit: {
-    color: '#D1D5DB',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },

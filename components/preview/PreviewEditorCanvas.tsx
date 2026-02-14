@@ -291,13 +291,43 @@ export function PreviewEditorCanvas({
               ]}
             >
               {headerVisible.title ? (
-                <Text style={styles.metaTitle}>{activityName}</Text>
+                <Text
+                  style={[
+                    styles.metaTitle,
+                    {
+                      fontFamily: fontPreset.family,
+                      fontWeight: fontPreset.weightTitle,
+                    },
+                  ]}
+                >
+                  {activityName}
+                </Text>
               ) : null}
               {headerVisible.date ? (
-                <Text style={styles.metaSubtitle}>{dateText}</Text>
+                <Text
+                  style={[
+                    styles.metaSubtitle,
+                    {
+                      fontFamily: fontPreset.family,
+                      fontWeight: '400',
+                    },
+                  ]}
+                >
+                  {dateText}
+                </Text>
               ) : null}
               {headerVisible.location ? (
-                <Text style={styles.metaLocation}>{locationText}</Text>
+                <Text
+                  style={[
+                    styles.metaLocation,
+                    {
+                      fontFamily: fontPreset.family,
+                      fontWeight: '400',
+                    },
+                  ]}
+                >
+                  {locationText}
+                </Text>
               ) : null}
             </DraggableBlock>
           ) : null}
@@ -586,19 +616,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   metaSubtitle: {
-    color: '#E5E7EB',
+    color: '#FFFFFF',
     fontSize: 12,
     marginTop: 2,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   metaLocation: {
-    color: '#D1D5DB',
+    color: '#FFFFFF',
     fontSize: 12,
     marginTop: 2,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   metaTitle: {
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '800',
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   routeBlock: {
     padding: 0,
