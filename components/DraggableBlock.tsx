@@ -11,6 +11,7 @@ import Animated, {
 type Props = {
   initialX: number;
   initialY: number;
+  initialScale?: number;
   minScale?: number;
   maxScale?: number;
   rotationDeg?: number;
@@ -26,6 +27,12 @@ type Props = {
   onDragGuideChange?: (guides: { showVertical: boolean; showHorizontal: boolean }) => void;
   onInteractionChange?: (active: boolean) => void;
   onRotationGuideChange?: (active: boolean) => void;
+  onTransformEnd?: (next: {
+    x: number;
+    y: number;
+    scale: number;
+    rotationDeg: number;
+  }) => void;
   rotationSnapThresholdDeg?: number;
 };
 
@@ -46,6 +53,7 @@ function getAxisBounds(canvasSize: number, layerSize: number) {
 export function DraggableBlock({
   initialX,
   initialY,
+  initialScale = 1,
   minScale = 0.7,
   maxScale = 2.8,
   rotationDeg = 0,
@@ -61,18 +69,19 @@ export function DraggableBlock({
   onDragGuideChange,
   onInteractionChange,
   onRotationGuideChange,
+  onTransformEnd,
   rotationSnapThresholdDeg = 2,
 }: Props) {
   const tx = useSharedValue(initialX);
   const ty = useSharedValue(initialY);
-  const scale = useSharedValue(1);
+  const scale = useSharedValue(initialScale);
   const dynamicRotationDeg = useSharedValue(0);
   const width = useSharedValue(0);
   const height = useSharedValue(0);
 
   const startX = useSharedValue(initialX);
   const startY = useSharedValue(initialY);
-  const startScale = useSharedValue(1);
+  const startScale = useSharedValue(initialScale);
   const startRotationDeg = useSharedValue(0);
   const lastShowVertical = useSharedValue(false);
   const lastShowHorizontal = useSharedValue(false);
@@ -86,6 +95,19 @@ export function DraggableBlock({
   };
   const emitRotationGuide = (active: boolean) => {
     onRotationGuideChange?.(active);
+  };
+  const emitTransformEnd = (
+    x: number,
+    y: number,
+    nextScale: number,
+    nextRotationDeg: number,
+  ) => {
+    onTransformEnd?.({
+      x,
+      y,
+      scale: nextScale,
+      rotationDeg: nextRotationDeg,
+    });
   };
 
   const normalizeAngle = (deg: number) => {
@@ -168,6 +190,14 @@ export function DraggableBlock({
     })
     .onEnd(() => {
       clampInsideCanvas();
+      if (onTransformEnd) {
+        runOnJS(emitTransformEnd)(
+          tx.value,
+          ty.value,
+          scale.value,
+          rotationDeg + dynamicRotationDeg.value,
+        );
+      }
       if (onInteractionChange) {
         runOnJS(emitInteraction)(false);
       }
@@ -179,6 +209,14 @@ export function DraggableBlock({
     })
     .onFinalize(() => {
       clampInsideCanvas();
+      if (onTransformEnd) {
+        runOnJS(emitTransformEnd)(
+          tx.value,
+          ty.value,
+          scale.value,
+          rotationDeg + dynamicRotationDeg.value,
+        );
+      }
       if (onInteractionChange) {
         runOnJS(emitInteraction)(false);
       }
@@ -201,12 +239,28 @@ export function DraggableBlock({
     })
     .onEnd(() => {
       clampInsideCanvas();
+      if (onTransformEnd) {
+        runOnJS(emitTransformEnd)(
+          tx.value,
+          ty.value,
+          scale.value,
+          rotationDeg + dynamicRotationDeg.value,
+        );
+      }
       if (onInteractionChange) {
         runOnJS(emitInteraction)(false);
       }
     })
     .onFinalize(() => {
       clampInsideCanvas();
+      if (onTransformEnd) {
+        runOnJS(emitTransformEnd)(
+          tx.value,
+          ty.value,
+          scale.value,
+          rotationDeg + dynamicRotationDeg.value,
+        );
+      }
       if (onInteractionChange) {
         runOnJS(emitInteraction)(false);
       }
@@ -241,6 +295,14 @@ export function DraggableBlock({
     })
     .onEnd(() => {
       clampInsideCanvas();
+      if (onTransformEnd) {
+        runOnJS(emitTransformEnd)(
+          tx.value,
+          ty.value,
+          scale.value,
+          rotationDeg + dynamicRotationDeg.value,
+        );
+      }
       if (onInteractionChange) {
         runOnJS(emitInteraction)(false);
       }
@@ -251,6 +313,14 @@ export function DraggableBlock({
     })
     .onFinalize(() => {
       clampInsideCanvas();
+      if (onTransformEnd) {
+        runOnJS(emitTransformEnd)(
+          tx.value,
+          ty.value,
+          scale.value,
+          rotationDeg + dynamicRotationDeg.value,
+        );
+      }
       if (onInteractionChange) {
         runOnJS(emitInteraction)(false);
       }
@@ -289,6 +359,14 @@ export function DraggableBlock({
     runOnUI(clampInsideCanvas)();
   }, [canvasWidth, canvasHeight]);
 
+  useEffect(() => {
+    tx.value = initialX;
+    ty.value = initialY;
+    scale.value = initialScale;
+    dynamicRotationDeg.value = 0;
+    runOnUI(clampInsideCanvas)();
+  }, [initialScale, initialX, initialY, rotationDeg]);
+
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View
@@ -307,6 +385,7 @@ export function DraggableBlock({
         }}
         style={[{ position: 'absolute', left: 0, top: 0 }, style, animatedStyle]}
       >
+        {children}
         {selected ? (
           <View
             pointerEvents="none"
@@ -318,7 +397,6 @@ export function DraggableBlock({
             ]}
           />
         ) : null}
-        {children}
       </Animated.View>
     </GestureDetector>
   );

@@ -14,6 +14,7 @@ import type {
   FontPreset,
   ImageOverlay,
   LayerId,
+  RouteMapVariant,
   RouteMode,
   StatsTemplate,
 } from '@/types/preview';
@@ -67,6 +68,17 @@ type Props = {
   canvasScaleY: number;
   cycleStatsTemplate: () => void;
   routeMode: RouteMode;
+  routeMapVariant: RouteMapVariant;
+  layerTransforms: Partial<
+    Record<
+      LayerId,
+      { x: number; y: number; scale: number; rotationDeg: number }
+    >
+  >;
+  onLayerTransformChange: (
+    layerId: LayerId,
+    next: { x: number; y: number; scale: number; rotationDeg: number },
+  ) => void;
   routeInitialXDisplay: number;
   routeInitialYDisplay: number;
   routeLayerWidthDisplay: number;
@@ -119,6 +131,9 @@ export function PreviewEditorCanvas({
   canvasScaleY,
   cycleStatsTemplate,
   routeMode,
+  routeMapVariant,
+  layerTransforms,
+  onLayerTransformChange,
   routeInitialXDisplay,
   routeInitialYDisplay,
   routeLayerWidthDisplay,
@@ -252,8 +267,13 @@ export function PreviewEditorCanvas({
           {visibleLayers.meta && hasHeaderContent ? (
             <DraggableBlock
               key="meta-layer"
-              initialX={Math.max(0, Math.round((canvasDisplayWidth - 240) / 2))}
-              initialY={Math.round(44 * canvasScaleY)}
+              initialX={
+                layerTransforms.meta?.x ??
+                Math.max(0, Math.round((canvasDisplayWidth - 240) / 2))
+              }
+              initialY={layerTransforms.meta?.y ?? Math.round(44 * canvasScaleY)}
+              initialScale={layerTransforms.meta?.scale ?? 1}
+              rotationDeg={layerTransforms.meta?.rotationDeg ?? 0}
               selected={showSelectionOutline && selectedLayer === 'meta'}
               outlineRadius={0}
               canvasWidth={canvasDisplayWidth}
@@ -264,6 +284,7 @@ export function PreviewEditorCanvas({
               onInteractionChange={(active) =>
                 setActiveLayer(active ? 'meta' : null)
               }
+              onTransformEnd={(next) => onLayerTransformChange('meta', next)}
               style={[
                 styles.metaBlock,
                 { zIndex: baseLayerZ('meta'), elevation: baseLayerZ('meta') },
@@ -284,8 +305,12 @@ export function PreviewEditorCanvas({
           {visibleLayers.stats ? (
             <DraggableBlock
               key="stats-layer"
-              initialX={centeredStatsXDisplay}
-              initialY={Math.round(template.y * canvasScaleY)}
+              initialX={layerTransforms.stats?.x ?? centeredStatsXDisplay}
+              initialY={
+                layerTransforms.stats?.y ?? Math.round(template.y * canvasScaleY)
+              }
+              initialScale={layerTransforms.stats?.scale ?? 1}
+              rotationDeg={layerTransforms.stats?.rotationDeg ?? 0}
               selected={showSelectionOutline && selectedLayer === 'stats'}
               outlineRadius={template.radius}
               canvasWidth={canvasDisplayWidth}
@@ -297,6 +322,7 @@ export function PreviewEditorCanvas({
               onInteractionChange={(active) =>
                 setActiveLayer(active ? 'stats' : null)
               }
+              onTransformEnd={(next) => onLayerTransformChange('stats', next)}
               style={[
                 styles.statsBlock,
                 {
@@ -325,8 +351,10 @@ export function PreviewEditorCanvas({
           {routeMode !== 'off' && visibleLayers.route ? (
             <DraggableBlock
               key="route-layer"
-              initialX={routeInitialXDisplay}
-              initialY={routeInitialYDisplay}
+              initialX={layerTransforms.route?.x ?? routeInitialXDisplay}
+              initialY={layerTransforms.route?.y ?? routeInitialYDisplay}
+              initialScale={layerTransforms.route?.scale ?? 1}
+              rotationDeg={layerTransforms.route?.rotationDeg ?? 0}
               selected={showSelectionOutline && selectedLayer === 'route'}
               outlineRadius={0}
               canvasWidth={canvasDisplayWidth}
@@ -338,6 +366,7 @@ export function PreviewEditorCanvas({
               onInteractionChange={(active) =>
                 setActiveLayer(active ? 'route' : null)
               }
+              onTransformEnd={(next) => onLayerTransformChange('route', next)}
               style={[
                 styles.routeBlock,
                 { zIndex: baseLayerZ('route'), elevation: baseLayerZ('route') },
@@ -346,6 +375,7 @@ export function PreviewEditorCanvas({
               <RouteLayer
                 polyline={activityPolyline}
                 mode={routeMode === 'map' ? 'map' : 'trace'}
+                mapVariant={routeMapVariant}
                 width={routeLayerWidthDisplay}
                 height={routeLayerHeightDisplay}
               />
@@ -359,19 +389,29 @@ export function PreviewEditorCanvas({
             return (
               <DraggableBlock
                 key={layerId}
-                initialX={Math.round((20 + index * 12) * canvasScaleX)}
-                initialY={Math.round((80 + index * 12) * canvasScaleY)}
+                initialX={
+                  layerTransforms[layerId]?.x ??
+                  Math.round((20 + index * 12) * canvasScaleX)
+                }
+                initialY={
+                  layerTransforms[layerId]?.y ??
+                  Math.round((80 + index * 12) * canvasScaleY)
+                }
+                initialScale={layerTransforms[layerId]?.scale ?? 1}
                 selected={showSelectionOutline && selectedLayer === layerId}
-                outlineRadius={radius.lg}
+                outlineRadius={0}
                 canvasWidth={canvasDisplayWidth}
                 canvasHeight={canvasDisplayHeight}
                 onDragGuideChange={onDragGuideChange}
                 onRotationGuideChange={onRotationGuideChange}
-                rotationDeg={overlay.rotationDeg}
+                rotationDeg={
+                  layerTransforms[layerId]?.rotationDeg ?? overlay.rotationDeg
+                }
                 onSelect={() => setSelectedLayer(layerId)}
                 onInteractionChange={(active) =>
                   setActiveLayer(active ? layerId : null)
                 }
+                onTransformEnd={(next) => onLayerTransformChange(layerId, next)}
                 style={[
                   styles.imageOverlayBlock,
                   {

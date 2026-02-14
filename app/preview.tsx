@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Platform,
   Pressable,
@@ -29,6 +30,11 @@ import {
   STORY_WIDTH,
   TEMPLATES,
 } from '@/lib/previewConfig';
+import {
+  BASE_LAYER_ORDER,
+  sanitizePreviewDraft,
+  type PreviewDraft,
+} from '@/lib/previewDraft';
 import { removeBackgroundOnDevice } from '@/lib/backgroundRemoval';
 import { composeVideoWithOverlay } from '@/lib/nativeVideoComposer';
 import {
@@ -45,6 +51,7 @@ import {
   FieldId,
   ImageOverlay,
   LayerId,
+  RouteMapVariant,
   RouteMode,
   StatsTemplate,
 } from '@/types/preview';
@@ -54,6 +61,23 @@ const ROUTE_LAYER_HEIGHT = 180;
 const IMAGE_OVERLAY_MAX_INITIAL = 180;
 const IMAGE_OVERLAY_MIN_INITIAL = 90;
 const EXPORT_PNG_WIDTH = 1080;
+const DEFAULT_VISIBLE_FIELDS: Record<FieldId, boolean> = {
+  distance: true,
+  time: true,
+  pace: true,
+  elev: true,
+};
+const DEFAULT_HEADER_VISIBLE = {
+  title: true,
+  date: true,
+  location: true,
+};
+const DEFAULT_VISIBLE_LAYERS: Partial<Record<LayerId, boolean>> = {
+  meta: true,
+  stats: true,
+  route: true,
+};
+const PREVIEW_DRAFT_KEY_PREFIX = 'paceframe.preview.draft.';
 
 type ApplyImageBackgroundOptions = {
   silent?: boolean;
@@ -99,31 +123,26 @@ export default function PreviewScreen() {
   const [selectedFontId, setSelectedFontId] = useState(FONT_PRESETS[0].id);
   const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>('km');
   const [routeMode, setRouteMode] = useState<RouteMode>('off');
-  const [visible, setVisible] = useState<Record<FieldId, boolean>>({
-    distance: true,
-    time: true,
-    pace: true,
-    elev: true,
-  });
-  const [headerVisible, setHeaderVisible] = useState({
-    title: true,
-    date: true,
-    location: true,
-  });
-  const [layerOrder, setLayerOrder] = useState<LayerId[]>([
-    'meta',
-    'stats',
-    'route',
-  ]);
+  const [routeMapVariant, setRouteMapVariant] =
+    useState<RouteMapVariant>('standard');
+  const [visible, setVisible] = useState<Record<FieldId, boolean>>(
+    DEFAULT_VISIBLE_FIELDS,
+  );
+  const [headerVisible, setHeaderVisible] = useState(DEFAULT_HEADER_VISIBLE);
+  const [layerOrder, setLayerOrder] = useState<LayerId[]>(BASE_LAYER_ORDER);
   const [visibleLayers, setVisibleLayers] = useState<
     Partial<Record<LayerId, boolean>>
-  >({
-    meta: true,
-    stats: true,
-    route: true,
-  });
+  >(DEFAULT_VISIBLE_LAYERS);
   const [behindSubjectLayers, setBehindSubjectLayers] = useState<
     Partial<Record<LayerId, boolean>>
+  >({});
+  const [layerTransforms, setLayerTransforms] = useState<
+    Partial<
+      Record<
+        LayerId,
+        { x: number; y: number; scale: number; rotationDeg: number }
+      >
+    >
   >({});
   const [selectedLayer, setSelectedLayer] = useState<LayerId | null>(null);
   const [outlinedLayer, setOutlinedLayer] = useState<LayerId | null>(null);
@@ -132,6 +151,8 @@ export default function PreviewScreen() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [isSquareFormat, setIsSquareFormat] = useState(false);
   const [resolvedLocationText, setResolvedLocationText] = useState('');
+  const [draftReady, setDraftReady] = useState(false);
+  const [isHydratingDraft, setIsHydratingDraft] = useState(false);
 
   const exportRef = useRef<View>(null);
 
@@ -306,6 +327,182 @@ export default function PreviewScreen() {
     return tiles;
   }, [canvasDisplayHeight, canvasDisplayWidth]);
 
+  const activityDraftKey = useMemo(
+    () =>
+      activity ? `${PREVIEW_DRAFT_KEY_PREFIX}${String(activity.id)}` : null,
+    [activity],
+  );
+
+  function resetDraftStateToDefaults() {
+    setMedia(null);
+    setBackgroundGradient(null);
+    setAutoSubjectUri(null);
+    setImageOverlays([]);
+    setSelectedTemplateId(TEMPLATES[0].id);
+    setSelectedFontId(FONT_PRESETS[0].id);
+    setDistanceUnit('km');
+    setRouteMode('off');
+    setRouteMapVariant('standard');
+    setVisible(DEFAULT_VISIBLE_FIELDS);
+    setHeaderVisible(DEFAULT_HEADER_VISIBLE);
+    setLayerOrder(BASE_LAYER_ORDER);
+    setVisibleLayers(DEFAULT_VISIBLE_LAYERS);
+    setBehindSubjectLayers({});
+    setLayerTransforms({});
+    setIsSquareFormat(false);
+    setSelectedLayer(null);
+    setOutlinedLayer(null);
+    setActiveLayer(null);
+  }
+
+  function applyDraft(draft: PreviewDraft) {
+    setMedia(draft.media ?? null);
+    setBackgroundGradient(draft.backgroundGradient ?? null);
+    setAutoSubjectUri(draft.autoSubjectUri ?? null);
+    setImageOverlays(draft.imageOverlays ?? []);
+    setSelectedTemplateId(draft.selectedTemplateId ?? TEMPLATES[0].id);
+    setSelectedFontId(draft.selectedFontId ?? FONT_PRESETS[0].id);
+    setDistanceUnit(draft.distanceUnit ?? 'km');
+    setRouteMode(draft.routeMode ?? 'off');
+    setRouteMapVariant(draft.routeMapVariant ?? 'standard');
+    setVisible(draft.visible ?? DEFAULT_VISIBLE_FIELDS);
+    setHeaderVisible(draft.headerVisible ?? DEFAULT_HEADER_VISIBLE);
+    setLayerOrder(draft.layerOrder?.length ? draft.layerOrder : BASE_LAYER_ORDER);
+    setVisibleLayers(draft.visibleLayers ?? DEFAULT_VISIBLE_LAYERS);
+    setBehindSubjectLayers(draft.behindSubjectLayers ?? {});
+    setLayerTransforms(draft.layerTransforms ?? {});
+    setIsSquareFormat(Boolean(draft.isSquareFormat));
+    setSelectedLayer(null);
+    setOutlinedLayer(null);
+    setActiveLayer(null);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateDraft() {
+      setIsHydratingDraft(true);
+      setDraftReady(false);
+      setMessage(null);
+      if (!activity || !activityDraftKey) {
+        resetDraftStateToDefaults();
+        if (!cancelled) {
+          setDraftReady(true);
+          setIsHydratingDraft(false);
+        }
+        return;
+      }
+
+      try {
+        const raw = await AsyncStorage.getItem(activityDraftKey);
+        if (cancelled) return;
+
+        if (raw) {
+          const parsed = JSON.parse(raw) as unknown;
+          const draft = sanitizePreviewDraft(parsed, {
+            templateIds: TEMPLATES.map((item) => item.id),
+            fontIds: FONT_PRESETS.map((item) => item.id),
+            defaults: {
+              selectedTemplateId: TEMPLATES[0].id,
+              selectedFontId: FONT_PRESETS[0].id,
+              distanceUnit: 'km',
+              routeMode: 'off',
+              routeMapVariant: 'standard',
+              visible: DEFAULT_VISIBLE_FIELDS,
+              headerVisible: DEFAULT_HEADER_VISIBLE,
+              visibleLayers: DEFAULT_VISIBLE_LAYERS,
+              isSquareFormat: false,
+            },
+          });
+          if (draft) {
+            applyDraft(draft);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            if (!cancelled) {
+              setDraftReady(true);
+              setIsHydratingDraft(false);
+            }
+            return;
+          }
+        }
+
+        resetDraftStateToDefaults();
+        if (activityPhotoUri) {
+          const asset: ImagePicker.ImagePickerAsset = {
+            uri: activityPhotoUri,
+            width: STORY_WIDTH,
+            height: STORY_HEIGHT,
+            type: 'image',
+          };
+          await applyImageBackground(asset, { silent: true });
+        }
+      } catch {
+        resetDraftStateToDefaults();
+      } finally {
+        if (!cancelled) {
+          setDraftReady(true);
+          setIsHydratingDraft(false);
+        }
+      }
+    }
+
+    void hydrateDraft();
+    return () => {
+      cancelled = true;
+    };
+  }, [activity?.id, activityDraftKey, activityPhotoUri]);
+
+  useEffect(() => {
+    if (!draftReady || !activityDraftKey || isHydratingDraft) return;
+
+    const draft: PreviewDraft = {
+      v: 1,
+      media,
+      backgroundGradient,
+      autoSubjectUri,
+      imageOverlays,
+      selectedTemplateId,
+      selectedFontId,
+      distanceUnit,
+      routeMode,
+      routeMapVariant,
+      visible,
+      headerVisible,
+      layerOrder,
+      visibleLayers,
+      behindSubjectLayers,
+      layerTransforms,
+      isSquareFormat,
+    };
+
+    const timeout = setTimeout(() => {
+      void AsyncStorage.setItem(activityDraftKey, JSON.stringify(draft)).catch(
+        () => {},
+      );
+    }, 180);
+
+    return () => clearTimeout(timeout);
+  }, [
+    activityDraftKey,
+    autoSubjectUri,
+    backgroundGradient,
+    behindSubjectLayers,
+    distanceUnit,
+    draftReady,
+    headerVisible,
+    imageOverlays,
+    isSquareFormat,
+    layerOrder,
+    media,
+    routeMapVariant,
+    routeMode,
+    selectedFontId,
+    selectedTemplateId,
+    visible,
+    visibleLayers,
+    layerTransforms,
+    isHydratingDraft,
+  ]);
+
   useFocusEffect(
     useCallback(() => {
       setActivePanel('background');
@@ -356,17 +553,6 @@ export default function PreviewScreen() {
       cancelled = true;
     };
   }, [activity]);
-
-  useEffect(() => {
-    if (!activityPhotoUri) return;
-    const asset: ImagePicker.ImagePickerAsset = {
-      uri: activityPhotoUri,
-      width: STORY_WIDTH,
-      height: STORY_HEIGHT,
-      type: 'image',
-    };
-    void applyImageBackground(asset, { silent: true });
-  }, [activity?.id, activityPhotoUri]);
 
   useEffect(() => {
     const allHeaderFieldsHidden =
@@ -565,7 +751,21 @@ export default function PreviewScreen() {
 
   function cycleRouteMode() {
     if (routeMode === 'off') return;
-    setRouteMode((prev) => (prev === 'map' ? 'trace' : 'map'));
+    if (routeMode === 'trace') {
+      setRouteMode('map');
+      setRouteMapVariant('standard');
+      return;
+    }
+    if (routeMode === 'map' && routeMapVariant === 'standard') {
+      setRouteMapVariant('dark');
+      return;
+    }
+    if (routeMode === 'map' && routeMapVariant === 'dark') {
+      setRouteMapVariant('satellite');
+      return;
+    }
+    setRouteMode('trace');
+    setRouteMapVariant('standard');
   }
 
   function reorderLayers(
@@ -586,10 +786,20 @@ export default function PreviewScreen() {
     setBehindSubjectLayers((prev) => ({ ...prev, [layerId]: value }));
   }
 
+  function onLayerTransformChange(
+    layerId: LayerId,
+    next: { x: number; y: number; scale: number; rotationDeg: number },
+  ) {
+    setLayerTransforms((prev) => ({ ...prev, [layerId]: next }));
+  }
+
   function toggleLayer(layerId: LayerId, value: boolean) {
     if (layerId === 'route') {
       if (value) {
         setRouteMode((prev) => (prev === 'off' ? 'trace' : prev));
+        setRouteMapVariant((prev) =>
+          routeMode === 'off' ? 'standard' : prev,
+        );
         setVisibleLayers((prev) => ({ ...prev, route: true }));
         setBehindSubjectLayers((prev) => ({ ...prev, route: false }));
         selectLayer('route');
@@ -597,6 +807,7 @@ export default function PreviewScreen() {
         setVisibleLayers((prev) => ({ ...prev, route: false }));
         setBehindSubjectLayers((prev) => ({ ...prev, route: false }));
         setRouteMode('off');
+        setRouteMapVariant('standard');
         if (selectedLayer === 'route') {
           selectLayer('stats');
         }
@@ -611,11 +822,17 @@ export default function PreviewScreen() {
     setBehindSubjectLayers((prev) => ({ ...prev, [layerId]: false }));
     if (layerId === 'route') {
       setRouteMode('off');
+      setRouteMapVariant('standard');
     }
     if (layerId.startsWith('image:')) {
       const id = layerId.replace('image:', '');
       setImageOverlays((prev) => prev.filter((item) => item.id !== id));
       setLayerOrder((prev) => prev.filter((item) => item !== layerId));
+      setLayerTransforms((prev) => {
+        const next = { ...prev };
+        delete next[layerId];
+        return next;
+      });
     }
     if (selectedLayer === layerId) {
       selectLayer('stats');
@@ -748,6 +965,24 @@ export default function PreviewScreen() {
     setMessage('Random gradient background generated.');
   }
 
+  async function resetToDefault() {
+    if (busy) return;
+    setMessage(null);
+    resetDraftStateToDefaults();
+
+    if (activityPhotoUri) {
+      const asset: ImagePicker.ImagePickerAsset = {
+        uri: activityPhotoUri,
+        width: STORY_WIDTH,
+        height: STORY_HEIGHT,
+        type: 'image',
+      };
+      await applyImageBackground(asset, { silent: true });
+    }
+
+    setMessage('Reset to default.');
+  }
+
   function toggleSquareFormat() {
     if (!isSquareFormat && media?.type === 'video') {
       setMessage('Switch to an image background before square mode.');
@@ -766,6 +1001,25 @@ export default function PreviewScreen() {
         options={{
           headerRight: () => (
             <View style={styles.headerActions}>
+              <Pressable
+                onPress={() => {
+                  void resetToDefault();
+                }}
+                hitSlop={8}
+                style={[
+                  styles.headerFormatButton,
+                  busy ? styles.headerFormatButtonDisabled : null,
+                ]}
+                disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel="Reset to default"
+              >
+                <MaterialCommunityIcons
+                  name="restore"
+                  size={18}
+                  color="#F3F4F6"
+                />
+              </Pressable>
               <Pressable
                 onPress={toggleSquareFormat}
                 hitSlop={8}
@@ -852,6 +1106,9 @@ export default function PreviewScreen() {
           canvasScaleY={canvasScaleY}
           cycleStatsTemplate={cycleStatsTemplate}
           routeMode={routeMode}
+          routeMapVariant={routeMapVariant}
+          layerTransforms={layerTransforms}
+          onLayerTransformChange={onLayerTransformChange}
           routeInitialXDisplay={routeInitialXDisplay}
           routeInitialYDisplay={routeInitialYDisplay}
           routeLayerWidthDisplay={routeLayerWidthDisplay}
