@@ -280,6 +280,11 @@ export function PreviewEditorCanvas({
     }
     return routeInitialXDisplay;
   })();
+  const canRenderRouteLayer =
+    routeMode !== 'off' &&
+    Boolean(visibleLayers.route) &&
+    typeof activityPolyline === 'string' &&
+    activityPolyline.trim().length > 0;
 
   return (
     <View
@@ -564,7 +569,7 @@ export function PreviewEditorCanvas({
             </DraggableBlock>
           ) : null}
 
-          {routeMode !== 'off' && visibleLayers.route ? (
+          {canRenderRouteLayer ? (
             <DraggableBlock
               key="route-layer"
               initialX={layerTransforms.route?.x ?? defaultRouteX}

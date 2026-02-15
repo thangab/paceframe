@@ -240,6 +240,16 @@ export default function PreviewScreen() {
     if (city) return city;
     return resolvedLocationText;
   }, [activity, resolvedLocationText]);
+  const activityPolyline = useMemo(() => {
+    const raw = activity?.map?.summary_polyline;
+    if (typeof raw !== 'string') return null;
+    const normalized = raw.trim();
+    if (!normalized) return null;
+    if (normalized.toLowerCase() === 'null') return null;
+    if (normalized.toLowerCase() === 'undefined') return null;
+    return normalized;
+  }, [activity?.map?.summary_polyline]);
+  const hasRouteLayer = Boolean(activityPolyline);
   const supportsFullStatsPreview = useMemo(() => {
     const t = (activity?.type || '').toLowerCase();
     return (
@@ -384,13 +394,20 @@ export default function PreviewScreen() {
     return layerOrder
       .slice()
       .reverse()
+      .filter((id) => (hasRouteLayer ? true : id !== 'route'))
       .filter((id) => (supportsPrimaryLayer ? true : id !== 'primary'))
       .map((id) => ({
         id,
         label: labelMap.get(id) ?? id,
         isBehind: Boolean(behindSubjectLayers[id]),
       }));
-  }, [behindSubjectLayers, imageOverlays, layerOrder, supportsPrimaryLayer]);
+  }, [
+    behindSubjectLayers,
+    hasRouteLayer,
+    imageOverlays,
+    layerOrder,
+    supportsPrimaryLayer,
+  ]);
   const canvasDisplaySize = useMemo(() => {
     // Keep exact target ratio while fitting visible space above the bottom overlay.
     const targetHeight = isSquareFormat ? STORY_WIDTH : STORY_HEIGHT;
@@ -685,6 +702,21 @@ export default function PreviewScreen() {
       setOutlinedLayer('stats');
     }
   }, [routeMode, selectedLayer]);
+
+  useEffect(() => {
+    if (hasRouteLayer) return;
+    setRouteMode('off');
+    setVisibleLayers((prev) =>
+      prev.route ? { ...prev, route: false } : prev,
+    );
+    setBehindSubjectLayers((prev) =>
+      prev.route ? { ...prev, route: false } : prev,
+    );
+    if (selectedLayer === 'route') {
+      setSelectedLayer('stats');
+      setOutlinedLayer('stats');
+    }
+  }, [hasRouteLayer, selectedLayer]);
 
   useEffect(() => {
     if (!supportsPrimaryLayer && selectedLayer === 'primary') {
@@ -1113,6 +1145,7 @@ export default function PreviewScreen() {
   }
 
   function cycleRouteMode() {
+    if (!hasRouteLayer) return;
     if (routeMode === 'off') return;
     if (routeMode === 'trace') {
       setRouteMode('map');
@@ -1162,6 +1195,7 @@ export default function PreviewScreen() {
 
   function toggleLayer(layerId: LayerId, value: boolean) {
     if (layerId === 'route') {
+      if (!hasRouteLayer) return;
       if (value) {
         setRouteMode((prev) => (prev === 'off' ? 'trace' : prev));
         setRouteMapVariant((prev) => (routeMode === 'off' ? 'standard' : prev));
@@ -1516,7 +1550,7 @@ export default function PreviewScreen() {
           routeInitialYDisplay={routeInitialYDisplay}
           routeLayerWidthDisplay={routeLayerWidthDisplay}
           routeLayerHeightDisplay={routeLayerHeightDisplay}
-          activityPolyline={activity.map.summary_polyline}
+          activityPolyline={activityPolyline}
           cycleRouteMode={cycleRouteMode}
           imageOverlays={imageOverlays}
           imageOverlayMaxInitial={IMAGE_OVERLAY_MAX_INITIAL}
