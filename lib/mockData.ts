@@ -12,12 +12,16 @@ export const mockActivities: StravaActivity[] = [
     start_date: '2026-02-08T06:20:00Z',
     start_latlng: [48.8566, 2.3522],
     average_speed: 3.42,
+    average_cadence: 168,
+    average_heartrate: 156,
+    // kilojoules: 462,
     location_city: 'Paris',
     location_country: 'France',
     map: {
       summary_polyline: 'gfo}EtohhUxD@bAxJmGF',
     },
-    photoUrl: 'https://images.unsplash.com/photo-1571008887538-b36bb32f4571?auto=format&fit=crop&w=600&q=80',
+    photoUrl:
+      'https://images.unsplash.com/photo-1571008887538-b36bb32f4571?auto=format&fit=crop&w=600&q=80',
   },
   {
     id: 900002,
@@ -30,12 +34,16 @@ export const mockActivities: StravaActivity[] = [
     start_date: '2026-02-06T18:20:00Z',
     start_latlng: [45.764, 4.8357],
     average_speed: 2.9,
+    average_cadence: 162,
+    average_heartrate: 141,
+    kilojoules: 305,
     location_city: 'Lyon',
     location_country: 'France',
     map: {
       summary_polyline: 'o~ocF~kbkVfS~@vCjBvD',
     },
-    photoUrl: 'https://images.unsplash.com/photo-1517963879433-6ad2b056d712?auto=format&fit=crop&w=600&q=80',
+    photoUrl:
+      'https://images.unsplash.com/photo-1517963879433-6ad2b056d712?auto=format&fit=crop&w=600&q=80',
   },
   {
     id: 900003,
@@ -48,11 +56,15 @@ export const mockActivities: StravaActivity[] = [
     start_date: '2026-02-02T05:15:00Z',
     start_latlng: [45.8992, 6.1294],
     average_speed: 3.07,
+    average_cadence: 171,
+    average_heartrate: 152,
+    kilojoules: 910,
     location_city: 'Annecy',
     location_country: 'France',
     map: {
       summary_polyline: 'mfp_Ix~vpAqCwAqBsBqCaC',
     },
-    photoUrl: 'https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?auto=format&fit=crop&w=600&q=80',
+    photoUrl:
+      'https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?auto=format&fit=crop&w=600&q=80',
   },
 ];

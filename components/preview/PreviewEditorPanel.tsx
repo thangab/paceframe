@@ -62,6 +62,9 @@ type Props = {
   onSelectFont: (fontId: string) => void;
   effectiveVisible: Record<FieldId, boolean>;
   supportsFullStatsPreview: boolean;
+  statsFieldAvailability: Record<FieldId, boolean>;
+  maxOptionalMetrics: number;
+  selectedOptionalMetrics: number;
   onToggleField: (field: FieldId, value: boolean) => void;
   headerVisible: Record<HeaderFieldId, boolean>;
   onToggleHeaderField: (field: HeaderFieldId, value: boolean) => void;
@@ -105,6 +108,9 @@ export function PreviewEditorPanel({
   onSelectFont,
   effectiveVisible,
   supportsFullStatsPreview,
+  statsFieldAvailability,
+  maxOptionalMetrics,
+  selectedOptionalMetrics,
   onToggleField,
   headerVisible,
   onToggleHeaderField,
@@ -494,10 +500,15 @@ export function PreviewEditorPanel({
                       ['time', 'Time'],
                       ['pace', 'Pace'],
                       ['elev', 'Elev'],
+                      ['cadence', 'Cadence'],
+                      ['calories', 'Calories'],
+                      ['avgHr', 'Avg HR'],
                     ] as [FieldId, string][]
                   ).map(([id, label]) => {
                     const selected = effectiveVisible[id];
-                    const disabled = !supportsFullStatsPreview;
+                    const disabled =
+                      !statsFieldAvailability[id] ||
+                      !supportsFullStatsPreview;
                     return (
                       <Pressable
                         key={id}
@@ -724,11 +735,17 @@ function TemplateLayoutPreview({ template }: { template: StatsTemplate }) {
                 time: true,
                 pace: true,
                 elev: true,
+                cadence: false,
+                calories: false,
+                avgHr: false,
               }}
               distanceText="10.3 km"
               durationText="50:20"
               paceText="4:52 /km"
               elevText="42 m"
+              cadenceText="168 spm"
+              caloriesText="462"
+              avgHeartRateText="156 bpm"
             />
           </View>
         </View>
@@ -741,7 +758,11 @@ function getTemplatePreviewHeight(layout: StatsTemplate['layout']) {
   switch (layout) {
     case 'hero':
     case 'glass-row':
+    case 'sunset-hero':
+    case 'morning-glass':
       return 190;
+    case 'split-bold':
+      return 228;
     case 'vertical':
     case 'soft-stack':
       return 244;
@@ -1107,7 +1128,9 @@ const styles = StyleSheet.create({
   },
   statsPillsWrap: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
+    rowGap: 8,
     borderWidth: 1,
     borderColor: '#2F3644',
     borderRadius: 12,
@@ -1115,8 +1138,9 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   statsPill: {
-    flex: 1,
-    minWidth: 0,
+    minWidth: 98,
+    flexGrow: 1,
+    flexBasis: '31%',
     borderRadius: 999,
     borderWidth: 1,
     borderColor: '#3A4356',

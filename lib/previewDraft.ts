@@ -207,6 +207,9 @@ function sanitizeVisible(
     time: asBoolean(input.time, fallback.time),
     pace: asBoolean(input.pace, fallback.pace),
     elev: asBoolean(input.elev, fallback.elev),
+    cadence: asBoolean(input.cadence, fallback.cadence),
+    calories: asBoolean(input.calories, fallback.calories),
+    avgHr: asBoolean(input.avgHr, fallback.avgHr),
   };
 }
 

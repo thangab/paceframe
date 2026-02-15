@@ -1,4 +1,11 @@
-export type FieldId = 'distance' | 'time' | 'pace' | 'elev';
+export type FieldId =
+  | 'distance'
+  | 'time'
+  | 'pace'
+  | 'elev'
+  | 'cadence'
+  | 'calories'
+  | 'avgHr';
 export type RouteMode = 'off' | 'map' | 'trace';
 export type RouteMapVariant = 'standard' | 'dark' | 'satellite';
 export type StatsLayout =
@@ -11,7 +18,10 @@ export type StatsLayout =
   | 'soft-stack'
   | 'pill-inline'
   | 'card-columns'
-  | 'panel-grid';
+  | 'panel-grid'
+  | 'sunset-hero'
+  | 'morning-glass'
+  | 'split-bold';
 export type BaseLayerId = 'meta' | 'stats' | 'route';
 export type LayerId = BaseLayerId | `image:${string}`;
 

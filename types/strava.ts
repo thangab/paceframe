@@ -24,6 +24,10 @@ export type StravaActivity = {
   start_latlng?: [number, number] | null;
   timezone?: string | null;
   average_speed: number;
+  average_cadence?: number | null;
+  average_heartrate?: number | null;
+  kilojoules?: number | null;
+  calories?: number | null;
   location_city?: string | null;
   location_state?: string | null;
   location_country?: string | null;

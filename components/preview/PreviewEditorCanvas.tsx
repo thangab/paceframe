@@ -62,6 +62,9 @@ type Props = {
   durationText: string;
   paceText: string;
   elevText: string;
+  cadenceText: string;
+  caloriesText: string;
+  avgHeartRateText: string;
   centeredStatsXDisplay: number;
   dynamicStatsWidthDisplay: number;
   canvasScaleX: number;
@@ -125,6 +128,9 @@ export function PreviewEditorCanvas({
   durationText,
   paceText,
   elevText,
+  cadenceText,
+  caloriesText,
+  avgHeartRateText,
   centeredStatsXDisplay,
   dynamicStatsWidthDisplay,
   canvasScaleX,
@@ -147,10 +153,20 @@ export function PreviewEditorCanvas({
   onRotationGuideChange,
 }: Props) {
   const showSelectionOutline = !isCapturingOverlay && !isExportingPng;
+  const usesSunsetHeader =
+    template.layout === 'sunset-hero' || template.layout === 'morning-glass';
+  const usesTemplateHeader =
+    usesSunsetHeader || template.layout === 'split-bold';
   const hasHeaderContent =
     (headerVisible.title && activityName.length > 0) ||
     (headerVisible.date && dateText.length > 0) ||
     (headerVisible.location && locationText.length > 0);
+  const headerMetaLine = [
+    headerVisible.location ? locationText : null,
+    headerVisible.date ? dateText : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <View
@@ -271,7 +287,9 @@ export function PreviewEditorCanvas({
                 layerTransforms.meta?.x ??
                 Math.max(0, Math.round((canvasDisplayWidth - 240) / 2))
               }
-              initialY={layerTransforms.meta?.y ?? Math.round(44 * canvasScaleY)}
+              initialY={
+                layerTransforms.meta?.y ?? Math.round(44 * canvasScaleY)
+              }
               initialScale={layerTransforms.meta?.scale ?? 1}
               rotationDeg={layerTransforms.meta?.rotationDeg ?? 0}
               selected={showSelectionOutline && selectedLayer === 'meta'}
@@ -287,6 +305,7 @@ export function PreviewEditorCanvas({
               onTransformEnd={(next) => onLayerTransformChange('meta', next)}
               style={[
                 styles.metaBlock,
+                usesTemplateHeader ? styles.metaBlockSunset : null,
                 { zIndex: baseLayerZ('meta'), elevation: baseLayerZ('meta') },
               ]}
             >
@@ -294,16 +313,20 @@ export function PreviewEditorCanvas({
                 <Text
                   style={[
                     styles.metaTitle,
+                    usesTemplateHeader ? styles.metaTitleSunset : null,
                     {
                       fontFamily: fontPreset.family,
                       fontWeight: fontPreset.weightTitle,
                     },
                   ]}
                 >
-                  {activityName}
+                  {usesTemplateHeader ? activityName.toUpperCase() : activityName}
                 </Text>
               ) : null}
-              {headerVisible.date ? (
+              {usesTemplateHeader && headerVisible.title ? (
+                <View style={styles.metaDividerSunset} />
+              ) : null}
+              {!usesTemplateHeader && headerMetaLine ? (
                 <Text
                   style={[
                     styles.metaSubtitle,
@@ -313,20 +336,21 @@ export function PreviewEditorCanvas({
                     },
                   ]}
                 >
-                  {dateText}
+                  {headerMetaLine}
                 </Text>
               ) : null}
-              {headerVisible.location ? (
+              {usesTemplateHeader && headerMetaLine ? (
                 <Text
                   style={[
-                    styles.metaLocation,
+                    styles.metaSubtitle,
+                    styles.metaSubtitleSunset,
                     {
                       fontFamily: fontPreset.family,
                       fontWeight: '400',
                     },
                   ]}
                 >
-                  {locationText}
+                  {headerMetaLine}
                 </Text>
               ) : null}
             </DraggableBlock>
@@ -337,7 +361,8 @@ export function PreviewEditorCanvas({
               key="stats-layer"
               initialX={layerTransforms.stats?.x ?? centeredStatsXDisplay}
               initialY={
-                layerTransforms.stats?.y ?? Math.round(template.y * canvasScaleY)
+                layerTransforms.stats?.y ??
+                Math.round(template.y * canvasScaleY)
               }
               initialScale={layerTransforms.stats?.scale ?? 1}
               rotationDeg={layerTransforms.stats?.rotationDeg ?? 0}
@@ -374,6 +399,9 @@ export function PreviewEditorCanvas({
                 durationText={durationText}
                 paceText={paceText}
                 elevText={elevText}
+                cadenceText={cadenceText}
+                caloriesText={caloriesText}
+                avgHeartRateText={avgHeartRateText}
               />
             </DraggableBlock>
           ) : null}
@@ -615,6 +643,10 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     alignItems: 'center',
   },
+  metaBlockSunset: {
+    width: 280,
+    paddingTop: 4,
+  },
   metaSubtitle: {
     color: '#FFFFFF',
     fontSize: 12,
@@ -622,6 +654,12 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.35)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  metaSubtitleSunset: {
+    color: 'rgba(235,235,242,0.9)',
+    fontSize: 13,
+    letterSpacing: 0.2,
+    marginTop: 6,
   },
   metaLocation: {
     color: '#FFFFFF',
@@ -638,6 +676,17 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  metaTitleSunset: {
+    fontSize: 24,
+    letterSpacing: 2.2,
+    marginBottom: 6,
+  },
+  metaDividerSunset: {
+    width: '82%',
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    marginTop: 2,
   },
   routeBlock: {
     padding: 0,

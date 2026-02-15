@@ -40,7 +40,6 @@ import { removeBackgroundOnDevice } from '@/lib/backgroundRemoval';
 import { composeVideoWithOverlay } from '@/lib/nativeVideoComposer';
 import {
   DistanceUnit,
-  formatDate,
   formatDistanceMeters,
   formatDuration,
   formatPace,
@@ -68,6 +67,9 @@ const DEFAULT_VISIBLE_FIELDS: Record<FieldId, boolean> = {
   time: true,
   pace: true,
   elev: true,
+  cadence: false,
+  calories: false,
+  avgHr: false,
 };
 const DEFAULT_HEADER_VISIBLE = {
   title: true,
@@ -189,20 +191,45 @@ export default function PreviewScreen() {
     distanceUnit,
   );
   const elevText = `${Math.round(activity?.total_elevation_gain ?? 0)} m`;
-  const dateText = activity ? formatDate(activity.start_date) : '';
+  const cadenceText = formatCadence(activity);
+  const hasCadence = Boolean(
+    activity?.average_cadence && activity.average_cadence > 0,
+  );
+  const hasCalories = Boolean(
+    (activity?.calories && activity.calories > 0) ||
+      (activity?.kilojoules && activity.kilojoules > 0),
+  );
+  const caloriesText = `${Math.max(
+    0,
+    Math.round(activity?.calories ?? activity?.kilojoules ?? 0),
+  )}`;
+  const avgHeartRateText =
+    activity?.average_heartrate && activity.average_heartrate > 0
+      ? `${Math.round(activity.average_heartrate)} bpm`
+      : '-- bpm';
+  const hasAvgHeartRate = Boolean(
+    activity?.average_heartrate && activity.average_heartrate > 0,
+  );
+  const statsFieldAvailability = useMemo<Record<FieldId, boolean>>(
+    () => ({
+      distance: true,
+      time: true,
+      pace: true,
+      elev: true,
+      cadence: hasCadence,
+      calories: hasCalories,
+      avgHr: hasAvgHeartRate,
+    }),
+    [hasAvgHeartRate, hasCadence, hasCalories],
+  );
+  const dateText = activity ? formatPreviewDate(activity.start_date) : '';
   const activityPhotoUri = activity?.photoUrl
     ? normalizeLocalUri(activity.photoUrl)
     : null;
   const locationText = useMemo(() => {
-    return (
-      [
-        activity?.location_city,
-        activity?.location_state,
-        activity?.location_country,
-      ]
-        .filter((part): part is string => Boolean(part && part.trim()))
-        .join(', ') || resolvedLocationText
-    );
+    const city = activity?.location_city?.trim();
+    if (city) return city;
+    return resolvedLocationText;
   }, [activity, resolvedLocationText]);
   const supportsFullStatsPreview = useMemo(() => {
     const t = (activity?.type || '').toLowerCase();
@@ -214,24 +241,66 @@ export default function PreviewScreen() {
       t === 'swim'
     );
   }, [activity?.type]);
+  const templateMetricLimit = useMemo(() => getTemplateMetricLimit(template), [template]);
+  const maxOptionalMetrics = Math.max(0, templateMetricLimit - 1);
   const effectiveVisible = useMemo<Record<FieldId, boolean>>(
+    () => {
+      if (!supportsFullStatsPreview) {
+        return {
+          distance: false,
+          time: true,
+          pace: false,
+          elev: false,
+          cadence: false,
+          calories: false,
+          avgHr: false,
+        };
+      }
+
+      const orderedOptional: Exclude<FieldId, 'distance'>[] = [
+        'time',
+        'pace',
+        'elev',
+        'cadence',
+        'calories',
+        'avgHr',
+      ];
+      const picked = orderedOptional.filter(
+        (field) => Boolean(visible[field]) && statsFieldAvailability[field],
+      );
+      const allowed = new Set(picked.slice(0, maxOptionalMetrics));
+
+      return {
+        distance: true,
+        time: allowed.has('time'),
+        pace: allowed.has('pace'),
+        elev: allowed.has('elev'),
+        cadence: allowed.has('cadence'),
+        calories: allowed.has('calories'),
+        avgHr: allowed.has('avgHr'),
+      };
+    },
+    [maxOptionalMetrics, statsFieldAvailability, supportsFullStatsPreview, visible],
+  );
+  const selectedOptionalMetrics = useMemo(
     () =>
-      supportsFullStatsPreview
-        ? { ...visible, distance: true }
-        : {
-            distance: false,
-            time: true,
-            pace: false,
-            elev: false,
-          },
-    [supportsFullStatsPreview, visible],
+      (effectiveVisible.time ? 1 : 0) +
+      (effectiveVisible.pace ? 1 : 0) +
+      (effectiveVisible.elev ? 1 : 0) +
+      (effectiveVisible.cadence ? 1 : 0) +
+      (effectiveVisible.calories ? 1 : 0) +
+      (effectiveVisible.avgHr ? 1 : 0),
+    [effectiveVisible],
   );
   const visibleStatsCount = useMemo(
     () =>
       (effectiveVisible.distance ? 1 : 0) +
       (effectiveVisible.time ? 1 : 0) +
       (effectiveVisible.pace ? 1 : 0) +
-      (effectiveVisible.elev ? 1 : 0),
+      (effectiveVisible.elev ? 1 : 0) +
+      (effectiveVisible.cadence ? 1 : 0) +
+      (effectiveVisible.calories ? 1 : 0) +
+      (effectiveVisible.avgHr ? 1 : 0),
     [effectiveVisible],
   );
   const dynamicStatsWidth = useMemo(
@@ -561,9 +630,7 @@ export default function PreviewScreen() {
         });
         if (cancelled || !result) return;
 
-        const resolved = [result.city, result.region, result.country]
-          .filter((part): part is string => Boolean(part && part.trim()))
-          .join(', ');
+        const resolved = result.city?.trim() || '';
         setResolvedLocationText(resolved);
       } catch {
         if (!cancelled) setResolvedLocationText('');
@@ -911,6 +978,18 @@ export default function PreviewScreen() {
 
   function toggleField(field: FieldId, value: boolean) {
     if (field === 'distance' && !value) {
+      return;
+    }
+    if (
+      value &&
+      field !== 'distance' &&
+      supportsFullStatsPreview &&
+      !effectiveVisible[field] &&
+      selectedOptionalMetrics >= maxOptionalMetrics
+    ) {
+      setMessage(
+        `This template supports ${templateMetricLimit} metrics max.`,
+      );
       return;
     }
     setVisible((prev) => ({ ...prev, [field]: value }));
@@ -1322,6 +1401,9 @@ export default function PreviewScreen() {
           durationText={durationText}
           paceText={paceText}
           elevText={elevText}
+          cadenceText={cadenceText}
+          caloriesText={caloriesText}
+          avgHeartRateText={avgHeartRateText}
           centeredStatsXDisplay={centeredStatsXDisplay}
           dynamicStatsWidthDisplay={dynamicStatsWidthDisplay}
           canvasScaleX={canvasScaleX}
@@ -1375,6 +1457,9 @@ export default function PreviewScreen() {
           onSelectFont={setSelectedFontId}
           effectiveVisible={effectiveVisible}
           supportsFullStatsPreview={supportsFullStatsPreview}
+          statsFieldAvailability={statsFieldAvailability}
+          maxOptionalMetrics={maxOptionalMetrics}
+          selectedOptionalMetrics={selectedOptionalMetrics}
           onToggleField={toggleField}
           headerVisible={headerVisible}
           onToggleHeaderField={toggleHeaderField}
@@ -1423,29 +1508,81 @@ function getInitialOverlaySize(
   };
 }
 
+function formatPreviewDate(isoDate: string) {
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+  }).format(date);
+}
+
+function formatCadence(
+  activity: {
+    average_cadence?: number | null;
+    type?: string | null;
+  } | null,
+) {
+  const raw = activity?.average_cadence;
+  if (!raw || raw <= 0) return '-- spm';
+
+  const type = (activity?.type ?? '').toLowerCase();
+  const isRunLike = type === 'run' || type === 'walk' || type === 'hike';
+
+  // Strava cadence for run-like sports can come as strides/min; display as steps/min.
+  if (isRunLike) {
+    const spm = raw < 130 ? raw * 2 : raw;
+    return `${Math.round(spm)} spm`;
+  }
+
+  return `${Math.round(raw)} rpm`;
+}
+
 function getDynamicStatsWidth(template: StatsTemplate, visibleCount: number) {
   const count = Math.max(1, Math.min(4, visibleCount));
 
   switch (template.layout) {
-    case 'row': {
-      // Hero: distance + bottom row; keep wider when many metrics are visible.
+    case 'hero':
+    case 'glass-row':
+    case 'sunset-hero': {
       if (count >= 4) return template.width;
       if (count === 3) return Math.max(220, template.width - 24);
       if (count === 2) return Math.max(170, template.width - 78);
-      return 140;
+      return Math.max(220, template.width - 52);
     }
-    case 'inline':
+    case 'morning-glass':
+      return template.width;
+    case 'split-bold':
+      return template.width;
+    case 'compact':
+    case 'pill-inline':
       return Math.max(150, Math.round(template.width * (0.45 + count * 0.14)));
-    case 'right':
+    case 'columns':
+    case 'card-columns':
       return Math.max(160, Math.round(template.width * (0.42 + count * 0.145)));
-    case 'grid':
+    case 'grid-2x2':
+    case 'panel-grid':
       if (count >= 4) return template.width;
       if (count === 3) return Math.max(220, template.width - 28);
       if (count === 2) return Math.max(160, template.width - 110);
       return 130;
-    case 'stack':
+    case 'vertical':
+    case 'soft-stack':
     default:
       return Math.max(130, Math.round(template.width * (0.42 + count * 0.145)));
+  }
+}
+
+function getTemplateMetricLimit(template: StatsTemplate) {
+  switch (template.layout) {
+    case 'sunset-hero':
+      return 5;
+    case 'morning-glass':
+      return 6;
+    case 'split-bold':
+      return 6;
+    default:
+      return 4;
   }
 }
 
