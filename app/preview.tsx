@@ -79,6 +79,7 @@ const DEFAULT_HEADER_VISIBLE = {
 const DEFAULT_VISIBLE_LAYERS: Partial<Record<LayerId, boolean>> = {
   meta: true,
   stats: true,
+  primary: true,
   route: true,
 };
 const PREVIEW_DRAFT_KEY_PREFIX = 'paceframe.preview.draft.';
@@ -139,6 +140,7 @@ export default function PreviewScreen() {
   const [visible, setVisible] = useState<Record<FieldId, boolean>>(
     DEFAULT_VISIBLE_FIELDS,
   );
+  const [primaryField, setPrimaryField] = useState<FieldId>('distance');
   const [headerVisible, setHeaderVisible] = useState(DEFAULT_HEADER_VISIBLE);
   const [layerOrder, setLayerOrder] = useState<LayerId[]>(BASE_LAYER_ORDER);
   const [visibleLayers, setVisibleLayers] = useState<
@@ -173,6 +175,13 @@ export default function PreviewScreen() {
     () =>
       TEMPLATES.find((item) => item.id === selectedTemplateId) ?? TEMPLATES[0],
     [selectedTemplateId],
+  );
+  const supportsPrimaryLayer = useMemo(
+    () =>
+      template.layout === 'sunset-hero' ||
+      template.layout === 'morning-glass' ||
+      template.layout === 'split-bold',
+    [template.layout],
   );
   const fontPreset = useMemo(
     () =>
@@ -241,8 +250,11 @@ export default function PreviewScreen() {
       t === 'swim'
     );
   }, [activity?.type]);
-  const templateMetricLimit = useMemo(() => getTemplateMetricLimit(template), [template]);
-  const maxOptionalMetrics = Math.max(0, templateMetricLimit - 1);
+  const templateMetricLimit = useMemo(
+    () => getTemplateMetricLimit(template),
+    [template],
+  );
+  const maxSelectableMetrics = Math.max(1, templateMetricLimit);
   const effectiveVisible = useMemo<Record<FieldId, boolean>>(
     () => {
       if (!supportsFullStatsPreview) {
@@ -257,7 +269,8 @@ export default function PreviewScreen() {
         };
       }
 
-      const orderedOptional: Exclude<FieldId, 'distance'>[] = [
+      const orderedFields: FieldId[] = [
+        'distance',
         'time',
         'pace',
         'elev',
@@ -265,13 +278,13 @@ export default function PreviewScreen() {
         'calories',
         'avgHr',
       ];
-      const picked = orderedOptional.filter(
+      const picked = orderedFields.filter(
         (field) => Boolean(visible[field]) && statsFieldAvailability[field],
       );
-      const allowed = new Set(picked.slice(0, maxOptionalMetrics));
+      const allowed = new Set(picked.slice(0, maxSelectableMetrics));
 
       return {
-        distance: true,
+        distance: allowed.has('distance'),
         time: allowed.has('time'),
         pace: allowed.has('pace'),
         elev: allowed.has('elev'),
@@ -280,10 +293,53 @@ export default function PreviewScreen() {
         avgHr: allowed.has('avgHr'),
       };
     },
-    [maxOptionalMetrics, statsFieldAvailability, supportsFullStatsPreview, visible],
+    [
+      maxSelectableMetrics,
+      statsFieldAvailability,
+      supportsFullStatsPreview,
+      visible,
+    ],
   );
-  const selectedOptionalMetrics = useMemo(
+  const metricTextByField = useMemo<Record<FieldId, string>>(
+    () => ({
+      distance: distanceText,
+      time: durationText,
+      pace: paceText,
+      elev: elevText,
+      cadence: cadenceText,
+      calories: caloriesText,
+      avgHr: avgHeartRateText,
+    }),
+    [
+      avgHeartRateText,
+      cadenceText,
+      caloriesText,
+      distanceText,
+      durationText,
+      elevText,
+      paceText,
+    ],
+  );
+  const primaryFieldEffective = useMemo<FieldId>(() => {
+    if (!supportsPrimaryLayer) return 'distance';
+    if (effectiveVisible[primaryField] && statsFieldAvailability[primaryField]) {
+      return primaryField;
+    }
+    const fallback = (
+      ['distance', 'time', 'pace', 'elev', 'cadence', 'calories', 'avgHr'] as FieldId[]
+    ).find((field) => effectiveVisible[field] && statsFieldAvailability[field]);
+    return fallback ?? 'distance';
+  }, [effectiveVisible, primaryField, statsFieldAvailability, supportsPrimaryLayer]);
+  const statsVisibleForLayer = useMemo<Record<FieldId, boolean>>(
     () =>
+      supportsPrimaryLayer
+        ? { ...effectiveVisible, [primaryFieldEffective]: false }
+        : effectiveVisible,
+    [effectiveVisible, primaryFieldEffective, supportsPrimaryLayer],
+  );
+  const selectedVisibleMetrics = useMemo(
+    () =>
+      (effectiveVisible.distance ? 1 : 0) +
       (effectiveVisible.time ? 1 : 0) +
       (effectiveVisible.pace ? 1 : 0) +
       (effectiveVisible.elev ? 1 : 0) +
@@ -294,14 +350,14 @@ export default function PreviewScreen() {
   );
   const visibleStatsCount = useMemo(
     () =>
-      (effectiveVisible.distance ? 1 : 0) +
-      (effectiveVisible.time ? 1 : 0) +
-      (effectiveVisible.pace ? 1 : 0) +
-      (effectiveVisible.elev ? 1 : 0) +
-      (effectiveVisible.cadence ? 1 : 0) +
-      (effectiveVisible.calories ? 1 : 0) +
-      (effectiveVisible.avgHr ? 1 : 0),
-    [effectiveVisible],
+      (statsVisibleForLayer.distance ? 1 : 0) +
+      (statsVisibleForLayer.time ? 1 : 0) +
+      (statsVisibleForLayer.pace ? 1 : 0) +
+      (statsVisibleForLayer.elev ? 1 : 0) +
+      (statsVisibleForLayer.cadence ? 1 : 0) +
+      (statsVisibleForLayer.calories ? 1 : 0) +
+      (statsVisibleForLayer.avgHr ? 1 : 0),
+    [statsVisibleForLayer],
   );
   const dynamicStatsWidth = useMemo(
     () => getDynamicStatsWidth(template, visibleStatsCount),
@@ -319,6 +375,7 @@ export default function PreviewScreen() {
     const labelMap = new Map<LayerId, string>([
       ['meta', 'Header'],
       ['stats', 'Stats'],
+      ['primary', 'Primary'],
       ['route', 'Route'],
     ]);
     imageOverlays.forEach((item) => {
@@ -327,12 +384,13 @@ export default function PreviewScreen() {
     return layerOrder
       .slice()
       .reverse()
+      .filter((id) => (supportsPrimaryLayer ? true : id !== 'primary'))
       .map((id) => ({
         id,
         label: labelMap.get(id) ?? id,
         isBehind: Boolean(behindSubjectLayers[id]),
       }));
-  }, [behindSubjectLayers, imageOverlays, layerOrder]);
+  }, [behindSubjectLayers, imageOverlays, layerOrder, supportsPrimaryLayer]);
   const canvasDisplaySize = useMemo(() => {
     // Keep exact target ratio while fitting visible space above the bottom overlay.
     const targetHeight = isSquareFormat ? STORY_WIDTH : STORY_HEIGHT;
@@ -432,6 +490,7 @@ export default function PreviewScreen() {
     setDistanceUnit('km');
     setRouteMode('trace');
     setRouteMapVariant('standard');
+    setPrimaryField('distance');
     setVisible(DEFAULT_VISIBLE_FIELDS);
     setHeaderVisible(DEFAULT_HEADER_VISIBLE);
     setLayerOrder(BASE_LAYER_ORDER);
@@ -454,12 +513,13 @@ export default function PreviewScreen() {
     setDistanceUnit(draft.distanceUnit ?? 'km');
     setRouteMode(draft.routeMode ?? 'trace');
     setRouteMapVariant(draft.routeMapVariant ?? 'standard');
+    setPrimaryField(draft.primaryField ?? 'distance');
     setVisible(draft.visible ?? DEFAULT_VISIBLE_FIELDS);
     setHeaderVisible(draft.headerVisible ?? DEFAULT_HEADER_VISIBLE);
     setLayerOrder(
       draft.layerOrder?.length ? draft.layerOrder : BASE_LAYER_ORDER,
     );
-    setVisibleLayers(draft.visibleLayers ?? DEFAULT_VISIBLE_LAYERS);
+    setVisibleLayers({ ...DEFAULT_VISIBLE_LAYERS, ...(draft.visibleLayers ?? {}) });
     setBehindSubjectLayers(draft.behindSubjectLayers ?? {});
     setLayerTransforms(draft.layerTransforms ?? {});
     setIsSquareFormat(Boolean(draft.isSquareFormat));
@@ -499,6 +559,7 @@ export default function PreviewScreen() {
               distanceUnit: 'km',
               routeMode: 'trace',
               routeMapVariant: 'standard',
+              primaryField: 'distance',
               visible: DEFAULT_VISIBLE_FIELDS,
               headerVisible: DEFAULT_HEADER_VISIBLE,
               visibleLayers: DEFAULT_VISIBLE_LAYERS,
@@ -556,6 +617,7 @@ export default function PreviewScreen() {
       distanceUnit,
       routeMode,
       routeMapVariant,
+      primaryField,
       visible,
       headerVisible,
       layerOrder,
@@ -586,6 +648,7 @@ export default function PreviewScreen() {
     media,
     routeMapVariant,
     routeMode,
+    primaryField,
     selectedFontId,
     selectedTemplateId,
     visible,
@@ -615,6 +678,13 @@ export default function PreviewScreen() {
       setOutlinedLayer('stats');
     }
   }, [routeMode, selectedLayer]);
+
+  useEffect(() => {
+    if (!supportsPrimaryLayer && selectedLayer === 'primary') {
+      setSelectedLayer('stats');
+      setOutlinedLayer('stats');
+    }
+  }, [selectedLayer, supportsPrimaryLayer]);
 
   useEffect(() => {
     let cancelled = false;
@@ -977,15 +1047,11 @@ export default function PreviewScreen() {
   }
 
   function toggleField(field: FieldId, value: boolean) {
-    if (field === 'distance' && !value) {
-      return;
-    }
     if (
       value &&
-      field !== 'distance' &&
       supportsFullStatsPreview &&
       !effectiveVisible[field] &&
-      selectedOptionalMetrics >= maxOptionalMetrics
+      selectedVisibleMetrics >= maxSelectableMetrics
     ) {
       setMessage(
         `This template supports ${templateMetricLimit} metrics max.`,
@@ -993,6 +1059,18 @@ export default function PreviewScreen() {
       return;
     }
     setVisible((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function setPrimaryMetric(field: FieldId) {
+    if (!supportsPrimaryLayer) return;
+    if (!statsFieldAvailability[field]) {
+      setMessage('This stat has no data for this activity.');
+      return;
+    }
+    setPrimaryField(field);
+    setVisible((prev) => ({ ...prev, [field]: true }));
+    setVisibleLayers((prev) => ({ ...prev, primary: true }));
+    selectLayer('primary');
   }
 
   function toggleHeaderField(
@@ -1008,6 +1086,16 @@ export default function PreviewScreen() {
       return;
     }
     setSelectedTemplateId(next.id);
+    if (
+      next.layout === 'sunset-hero' ||
+      next.layout === 'morning-glass' ||
+      next.layout === 'split-bold'
+    ) {
+      setLayerTransforms((prev) => {
+        const { stats: _stats, primary: _primary, ...rest } = prev;
+        return rest;
+      });
+    }
   }
 
   function cycleStatsTemplate() {
@@ -1396,7 +1484,11 @@ export default function PreviewScreen() {
           headerVisible={headerVisible}
           template={template}
           fontPreset={fontPreset}
-          effectiveVisible={effectiveVisible}
+          effectiveVisible={statsVisibleForLayer}
+          supportsPrimaryLayer={supportsPrimaryLayer}
+          primaryVisible={Boolean(visibleLayers.primary)}
+          primaryField={primaryFieldEffective}
+          primaryValueText={metricTextByField[primaryFieldEffective]}
           distanceText={distanceText}
           durationText={durationText}
           paceText={paceText}
@@ -1458,8 +1550,11 @@ export default function PreviewScreen() {
           effectiveVisible={effectiveVisible}
           supportsFullStatsPreview={supportsFullStatsPreview}
           statsFieldAvailability={statsFieldAvailability}
-          maxOptionalMetrics={maxOptionalMetrics}
-          selectedOptionalMetrics={selectedOptionalMetrics}
+          supportsPrimaryLayer={supportsPrimaryLayer}
+          primaryField={primaryField}
+          onSetPrimaryField={setPrimaryMetric}
+          maxOptionalMetrics={maxSelectableMetrics}
+          selectedOptionalMetrics={selectedVisibleMetrics}
           onToggleField={toggleField}
           headerVisible={headerVisible}
           onToggleHeaderField={toggleHeaderField}
@@ -1539,37 +1634,55 @@ function formatCadence(
 }
 
 function getDynamicStatsWidth(template: StatsTemplate, visibleCount: number) {
-  const count = Math.max(1, Math.min(4, visibleCount));
+  const count = Math.max(1, visibleCount);
+  const compactCount = Math.min(4, count);
 
   switch (template.layout) {
     case 'hero':
-    case 'glass-row':
-    case 'sunset-hero': {
-      if (count >= 4) return template.width;
-      if (count === 3) return Math.max(220, template.width - 24);
-      if (count === 2) return Math.max(170, template.width - 78);
+    case 'glass-row': {
+      if (compactCount >= 4) return template.width;
+      if (compactCount === 3) return Math.max(220, template.width - 24);
+      if (compactCount === 2) return Math.max(170, template.width - 78);
       return Math.max(220, template.width - 52);
     }
+    case 'sunset-hero':
+      // Keep cards readable even with only 1-2 metrics visible.
+      return template.width;
     case 'morning-glass':
       return template.width;
-    case 'split-bold':
-      return template.width;
+    case 'split-bold': {
+      // Keep split-bold compact: this layer should stay as a narrow right column.
+      if (count >= 5) return 208;
+      if (count === 4) return 202;
+      if (count === 3) return 194;
+      if (count === 2) return 184;
+      return 170;
+    }
     case 'compact':
     case 'pill-inline':
-      return Math.max(150, Math.round(template.width * (0.45 + count * 0.14)));
+      return Math.max(
+        150,
+        Math.round(template.width * (0.45 + compactCount * 0.14)),
+      );
     case 'columns':
     case 'card-columns':
-      return Math.max(160, Math.round(template.width * (0.42 + count * 0.145)));
+      return Math.max(
+        160,
+        Math.round(template.width * (0.42 + compactCount * 0.145)),
+      );
     case 'grid-2x2':
     case 'panel-grid':
-      if (count >= 4) return template.width;
-      if (count === 3) return Math.max(220, template.width - 28);
-      if (count === 2) return Math.max(160, template.width - 110);
+      if (compactCount >= 4) return template.width;
+      if (compactCount === 3) return Math.max(220, template.width - 28);
+      if (compactCount === 2) return Math.max(160, template.width - 110);
       return 130;
     case 'vertical':
     case 'soft-stack':
     default:
-      return Math.max(130, Math.round(template.width * (0.42 + count * 0.145)));
+      return Math.max(
+        130,
+        Math.round(template.width * (0.42 + compactCount * 0.145)),
+      );
   }
 }
 

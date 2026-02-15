@@ -22,7 +22,7 @@ export type StatsLayout =
   | 'sunset-hero'
   | 'morning-glass'
   | 'split-bold';
-export type BaseLayerId = 'meta' | 'stats' | 'route';
+export type BaseLayerId = 'meta' | 'stats' | 'route' | 'primary';
 export type LayerId = BaseLayerId | `image:${string}`;
 
 export type StatsTemplate = {

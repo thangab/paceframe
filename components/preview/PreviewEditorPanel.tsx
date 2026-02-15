@@ -63,6 +63,9 @@ type Props = {
   effectiveVisible: Record<FieldId, boolean>;
   supportsFullStatsPreview: boolean;
   statsFieldAvailability: Record<FieldId, boolean>;
+  supportsPrimaryLayer: boolean;
+  primaryField: FieldId;
+  onSetPrimaryField: (field: FieldId) => void;
   maxOptionalMetrics: number;
   selectedOptionalMetrics: number;
   onToggleField: (field: FieldId, value: boolean) => void;
@@ -109,6 +112,9 @@ export function PreviewEditorPanel({
   effectiveVisible,
   supportsFullStatsPreview,
   statsFieldAvailability,
+  supportsPrimaryLayer,
+  primaryField,
+  onSetPrimaryField,
   maxOptionalMetrics,
   selectedOptionalMetrics,
   onToggleField,
@@ -497,6 +503,7 @@ export function PreviewEditorPanel({
                 <View style={styles.statsPillsWrap}>
                   {(
                     [
+                      ['distance', 'Distance'],
                       ['time', 'Time'],
                       ['pace', 'Pace'],
                       ['elev', 'Elev'],
@@ -537,6 +544,56 @@ export function PreviewEditorPanel({
                     );
                   })}
                 </View>
+
+                {supportsPrimaryLayer ? (
+                  <>
+                    <Text style={styles.sectionTitle}>Primary stat</Text>
+                    <View style={styles.statsPillsWrap}>
+                      {(
+                        [
+                          ['distance', 'Distance'],
+                          ['time', 'Time'],
+                          ['pace', 'Pace'],
+                          ['elev', 'Elev'],
+                          ['cadence', 'Cadence'],
+                          ['calories', 'Calories'],
+                          ['avgHr', 'Avg HR'],
+                        ] as [FieldId, string][]
+                      ).map(([id, label]) => {
+                        const selected = id === primaryField;
+                        const disabled =
+                          !statsFieldAvailability[id] ||
+                          !supportsFullStatsPreview;
+                        return (
+                          <Pressable
+                            key={`primary-${id}`}
+                            disabled={disabled}
+                            onPress={() => onSetPrimaryField(id)}
+                            style={[
+                              styles.statsPill,
+                              selected && styles.statsPillSelected,
+                              disabled && styles.statsPillDisabled,
+                            ]}
+                          >
+                            <MaterialCommunityIcons
+                              name={selected ? 'star' : 'star-outline'}
+                              size={14}
+                              color={selected ? '#111500' : '#9CA3AF'}
+                            />
+                            <Text
+                              style={[
+                                styles.statsPillText,
+                                selected && styles.statsPillTextSelected,
+                              ]}
+                            >
+                              {label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : null}
 
                 <Text style={styles.sectionTitle}>Header infos</Text>
                 <View style={styles.statsPillsWrap}>

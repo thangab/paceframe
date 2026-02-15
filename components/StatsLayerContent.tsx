@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FontPreset, StatsTemplate } from '@/types/preview';
+import { FieldId, FontPreset, StatsTemplate } from '@/types/preview';
 
 type VisibleFields = {
   distance: boolean;
@@ -18,6 +18,7 @@ type Props = {
   template: StatsTemplate;
   fontPreset: FontPreset;
   visible: VisibleFields;
+  primaryInSeparateLayer?: boolean;
   distanceText: string;
   durationText: string;
   paceText: string;
@@ -37,6 +38,7 @@ export function StatsLayerContent({
   template,
   fontPreset,
   visible,
+  primaryInSeparateLayer = false,
   distanceText,
   durationText,
   paceText,
@@ -64,65 +66,62 @@ export function StatsLayerContent({
   ].filter(Boolean) as { id: string; label: string; value: string }[];
 
   if (template.layout === 'sunset-hero') {
-    const primaryMetric =
-      metrics.find((metric) => metric.id === 'distance') ?? metrics[0];
-    const secondaryMetrics = metrics
-      .filter((metric) => metric.id !== primaryMetric?.id)
-      .slice(0, 4);
-
     return (
       <View style={styles.sunsetWrap}>
-        {primaryMetric ? (
-          <View style={styles.sunsetDistanceWrap}>
+        {!primaryInSeparateLayer && metrics[0] ? (
+          <View style={styles.morningDistanceWrap}>
             <GradientValueWithUnit
-              value={primaryMetric.value}
+              value={metrics[0].value}
               fontPreset={fontPreset}
             />
           </View>
         ) : null}
 
         <View style={styles.sunsetGrid}>
-          {secondaryMetrics.map((metric) => (
-            <View key={metric.id} style={styles.sunsetCard}>
-              <Text
-                style={[
-                  styles.sunsetCardLabel,
-                  { fontFamily: fontPreset.family },
-                ]}
-              >
-                {metric.label.toUpperCase()}
-              </Text>
-              <ValueWithUnit
-                value={metric.value}
-                fontPreset={fontPreset}
-                valueStyle={styles.sunsetCardValue}
-                unitStyle={styles.sunsetCardUnit}
-                numberOfLines={1}
-                autoFit
-                minimumFontScale={0.84}
-              />
-            </View>
-          ))}
+          {(primaryInSeparateLayer ? metrics : metrics.slice(1))
+            .slice(0, 4)
+            .map((metric) => (
+              <View key={metric.id} style={styles.sunsetCard}>
+                <Text
+                  style={[
+                    styles.sunsetCardLabel,
+                    { fontFamily: fontPreset.family },
+                  ]}
+                >
+                  {metric.label.toUpperCase()}
+                </Text>
+                <ValueWithUnit
+                  value={metric.value}
+                  fontPreset={fontPreset}
+                  valueStyle={styles.sunsetCardValue}
+                  unitStyle={styles.sunsetCardUnit}
+                  numberOfLines={1}
+                  autoFit={false}
+                  minimumFontScale={1}
+                />
+              </View>
+            ))}
         </View>
       </View>
     );
   }
 
   if (template.layout === 'morning-glass') {
-    const primaryMetric =
-      metrics.find((metric) => metric.id === 'distance') ?? metrics[0];
-    const optional = metrics.filter(
-      (metric) => metric.id !== primaryMetric?.id,
-    );
-    const topRow = optional.slice(0, Math.min(3, optional.length));
-    const bottomRow = optional.slice(3, 6);
+    const source = primaryInSeparateLayer ? metrics : metrics.slice(1);
+    const topRow = source.slice(0, Math.min(3, source.length));
+    const bottomRow = source.slice(3, 6);
 
     return (
-      <View style={styles.morningWrap}>
-        {primaryMetric ? (
+      <View
+        style={[
+          styles.morningWrap,
+          primaryInSeparateLayer && styles.morningWrapSecondaryOnly,
+        ]}
+      >
+        {!primaryInSeparateLayer && metrics[0] ? (
           <View style={styles.morningDistanceWrap}>
             <ValueWithUnit
-              value={primaryMetric.value}
+              value={metrics[0].value}
               fontPreset={fontPreset}
               valueStyle={styles.morningDistanceValue}
               unitStyle={styles.morningDistanceUnit}
@@ -173,31 +172,23 @@ export function StatsLayerContent({
   }
 
   if (template.layout === 'split-bold') {
-    const primaryMetric =
-      metrics.find((metric) => metric.id === 'distance') ?? metrics[0];
-    const secondary = metrics.filter(
-      (metric) => metric.id !== primaryMetric?.id,
-    );
-    const { main: leftMain, unit: leftUnitRaw } = splitMetricValue(
-      primaryMetric?.value ?? '--',
-    );
-    const leftMainLines = leftMain.includes('.')
-      ? leftMain.split('.')
-      : [leftMain];
-    const leftUnit = leftUnitRaw ? leftUnitRaw.toUpperCase() : '';
+    const secondary = primaryInSeparateLayer ? metrics : metrics.slice(1);
 
     return (
-      <View style={styles.splitBoldWrap}>
-        <View style={styles.splitBoldLeft}>
-          {leftMainLines.map((line, index) => (
-            <Text key={`${line}-${index}`} style={styles.splitBoldLeftValue}>
-              {line}
-            </Text>
-          ))}
-          {leftUnit ? (
-            <Text style={styles.splitBoldLeftUnit}>{leftUnit}</Text>
-          ) : null}
-        </View>
+      <View
+        style={[
+          styles.splitBoldWrap,
+          primaryInSeparateLayer && styles.splitBoldWrapSecondaryOnly,
+        ]}
+      >
+        {!primaryInSeparateLayer ? (
+          <View style={styles.splitBoldLeft}>
+            <SplitBoldPrimaryValue
+              value={metrics[0]?.value ?? '--'}
+              fontPreset={fontPreset}
+            />
+          </View>
+        ) : null}
         <View style={styles.splitBoldRight}>
           {secondary.slice(0, 5).map((metric) => (
             <View key={metric.id} style={styles.splitBoldMetric}>
@@ -216,7 +207,7 @@ export function StatsLayerContent({
                 unitStyle={styles.splitBoldMetricUnit}
                 numberOfLines={1}
                 autoFit
-                minimumFontScale={0.84}
+                minimumFontScale={0.94}
               />
             </View>
           ))}
@@ -518,6 +509,52 @@ function splitBoldLabel(metricId: string) {
   }
 }
 
+export function PrimaryStatLayerContent({
+  template,
+  fontPreset,
+  primaryField,
+  value,
+}: {
+  template: StatsTemplate;
+  fontPreset: FontPreset;
+  primaryField: FieldId;
+  value: string;
+}) {
+  if (template.layout === 'sunset-hero') {
+    return (
+      <View style={styles.morningDistanceWrap}>
+        <GradientValueWithUnit value={value} fontPreset={fontPreset} />
+      </View>
+    );
+  }
+
+  if (template.layout === 'morning-glass') {
+    return (
+      <View style={styles.morningDistanceWrap}>
+        <ValueWithUnit
+          value={value}
+          fontPreset={fontPreset}
+          valueStyle={styles.morningDistanceValue}
+          unitStyle={styles.morningDistanceUnit}
+          numberOfLines={1}
+          autoFit
+          minimumFontScale={0.78}
+        />
+      </View>
+    );
+  }
+
+  if (template.layout === 'split-bold') {
+    return (
+      <View style={styles.splitBoldPrimaryOnly}>
+        <SplitBoldPrimaryValue value={value} fontPreset={fontPreset} />
+      </View>
+    );
+  }
+
+  return null;
+}
+
 function ColumnMetric({
   label,
   value,
@@ -633,6 +670,52 @@ function splitMetricValue(value: string) {
   return { main: match[1], unit: match[2] };
 }
 
+function SplitBoldPrimaryValue({
+  value,
+  fontPreset,
+}: {
+  value: string;
+  fontPreset: FontPreset;
+}) {
+  const { main: leftMain, unit: leftUnitRaw } = splitMetricValue(value);
+  const leftMainLines = leftMain.includes('.')
+    ? leftMain.split('.')
+    : [leftMain];
+  const leftUnit = leftUnitRaw ? leftUnitRaw.toUpperCase() : '';
+
+  return (
+    <>
+      {leftMainLines.map((line, index) => (
+        <Text
+          key={`${line}-${index}`}
+          style={[
+            styles.splitBoldLeftValue,
+            {
+              fontFamily: fontPreset.family,
+              fontWeight: fontPreset.weightValue,
+            },
+          ]}
+        >
+          {line}
+        </Text>
+      ))}
+      {leftUnit ? (
+        <Text
+          style={[
+            styles.splitBoldLeftUnit,
+            {
+              fontFamily: fontPreset.family,
+              fontWeight: fontPreset.weightValue,
+            },
+          ]}
+        >
+          {leftUnit}
+        </Text>
+      ) : null}
+    </>
+  );
+}
+
 function GradientValueWithUnit({
   value,
   fontPreset,
@@ -641,18 +724,22 @@ function GradientValueWithUnit({
   fontPreset: FontPreset;
 }) {
   const { main, unit } = splitMetricValue(value);
+  const estimatedMaskWidth = Math.max(
+    130,
+    Math.min(300, Math.round(main.length * 52)),
+  );
 
   return (
     <View style={styles.sunsetDistanceGradientRow}>
       <MaskedView
-        style={styles.sunsetDistanceMasked}
+        style={[styles.sunsetDistanceMasked, { width: estimatedMaskWidth }]}
         maskElement={
           <Text
             numberOfLines={1}
             adjustsFontSizeToFit
-            minimumFontScale={0.74}
+            minimumFontScale={0.78}
             style={[
-              styles.sunsetDistanceValue,
+              styles.morningDistanceValue,
               {
                 fontFamily: fontPreset.family,
                 fontWeight: fontPreset.weightValue,
@@ -673,7 +760,8 @@ function GradientValueWithUnit({
       {unit ? (
         <Text
           style={[
-            styles.sunsetDistanceUnit,
+            styles.morningDistanceUnit,
+            styles.sunsetDistanceUnitAdjust,
             TEXT_SHADOW_STYLE,
             { fontFamily: fontPreset.family },
           ]}
@@ -772,6 +860,9 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingTop: 8,
   },
+  morningWrapSecondaryOnly: {
+    paddingTop: 0,
+  },
   morningDistanceWrap: {
     width: '100%',
     alignItems: 'center',
@@ -838,6 +929,9 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     gap: 6,
   },
+  splitBoldWrapSecondaryOnly: {
+    justifyContent: 'flex-end',
+  },
   splitBoldLeft: {
     width: '56%',
     justifyContent: 'center',
@@ -846,24 +940,37 @@ const styles = StyleSheet.create({
   splitBoldLeftValue: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 136,
-    lineHeight: 128,
+    lineHeight: 144,
     letterSpacing: -6,
-    fontWeight: '900',
-    paddingTop: 4,
+    fontWeight: '700',
+    fontStyle: 'italic',
+    paddingTop: 8,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   splitBoldLeftUnit: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 110,
-    lineHeight: 108,
+    lineHeight: 120,
     letterSpacing: -3,
-    fontWeight: '900',
-    marginTop: -16,
+    fontWeight: '700',
+    fontStyle: 'italic',
+    marginTop: -12,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   splitBoldRight: {
     flex: 1,
     justifyContent: 'space-evenly',
     paddingRight: 2,
     paddingVertical: 6,
+  },
+  splitBoldPrimaryOnly: {
+    width: '100%',
+    justifyContent: 'center',
+    paddingLeft: 2,
   },
   splitBoldMetric: {
     marginBottom: 4,
@@ -877,7 +984,8 @@ const styles = StyleSheet.create({
   splitBoldMetricValue: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 56,
-    lineHeight: 58,
+    lineHeight: 66,
+    paddingTop: 3,
   },
   splitBoldMetricUnit: {
     color: 'rgba(255,255,255,0.6)',
@@ -900,28 +1008,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sunsetDistanceMasked: {
-    height: 98,
-    minWidth: 170,
+    height: 112,
     justifyContent: 'flex-end',
   },
-  sunsetDistanceGradientFill: {
-    flex: 1,
-  },
-  sunsetDistanceValue: {
-    color: '#000000',
-    fontSize: 96,
-    lineHeight: 98,
-    letterSpacing: -2,
-    textShadowColor: 'rgba(0,0,0,0.42)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
-  },
-  sunsetDistanceUnit: {
-    color: '#FFFFFF',
-    fontSize: 38,
-    fontStyle: 'italic',
-    fontWeight: '700',
-    marginBottom: 8,
+  sunsetDistanceGradientFill: { flex: 1 },
+  sunsetDistanceUnitAdjust: {
+    marginBottom: 20,
   },
   sunsetGrid: {
     width: '100%',
@@ -939,7 +1031,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.16)',
     backgroundColor: 'rgba(10,8,18,0.42)',
-    minHeight: 92,
+    minHeight: 100,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -957,7 +1049,7 @@ const styles = StyleSheet.create({
   },
   sunsetCardUnit: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 16,
     fontStyle: 'italic',
     fontWeight: '700',
   },

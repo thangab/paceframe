@@ -9,7 +9,7 @@ import type {
   RouteMode,
 } from '@/types/preview';
 
-export const BASE_LAYER_ORDER: LayerId[] = ['route', 'stats', 'meta'];
+export const BASE_LAYER_ORDER: LayerId[] = ['route', 'stats', 'primary', 'meta'];
 
 export type LayerTransform = {
   x: number;
@@ -29,6 +29,7 @@ export type PreviewDraft = {
   distanceUnit: DistanceUnit;
   routeMode: RouteMode;
   routeMapVariant: RouteMapVariant;
+  primaryField: FieldId;
   visible: Record<FieldId, boolean>;
   headerVisible: {
     title: boolean;
@@ -51,6 +52,7 @@ type SanitizeOptions = {
     distanceUnit: DistanceUnit;
     routeMode: RouteMode;
     routeMapVariant: RouteMapVariant;
+    primaryField: FieldId;
     visible: Record<FieldId, boolean>;
     headerVisible: {
       title: boolean;
@@ -71,6 +73,7 @@ function isLayerId(value: string): value is LayerId {
     value === 'meta' ||
     value === 'stats' ||
     value === 'route' ||
+    value === 'primary' ||
     value.startsWith('image:')
   );
 }
@@ -249,6 +252,15 @@ export function sanitizePreviewDraft(
     input.routeMapVariant === 'dark' || input.routeMapVariant === 'satellite'
       ? input.routeMapVariant
       : options.defaults.routeMapVariant;
+  const primaryField: FieldId =
+    input.primaryField === 'time' ||
+    input.primaryField === 'pace' ||
+    input.primaryField === 'elev' ||
+    input.primaryField === 'cadence' ||
+    input.primaryField === 'calories' ||
+    input.primaryField === 'avgHr'
+      ? input.primaryField
+      : options.defaults.primaryField;
   const imageOverlays = sanitizeImageOverlays(input.imageOverlays);
   const overlayLayerIds = new Set(
     imageOverlays.map((item) => `image:${item.id}` as LayerId),
@@ -256,6 +268,7 @@ export function sanitizePreviewDraft(
   const keepLayerKey = (layerId: LayerId) =>
     layerId === 'meta' ||
     layerId === 'stats' ||
+    layerId === 'primary' ||
     layerId === 'route' ||
     overlayLayerIds.has(layerId);
   const layerOrder = sanitizeLayerOrder(input.layerOrder).filter(keepLayerKey);
@@ -274,6 +287,7 @@ export function sanitizePreviewDraft(
     distanceUnit,
     routeMode,
     routeMapVariant,
+    primaryField,
     visible: sanitizeVisible(input.visible, options.defaults.visible),
     headerVisible: sanitizeHeaderVisible(
       input.headerVisible,

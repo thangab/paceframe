@@ -5,7 +5,10 @@ import { ResizeMode, Video } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DraggableBlock } from '@/components/DraggableBlock';
 import { RouteLayer } from '@/components/RouteLayer';
-import { StatsLayerContent } from '@/components/StatsLayerContent';
+import {
+  PrimaryStatLayerContent,
+  StatsLayerContent,
+} from '@/components/StatsLayerContent';
 import { colors, radius } from '@/constants/theme';
 import { CHECKER_SIZE } from '@/lib/previewConfig';
 import type {
@@ -58,6 +61,10 @@ type Props = {
   template: StatsTemplate;
   fontPreset: FontPreset;
   effectiveVisible: Record<FieldId, boolean>;
+  supportsPrimaryLayer: boolean;
+  primaryVisible: boolean;
+  primaryField: FieldId;
+  primaryValueText: string;
   distanceText: string;
   durationText: string;
   paceText: string;
@@ -124,6 +131,10 @@ export function PreviewEditorCanvas({
   template,
   fontPreset,
   effectiveVisible,
+  supportsPrimaryLayer,
+  primaryVisible,
+  primaryField,
+  primaryValueText,
   distanceText,
   durationText,
   paceText,
@@ -167,6 +178,88 @@ export function PreviewEditorCanvas({
   ]
     .filter(Boolean)
     .join(' · ');
+  const defaultMetaWidth = usesTemplateHeader ? 280 : 240;
+  const splitBoldStatsCount = (() => {
+    if (template.layout !== 'split-bold') return 0;
+    return (
+      (effectiveVisible.distance ? 1 : 0) +
+      (effectiveVisible.time ? 1 : 0) +
+      (effectiveVisible.pace ? 1 : 0) +
+      (effectiveVisible.elev ? 1 : 0) +
+      (effectiveVisible.cadence ? 1 : 0) +
+      (effectiveVisible.calories ? 1 : 0) +
+      (effectiveVisible.avgHr ? 1 : 0)
+    );
+  })();
+  const defaultStatsY = (() => {
+    switch (template.layout) {
+      case 'sunset-hero':
+        return Math.round(430 * canvasScaleY);
+      case 'morning-glass':
+        return Math.round(452 * canvasScaleY);
+      case 'split-bold': {
+        const estimatedStatsHeight = Math.max(
+          120,
+          Math.round(splitBoldStatsCount * 96 * canvasScaleY),
+        );
+        return Math.max(
+          0,
+          Math.round((canvasDisplayHeight - estimatedStatsHeight) / 2),
+        );
+      }
+      default:
+        return Math.round(template.y * canvasScaleY);
+    }
+  })();
+  const defaultStatsX = (() => {
+    switch (template.layout) {
+      case 'split-bold':
+        return Math.max(
+          0,
+          Math.round(canvasDisplayWidth - dynamicStatsWidthDisplay),
+        );
+      default:
+        return centeredStatsXDisplay;
+    }
+  })();
+  const defaultPrimaryX = (() => {
+    switch (template.layout) {
+      case 'sunset-hero':
+        return Math.round(52 * canvasScaleX);
+      case 'morning-glass':
+        return Math.round(50 * canvasScaleX);
+      case 'split-bold':
+        return 0;
+      default:
+        return Math.round(40 * canvasScaleX);
+    }
+  })();
+  const defaultPrimaryY = (() => {
+    switch (template.layout) {
+      case 'sunset-hero':
+        return Math.round(220 * canvasScaleY);
+      case 'morning-glass':
+        return Math.round(252 * canvasScaleY);
+      case 'split-bold': {
+        const normalized = primaryValueText.trim();
+        const unitMatch = normalized.match(/(\/km|\/mi|km|mi|m|bpm|spm|rpm)$/i);
+        const unit = unitMatch ? unitMatch[1] : '';
+        const main = unit
+          ? normalized.slice(0, normalized.length - unit.length).trim()
+          : normalized;
+        const mainLines = main.includes('.') ? main.split('.').length : 1;
+        // Mirrors SplitBoldPrimaryValue visual stack:
+        // lineHeight(128) per main line + unit block (~92 effective with negative margin).
+        const estimatedPrimaryHeight = mainLines * 128 + (unit ? 92 : 0);
+        return Math.max(
+          0,
+          Math.round((canvasDisplayHeight - estimatedPrimaryHeight) / 2),
+        );
+      }
+      default:
+        return Math.round(260 * canvasScaleY);
+    }
+  })();
 
   return (
     <View
@@ -285,7 +378,10 @@ export function PreviewEditorCanvas({
               key="meta-layer"
               initialX={
                 layerTransforms.meta?.x ??
-                Math.max(0, Math.round((canvasDisplayWidth - 240) / 2))
+                Math.max(
+                  0,
+                  Math.round((canvasDisplayWidth - defaultMetaWidth) / 2),
+                )
               }
               initialY={
                 layerTransforms.meta?.y ?? Math.round(44 * canvasScaleY)
@@ -359,10 +455,11 @@ export function PreviewEditorCanvas({
           {visibleLayers.stats ? (
             <DraggableBlock
               key="stats-layer"
-              initialX={layerTransforms.stats?.x ?? centeredStatsXDisplay}
+              initialX={layerTransforms.stats?.x ?? defaultStatsX}
               initialY={
-                layerTransforms.stats?.y ??
-                Math.round(template.y * canvasScaleY)
+                template.layout === 'split-bold'
+                  ? defaultStatsY
+                  : (layerTransforms.stats?.y ?? defaultStatsY)
               }
               initialScale={layerTransforms.stats?.scale ?? 1}
               rotationDeg={layerTransforms.stats?.rotationDeg ?? 0}
@@ -395,6 +492,7 @@ export function PreviewEditorCanvas({
                 template={template}
                 fontPreset={fontPreset}
                 visible={effectiveVisible}
+                primaryInSeparateLayer={supportsPrimaryLayer && primaryVisible}
                 distanceText={distanceText}
                 durationText={durationText}
                 paceText={paceText}
@@ -402,6 +500,58 @@ export function PreviewEditorCanvas({
                 cadenceText={cadenceText}
                 caloriesText={caloriesText}
                 avgHeartRateText={avgHeartRateText}
+              />
+            </DraggableBlock>
+          ) : null}
+
+          {supportsPrimaryLayer && primaryVisible ? (
+            <DraggableBlock
+              key="primary-layer"
+              initialX={
+                template.layout === 'split-bold'
+                  ? defaultPrimaryX
+                  : (layerTransforms.primary?.x ?? defaultPrimaryX)
+              }
+              initialY={
+                template.layout === 'split-bold'
+                  ? defaultPrimaryY
+                  : (layerTransforms.primary?.y ?? defaultPrimaryY)
+              }
+              initialScale={layerTransforms.primary?.scale ?? 1}
+              rotationDeg={layerTransforms.primary?.rotationDeg ?? 0}
+              selected={showSelectionOutline && selectedLayer === 'primary'}
+              outlineRadius={0}
+              canvasWidth={canvasDisplayWidth}
+              canvasHeight={canvasDisplayHeight}
+              onDragGuideChange={onDragGuideChange}
+              onRotationGuideChange={onRotationGuideChange}
+              onSelect={() => setSelectedLayer('primary')}
+              onInteractionChange={(active) =>
+                setActiveLayer(active ? 'primary' : null)
+              }
+              onTransformEnd={(next) =>
+                onLayerTransformChange('primary', next)
+              }
+              style={[
+                styles.primaryBlock,
+                {
+                  width: Math.round(
+                    (template.layout === 'split-bold'
+                      ? 176
+                      : template.layout === 'sunset-hero'
+                        ? 344
+                        : 250) * canvasScaleX,
+                  ),
+                  zIndex: baseLayerZ('primary'),
+                  elevation: baseLayerZ('primary'),
+                },
+              ]}
+            >
+              <PrimaryStatLayerContent
+                template={template}
+                fontPreset={fontPreset}
+                primaryField={primaryField}
+                value={primaryValueText}
               />
             </DraggableBlock>
           ) : null}
@@ -632,6 +782,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     alignItems: 'stretch',
+  },
+  primaryBlock: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    alignItems: 'stretch',
+    backgroundColor: 'transparent',
   },
   metaBlock: {
     width: 240,
