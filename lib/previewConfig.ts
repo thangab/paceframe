@@ -87,7 +87,7 @@ export const TEMPLATES: StatsTemplate[] = [
     id: 'soft-stack',
     name: 'Soft Stack',
     layout: 'soft-stack',
-    premium: false,
+    premium: true,
     x: 36,
     y: 300,
     width: 288,

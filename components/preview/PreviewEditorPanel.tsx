@@ -24,8 +24,7 @@ import type {
 export type PreviewPanelTab =
   | 'background'
   | 'content'
-  | 'style'
-  | 'data'
+  | 'design'
   | 'help';
 type HeaderFieldId = 'title' | 'date' | 'location';
 
@@ -131,8 +130,7 @@ export function PreviewEditorPanel({
   const mainTabs = [
     { id: 'background', label: 'Background', icon: 'image-area-close' },
     { id: 'content', label: 'Content', icon: 'layers-outline' },
-    { id: 'data', label: 'Data', icon: 'chart-box-outline' },
-    { id: 'style', label: 'Style', icon: 'palette-outline' },
+    { id: 'design', label: 'Design', icon: 'palette-outline' },
   ] as {
     id: PreviewPanelTab;
     label: string;
@@ -432,7 +430,7 @@ export function PreviewEditorPanel({
             </View>
           ) : null}
 
-          {activePanel === 'style' ? (
+          {activePanel === 'design' ? (
             <ScrollView
               style={styles.panelScroll}
               showsVerticalScrollIndicator={false}
@@ -450,55 +448,29 @@ export function PreviewEditorPanel({
                     return (
                       <Pressable
                         key={item.id}
-                        style={[
-                          styles.templateCard,
-                          selected && styles.templateCardSelected,
-                        ]}
+                        style={styles.templateItem}
                         onPress={() => onSelectTemplate(item)}
                         accessibilityLabel={item.name}
                       >
-                        <TemplateLayoutPreview template={item} />
-                        {isLocked ? (
-                          <Text style={styles.chipSub}>Premium</Text>
-                        ) : null}
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-
-                <Text style={styles.sectionTitle}>Font</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.chipRow}
-                >
-                  {FONT_PRESETS.map((item) => {
-                    const selected = item.id === selectedFontId;
-                    return (
-                      <Pressable
-                        key={item.id}
-                        style={[styles.chip, selected && styles.chipSelected]}
-                        onPress={() => onSelectFont(item.id)}
-                      >
-                        <Text
-                          style={[styles.chipText, { fontFamily: item.family }]}
+                        <View
+                          style={[
+                            styles.templateCard,
+                            selected && styles.templateCardSelected,
+                          ]}
                         >
-                          {item.name}
-                        </Text>
+                          <TemplateLayoutPreview template={item} />
+                          {isLocked ? (
+                            <Text style={styles.templatePremiumBadge}>
+                              Premium
+                            </Text>
+                          ) : null}
+                        </View>
+                        <Text style={styles.templateCardName}>{item.name}</Text>
                       </Pressable>
                     );
                   })}
                 </ScrollView>
-              </View>
-            </ScrollView>
-          ) : null}
 
-          {activePanel === 'data' ? (
-            <ScrollView
-              style={styles.panelScroll}
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={styles.controls}>
                 <Text style={styles.sectionTitle}>Stats Infos</Text>
                 <View style={styles.statsPillsWrap}>
                   {(
@@ -514,86 +486,60 @@ export function PreviewEditorPanel({
                   ).map(([id, label]) => {
                     const selected = effectiveVisible[id];
                     const disabled =
-                      !statsFieldAvailability[id] ||
-                      !supportsFullStatsPreview;
+                      !statsFieldAvailability[id] || !supportsFullStatsPreview;
+                    const primaryDisabled = disabled || !selected;
+                    const isPrimary = supportsPrimaryLayer && id === primaryField;
                     return (
-                      <Pressable
-                        key={id}
-                        disabled={disabled}
-                        onPress={() => onToggleField(id, !selected)}
-                        style={[
-                          styles.statsPill,
-                          selected && styles.statsPillSelected,
-                          disabled && styles.statsPillDisabled,
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="check"
-                          size={14}
-                          color={selected ? '#111500' : '#9CA3AF'}
-                        />
-                        <Text
+                      <View key={id} style={styles.statsControlRow}>
+                        <Pressable
+                          disabled={disabled}
+                          onPress={() => onToggleField(id, !selected)}
                           style={[
-                            styles.statsPillText,
-                            selected && styles.statsPillTextSelected,
+                            styles.statsPill,
+                            styles.statsPillMain,
+                            selected && styles.statsPillSelected,
+                            disabled && styles.statsPillDisabled,
                           ]}
                         >
-                          {label}
-                        </Text>
-                      </Pressable>
+                          <MaterialCommunityIcons
+                            name="check"
+                            size={14}
+                            color={selected ? '#111500' : '#9CA3AF'}
+                          />
+                          <Text
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                            style={[
+                              styles.statsPillText,
+                              selected && styles.statsPillTextSelected,
+                            ]}
+                          >
+                            {label}
+                          </Text>
+                        </Pressable>
+                        {supportsPrimaryLayer ? (
+                          <Pressable
+                            disabled={primaryDisabled}
+                            onPress={() => onSetPrimaryField(id)}
+                            style={[
+                              styles.statsPrimaryBtn,
+                              isPrimary && styles.statsPrimaryBtnSelected,
+                              primaryDisabled && styles.statsPillDisabled,
+                            ]}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Set ${label} as primary`}
+                          >
+                            <MaterialCommunityIcons
+                              name={isPrimary ? 'star' : 'star-outline'}
+                              size={13}
+                              color={isPrimary ? '#111500' : '#9CA3AF'}
+                            />
+                          </Pressable>
+                        ) : null}
+                      </View>
                     );
                   })}
                 </View>
-
-                {supportsPrimaryLayer ? (
-                  <>
-                    <Text style={styles.sectionTitle}>Primary stat</Text>
-                    <View style={styles.statsPillsWrap}>
-                      {(
-                        [
-                          ['distance', 'Distance'],
-                          ['time', 'Time'],
-                          ['pace', 'Pace'],
-                          ['elev', 'Elev'],
-                          ['cadence', 'Cadence'],
-                          ['calories', 'Calories'],
-                          ['avgHr', 'Avg HR'],
-                        ] as [FieldId, string][]
-                      ).map(([id, label]) => {
-                        const selected = id === primaryField;
-                        const disabled =
-                          !statsFieldAvailability[id] ||
-                          !supportsFullStatsPreview;
-                        return (
-                          <Pressable
-                            key={`primary-${id}`}
-                            disabled={disabled}
-                            onPress={() => onSetPrimaryField(id)}
-                            style={[
-                              styles.statsPill,
-                              selected && styles.statsPillSelected,
-                              disabled && styles.statsPillDisabled,
-                            ]}
-                          >
-                            <MaterialCommunityIcons
-                              name={selected ? 'star' : 'star-outline'}
-                              size={14}
-                              color={selected ? '#111500' : '#9CA3AF'}
-                            />
-                            <Text
-                              style={[
-                                styles.statsPillText,
-                                selected && styles.statsPillTextSelected,
-                              ]}
-                            >
-                              {label}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </>
-                ) : null}
 
                 <Text style={styles.sectionTitle}>Header infos</Text>
                 <View style={styles.statsPillsWrap}>
@@ -632,6 +578,30 @@ export function PreviewEditorPanel({
                   })}
                 </View>
 
+                <Text style={styles.sectionTitle}>Font</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.chipRow}
+                >
+                  {FONT_PRESETS.map((item) => {
+                    const selected = item.id === selectedFontId;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        style={[styles.chip, selected && styles.chipSelected]}
+                        onPress={() => onSelectFont(item.id)}
+                      >
+                        <Text
+                          style={[styles.chipText, { fontFamily: item.family }]}
+                        >
+                          {item.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+
                 <Text style={styles.sectionTitle}>Unit</Text>
                 <View style={styles.mediaPickRow}>
                   {(
@@ -669,8 +639,8 @@ export function PreviewEditorPanel({
               <View style={styles.controls}>
                 <Text style={styles.note}>
                   Pinch/rotate/drag blocks. Center and rotation guides appear
-                  during move. Tap stats to switch template. Tap route to
-                  switch map/trace.
+                  during move. Tap stats to switch template. Tap route to switch
+                  map/trace.
                 </Text>
                 {message ? <Text style={styles.note}>{message}</Text> : null}
                 {appCacheUsageLabel ? (
@@ -731,6 +701,12 @@ export function PreviewEditorPanel({
               </Pressable>
             );
           })}
+          <Pressable
+            disabled
+            style={[styles.panelTab, styles.panelTabEmpty]}
+            accessibilityRole="button"
+            accessibilityLabel="Empty"
+          />
         </View>
         <Pressable
           onPress={() => onPressTab('help')}
@@ -877,6 +853,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#232833',
     padding: 0,
     overflow: 'hidden',
+    position: 'relative',
+  },
+  templateItem: {
+    alignItems: 'center',
+  },
+  templateCardName: {
+    color: '#E5E7EB',
+    fontSize: 11,
+    fontWeight: '400',
+    textAlign: 'center',
+    paddingHorizontal: 6,
+    paddingTop: 6,
+    paddingBottom: 4,
+  },
+  templatePremiumBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    color: '#D9F04A',
+    fontSize: 10,
+    fontWeight: '400',
+    backgroundColor: 'rgba(17,24,39,0.78)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    overflow: 'hidden',
   },
   templateCardSelected: {
     borderColor: '#D9F04A',
@@ -1019,6 +1021,9 @@ const styles = StyleSheet.create({
   },
   panelTabSelected: {
     backgroundColor: '#D9F04A',
+  },
+  panelTabEmpty: {
+    opacity: 0.35,
   },
   panelTabText: {
     color: '#E5E7EB',
@@ -1208,6 +1213,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+  },
+  statsPillMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  statsControlRow: {
+    width: '48%',
+    minWidth: 0,
+    flexGrow: 0,
+    flexBasis: '48%',
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 6,
+  },
+  statsPrimaryBtn: {
+    width: 34,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#3A4356',
+    backgroundColor: '#2A3140',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsPrimaryBtnSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   statsPillSelected: {
     backgroundColor: colors.primary,
