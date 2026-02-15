@@ -224,8 +224,10 @@ export function PreviewEditorCanvas({
   })();
   const defaultPrimaryX = (() => {
     switch (template.layout) {
-      case 'sunset-hero':
-        return Math.round(52 * canvasScaleX);
+      case 'sunset-hero': {
+        const primaryWidth = Math.round(344 * canvasScaleX);
+        return Math.max(0, Math.round((canvasDisplayWidth - primaryWidth) / 2));
+      }
       case 'morning-glass':
         return Math.round(50 * canvasScaleX);
       case 'split-bold':
@@ -237,7 +239,7 @@ export function PreviewEditorCanvas({
   const defaultPrimaryY = (() => {
     switch (template.layout) {
       case 'sunset-hero':
-        return Math.round(220 * canvasScaleY);
+        return Math.round(108 * canvasScaleY);
       case 'morning-glass':
         return Math.round(252 * canvasScaleY);
       case 'split-bold': {
@@ -259,6 +261,24 @@ export function PreviewEditorCanvas({
       default:
         return Math.round(260 * canvasScaleY);
     }
+  })();
+  const defaultRouteY = (() => {
+    if (template.layout === 'sunset-hero') {
+      return Math.max(
+        0,
+        Math.round((canvasDisplayHeight - routeLayerHeightDisplay) / 2),
+      );
+    }
+    return routeInitialYDisplay;
+  })();
+  const defaultRouteX = (() => {
+    if (template.layout === 'sunset-hero') {
+      return Math.max(
+        0,
+        Math.round((canvasDisplayWidth - routeLayerWidthDisplay) / 2),
+      );
+    }
+    return routeInitialXDisplay;
   })();
 
   return (
@@ -416,7 +436,9 @@ export function PreviewEditorCanvas({
                     },
                   ]}
                 >
-                  {usesTemplateHeader ? activityName.toUpperCase() : activityName}
+                  {usesTemplateHeader
+                    ? activityName.toUpperCase()
+                    : activityName}
                 </Text>
               ) : null}
               {usesTemplateHeader && headerVisible.title ? (
@@ -456,11 +478,7 @@ export function PreviewEditorCanvas({
             <DraggableBlock
               key="stats-layer"
               initialX={layerTransforms.stats?.x ?? defaultStatsX}
-              initialY={
-                template.layout === 'split-bold'
-                  ? defaultStatsY
-                  : (layerTransforms.stats?.y ?? defaultStatsY)
-              }
+              initialY={layerTransforms.stats?.y ?? defaultStatsY}
               initialScale={layerTransforms.stats?.scale ?? 1}
               rotationDeg={layerTransforms.stats?.rotationDeg ?? 0}
               selected={showSelectionOutline && selectedLayer === 'stats'}
@@ -507,16 +525,8 @@ export function PreviewEditorCanvas({
           {supportsPrimaryLayer && primaryVisible ? (
             <DraggableBlock
               key="primary-layer"
-              initialX={
-                template.layout === 'split-bold'
-                  ? defaultPrimaryX
-                  : (layerTransforms.primary?.x ?? defaultPrimaryX)
-              }
-              initialY={
-                template.layout === 'split-bold'
-                  ? defaultPrimaryY
-                  : (layerTransforms.primary?.y ?? defaultPrimaryY)
-              }
+              initialX={layerTransforms.primary?.x ?? defaultPrimaryX}
+              initialY={layerTransforms.primary?.y ?? defaultPrimaryY}
               initialScale={layerTransforms.primary?.scale ?? 1}
               rotationDeg={layerTransforms.primary?.rotationDeg ?? 0}
               selected={showSelectionOutline && selectedLayer === 'primary'}
@@ -529,9 +539,7 @@ export function PreviewEditorCanvas({
               onInteractionChange={(active) =>
                 setActiveLayer(active ? 'primary' : null)
               }
-              onTransformEnd={(next) =>
-                onLayerTransformChange('primary', next)
-              }
+              onTransformEnd={(next) => onLayerTransformChange('primary', next)}
               style={[
                 styles.primaryBlock,
                 {
@@ -559,8 +567,8 @@ export function PreviewEditorCanvas({
           {routeMode !== 'off' && visibleLayers.route ? (
             <DraggableBlock
               key="route-layer"
-              initialX={layerTransforms.route?.x ?? routeInitialXDisplay}
-              initialY={layerTransforms.route?.y ?? routeInitialYDisplay}
+              initialX={layerTransforms.route?.x ?? defaultRouteX}
+              initialY={layerTransforms.route?.y ?? defaultRouteY}
               initialScale={layerTransforms.route?.scale ?? 1}
               rotationDeg={layerTransforms.route?.rotationDeg ?? 0}
               selected={showSelectionOutline && selectedLayer === 'route'}

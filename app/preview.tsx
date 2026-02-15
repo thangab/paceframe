@@ -480,12 +480,19 @@ export default function PreviewScreen() {
     [activity],
   );
 
-  function resetDraftStateToDefaults() {
+  function resetDraftStateToDefaults(options?: { keepTemplateId?: string }) {
+    const templateIdToKeep = options?.keepTemplateId;
+    const hasTemplateToKeep = Boolean(
+      templateIdToKeep &&
+        TEMPLATES.some((item) => item.id === templateIdToKeep),
+    );
     setMedia(null);
     setBackgroundGradient(null);
     setAutoSubjectUri(null);
     setImageOverlays([]);
-    setSelectedTemplateId(TEMPLATES[0].id);
+    setSelectedTemplateId(
+      hasTemplateToKeep ? (templateIdToKeep as string) : TEMPLATES[0].id,
+    );
     setSelectedFontId(FONT_PRESETS[0].id);
     setDistanceUnit('km');
     setRouteMode('trace');
@@ -1350,7 +1357,7 @@ export default function PreviewScreen() {
     const previousMedia = media;
     const previousAutoSubjectUri = autoSubjectUri;
     const previousOverlayUris = imageOverlays.map((item) => item.uri);
-    resetDraftStateToDefaults();
+    resetDraftStateToDefaults({ keepTemplateId: selectedTemplateId });
     void cleanupMediaIfTemp(previousMedia);
     void cleanupTempUriIfOwned(previousAutoSubjectUri);
     previousOverlayUris.forEach((uri) => {
