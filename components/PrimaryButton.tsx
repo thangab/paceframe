@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import type { ReactNode } from 'react';
 import { colors, radius, spacing } from '@/constants/theme';
 
 type Props = {
@@ -8,6 +9,7 @@ type Props = {
   disabled?: boolean;
   variant?: 'primary' | 'secondary' | 'danger';
   icon?: keyof typeof MaterialCommunityIcons.glyphMap;
+  iconElement?: ReactNode;
   colorScheme?: 'default' | 'panel';
   iconPosition?: 'left' | 'top';
   compact?: boolean;
@@ -19,6 +21,7 @@ export function PrimaryButton({
   disabled,
   variant = 'primary',
   icon,
+  iconElement,
   colorScheme = 'default',
   iconPosition = 'left',
   compact = false,
@@ -47,7 +50,17 @@ export function PrimaryButton({
         disabled && styles.disabled,
       ]}
     >
-      {icon ? (
+      {iconElement ? (
+        <View
+          style={[
+            iconPosition === 'top' ? styles.iconTop : styles.iconLeft,
+            compact ? styles.iconCompact : null,
+          ]}
+        >
+          {iconElement}
+        </View>
+      ) : null}
+      {!iconElement && icon ? (
         <MaterialCommunityIcons
           name={icon}
           size={compact ? 14 : 16}

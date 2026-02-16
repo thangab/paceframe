@@ -1,15 +1,9 @@
 import { useState } from 'react';
-import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
-import {
-  Linking,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { FontAwesome6 } from '@expo/vector-icons';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors, spacing } from '@/constants/theme';
 import { importActivitiesFromHealthKit } from '@/lib/healthkit';
@@ -135,62 +129,99 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>PaceFrame</Text>
-      <Text style={styles.subtitle}>
-        Create beautiful run cards from your Strava activities.
-      </Text>
+      <View style={styles.card}>
+        <View style={styles.brandMark}>
+          <MaterialCommunityIcons name="run-fast" size={26} color="#111500" />
+        </View>
+        <Text style={styles.title}>PaceFrame</Text>
+        <Text style={styles.subtitle}>
+          Create beautiful run cards from your Strava activities.
+        </Text>
 
-      <PrimaryButton
-        label={
-          isBusy
-            ? 'Connecting...'
-            : isMockStravaEnabled()
-              ? 'Continue (Mock Mode)'
-              : 'Connect Strava'
-        }
-        onPress={handleLogin}
-        disabled={isBusy}
-      />
-
-      {!isMockStravaEnabled() ? (
-        <Pressable
-          style={({ pressed }) => [
-            styles.mockCard,
-            pressed ? styles.mockCardPressed : null,
-          ]}
-          onPress={handleMockLogin}
-          disabled={isBusy}
-        >
-          <View style={styles.mockIconWrap}>
-            <Text style={styles.mockIcon}>✦</Text>
+        {error ? (
+          <View style={styles.errorBanner}>
+            <MaterialCommunityIcons
+              name="alert-circle-outline"
+              size={16}
+              color="#FCA5A5"
+            />
+            <Text style={styles.errorText}>{error}</Text>
           </View>
-          <View style={styles.mockCopy}>
-            <Text style={styles.mockTitle}>Try Mock Activity</Text>
-            <Text style={styles.mockSubtitle}>
-              No Strava account? Use demo data to see how it works.
+        ) : null}
+
+        <View style={styles.actions}>
+          <PrimaryButton
+            label={
+              isBusy
+                ? 'Connecting...'
+                : isMockStravaEnabled()
+                  ? 'Continue (Mock Mode)'
+                  : 'Connect Strava'
+            }
+            iconElement={<FontAwesome6 name="strava" size={16} color="#111500" />}
+            onPress={handleLogin}
+            disabled={isBusy}
+          />
+
+          {!isMockStravaEnabled() ? (
+            <Pressable
+              onPress={handleMockLogin}
+              disabled={isBusy}
+              style={({ pressed }) => [
+                styles.demoCard,
+                pressed && !isBusy ? styles.demoCardPressed : null,
+                isBusy ? styles.demoCardDisabled : null,
+              ]}
+            >
+              <View style={styles.demoIconWrap}>
+                <MaterialCommunityIcons
+                  name="flask-outline"
+                  size={18}
+                  color="#111500"
+                />
+              </View>
+              <View style={styles.demoCopy}>
+                <Text style={styles.demoTitle}>Use Demo Activity</Text>
+                <Text style={styles.demoSubtitle}>
+                  No Strava account? Try the app with sample data.
+                </Text>
+              </View>
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={18}
+                color={colors.textMuted}
+              />
+            </Pressable>
+          ) : null}
+
+          {Platform.OS === 'ios' ? (
+            <PrimaryButton
+              label="Import from Health"
+              icon="heart-pulse"
+              onPress={handleHealthKitImport}
+              variant="secondary"
+              disabled={isBusy}
+            />
+          ) : null}
+        </View>
+
+        {shouldShowHealthSettings ? (
+          <View style={styles.healthHelpWrap}>
+            <MaterialCommunityIcons
+              name="cog-outline"
+              size={15}
+              color={colors.textMuted}
+            />
+            <Text style={styles.healthHelpText}>
+              Open Settings {'>'} Privacy & Security {'>'} Health app {'>'}{' '}
+              PaceFrame and enable Workout + Workout Routes.
             </Text>
           </View>
-          <Text style={styles.mockArrow}>›</Text>
-        </Pressable>
-      ) : null}
-
-      {Platform.OS === 'ios' ? (
-        <PrimaryButton
-          label="Import from Health"
-          onPress={handleHealthKitImport}
-          variant="secondary"
-          disabled={isBusy}
-        />
-      ) : null}
-
-      {shouldShowHealthSettings ? (
-        <View style={styles.healthHelpWrap}>
-          <Text style={styles.healthHelpText}>
-            Open Settings {'>'} Privacy & Security {'>'} Health app {'>'}{' '}
-            PaceFrame and enable Workout + Workout Routes.
-          </Text>
-        </View>
-      ) : null}
+        ) : null}
+      </View>
+      <Text style={styles.footerHint}>
+        Your Strava login is used only to read activities.
+      </Text>
     </View>
   );
 }
@@ -201,79 +232,113 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     justifyContent: 'center',
     backgroundColor: colors.background,
+  },
+  card: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
     gap: spacing.md,
   },
+  brandMark: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
-    fontSize: 36,
+    fontSize: 34,
     fontWeight: '800',
     color: colors.text,
   },
   subtitle: {
     color: colors.textMuted,
     fontSize: 16,
-    marginBottom: spacing.sm,
+    lineHeight: 22,
+    marginTop: -4,
   },
-  error: {
-    color: colors.danger,
+  actions: {
+    gap: spacing.sm,
   },
-  hint: {
-    color: colors.textMuted,
-    marginTop: spacing.md,
-    fontSize: 13,
-  },
-  mockCard: {
-    marginTop: spacing.xs,
-    borderRadius: 20,
+  demoCard: {
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(212,255,84,0.35)',
-    backgroundColor: '#222712',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  mockCardPressed: {
-    opacity: 0.9,
+  demoCardPressed: {
+    opacity: 0.88,
   },
-  mockIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: '#D4FF54',
+  demoCardDisabled: {
+    opacity: 0.6,
+  },
+  demoIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mockIcon: {
-    color: '#101404',
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  mockCopy: {
+  demoCopy: {
     flex: 1,
   },
-  mockTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  mockSubtitle: {
-    color: '#B7BF9A',
-    marginTop: 2,
+  demoTitle: {
+    color: colors.text,
     fontSize: 14,
-    lineHeight: 20,
+    fontWeight: '700',
   },
-  mockArrow: {
-    color: '#D4FF54',
-    fontSize: 30,
-    lineHeight: 32,
+  demoSubtitle: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 1,
+  },
+  errorBanner: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(220,38,38,0.35)',
+    backgroundColor: 'rgba(127,29,29,0.16)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#FCA5A5',
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
   },
   healthHelpWrap: {
     gap: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
   },
   healthHelpText: {
     color: colors.textMuted,
     fontSize: 12,
     lineHeight: 18,
+    flex: 1,
+  },
+  footerHint: {
+    color: colors.textMuted,
+    textAlign: 'center',
+    fontSize: 12,
+    marginTop: spacing.md,
   },
 });
