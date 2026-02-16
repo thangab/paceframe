@@ -30,8 +30,18 @@ export type PreviewPanelTab =
   | 'background'
   | 'content'
   | 'design'
+  | 'effects'
   | 'help';
 type HeaderFieldId = 'title' | 'date' | 'location';
+type VisualEffectPreset = {
+  id: string;
+  label: string;
+  description?: string;
+  backgroundOverlayColor: string;
+  backgroundOverlayOpacity: number;
+  subjectOverlayColor: string;
+  subjectOverlayOpacity: number;
+};
 
 type Props = {
   panelOpen: boolean;
@@ -95,6 +105,12 @@ type Props = {
   sunsetPrimaryGradient: [string, string, string];
   sunsetPrimaryGradientPresets: [string, string, string][];
   onSetSunsetPrimaryGradient: (gradient: [string, string, string]) => void;
+  visualEffectPresets: VisualEffectPreset[];
+  selectedFilterEffectId: string;
+  selectedBlurEffectId: string;
+  onSetFilterEffect: (effectId: string) => void;
+  onSetBlurEffect: (effectId: string) => void;
+  effectsEnabled: boolean;
   isPremium: boolean;
   message: string | null;
   appCacheUsageLabel?: string;
@@ -153,6 +169,12 @@ export function PreviewEditorPanel({
   sunsetPrimaryGradient,
   sunsetPrimaryGradientPresets,
   onSetSunsetPrimaryGradient,
+  visualEffectPresets,
+  selectedFilterEffectId,
+  selectedBlurEffectId,
+  onSetFilterEffect,
+  onSetBlurEffect,
+  effectsEnabled,
   isPremium,
   message,
   appCacheUsageLabel,
@@ -256,6 +278,27 @@ export function PreviewEditorPanel({
       gridHues.map((hue) => hsvToHex(hue, tone.s, tone.v)),
     ),
   ];
+  const blurEffectIds = [
+    'background-blur',
+    'background-radial-blur',
+    'background-motion-blur',
+  ];
+  const noBlurEffect: VisualEffectPreset = {
+    id: 'none',
+    label: 'No Blur',
+    description: 'Disable blur',
+    backgroundOverlayColor: '#000000',
+    backgroundOverlayOpacity: 0,
+    subjectOverlayColor: '#000000',
+    subjectOverlayOpacity: 0,
+  };
+  const filterEffects = visualEffectPresets.filter(
+    (effect) => !blurEffectIds.includes(effect.id),
+  );
+  const blurEffects = [
+    noBlurEffect,
+    ...visualEffectPresets.filter((effect) => blurEffectIds.includes(effect.id)),
+  ];
 
   function handleOpacityTrackLayout(event: LayoutChangeEvent) {
     setOpacityTrackWidth(event.nativeEvent.layout.width);
@@ -313,10 +356,17 @@ export function PreviewEditorPanel({
     { id: 'background', label: 'Background', icon: 'image-area-close' },
     { id: 'content', label: 'Content', icon: 'layers-outline' },
     { id: 'design', label: 'Design', icon: 'palette-outline' },
+    {
+      id: 'effects',
+      label: 'Effects',
+      icon: 'image-filter-center-focus',
+      disabled: !effectsEnabled,
+    },
   ] as {
     id: PreviewPanelTab;
     label: string;
     icon: keyof typeof MaterialCommunityIcons.glyphMap;
+    disabled?: boolean;
   }[];
   const [orderedLayerEntries, setOrderedLayerEntries] = useState(layerEntries);
   const [draggingLayerId, setDraggingLayerId] = useState<LayerId | null>(null);
@@ -325,7 +375,8 @@ export function PreviewEditorPanel({
     setOrderedLayerEntries(layerEntries);
   }, [layerEntries]);
 
-  function onPressTab(tabId: PreviewPanelTab) {
+  function onPressTab(tabId: PreviewPanelTab, disabled?: boolean) {
+    if (disabled) return;
     if (panelOpen && activePanel === tabId) {
       setPanelOpen(false);
       return;
@@ -334,6 +385,37 @@ export function PreviewEditorPanel({
       setPanelOpen(true);
     }
     setActivePanel(tabId);
+  }
+
+  function renderEffectsRow(
+    effects: VisualEffectPreset[],
+    selectedId: string,
+    onSelect: (effectId: string) => void,
+  ) {
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.effectsList}
+      >
+        {effects.map((effect) => {
+          const selected = effect.id === selectedId;
+          return (
+            <Pressable
+              key={effect.id}
+              onPress={() => onSelect(effect.id)}
+              style={({ pressed }) => [
+                styles.effectCard,
+                selected && styles.effectCardSelected,
+                pressed && styles.effectCardPressed,
+              ]}
+            >
+              <Text style={styles.effectTitle}>{effect.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    );
   }
 
   return (
@@ -961,6 +1043,26 @@ export function PreviewEditorPanel({
             </ScrollView>
           ) : null}
 
+          {activePanel === 'effects' ? (
+            <ScrollView
+              style={styles.panelScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.controls}>
+                <Text style={styles.sectionTitle}>Filters</Text>
+                {renderEffectsRow(
+                  filterEffects,
+                  selectedFilterEffectId,
+                  onSetFilterEffect,
+                )}
+              </View>
+              <View style={[styles.controls, styles.effectsSectionSpacing]}>
+                <Text style={styles.sectionTitle}>Blur</Text>
+                {renderEffectsRow(blurEffects, selectedBlurEffectId, onSetBlurEffect)}
+              </View>
+            </ScrollView>
+          ) : null}
+
           {activePanel === 'help' ? (
             <ScrollView
               style={styles.panelScroll}
@@ -1148,19 +1250,31 @@ export function PreviewEditorPanel({
             return (
               <Pressable
                 key={tab.id}
-                onPress={() => onPressTab(tab.id)}
-                style={[styles.panelTab, selected && styles.panelTabSelected]}
+                onPress={() => onPressTab(tab.id, tab.disabled)}
+                disabled={tab.disabled}
+                style={[
+                  styles.panelTab,
+                  selected && styles.panelTabSelected,
+                  tab.disabled && styles.panelTabDisabled,
+                ]}
               >
                 <View style={styles.panelTabContent}>
                   <MaterialCommunityIcons
                     name={tab.icon}
                     size={14}
-                    color={selected ? '#111827' : '#E5E7EB'}
+                    color={
+                      tab.disabled
+                        ? '#6B7280'
+                        : selected
+                          ? '#111827'
+                          : '#E5E7EB'
+                    }
                   />
                   <Text
                     style={[
                       styles.panelTabText,
                       selected && styles.panelTabTextSelected,
+                      tab.disabled && styles.panelTabTextDisabled,
                     ]}
                   >
                     {tab.label}
@@ -1169,12 +1283,6 @@ export function PreviewEditorPanel({
               </Pressable>
             );
           })}
-          <Pressable
-            disabled
-            style={[styles.panelTab, styles.panelTabEmpty]}
-            accessibilityRole="button"
-            accessibilityLabel="Empty"
-          />
         </View>
         <Pressable
           onPress={() => onPressTab('help')}
@@ -1443,6 +1551,9 @@ const styles = StyleSheet.create({
   controls: {
     gap: spacing.sm,
   },
+  effectsSectionSpacing: {
+    marginTop: spacing.sm,
+  },
   activityPhotoRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
@@ -1556,8 +1667,8 @@ const styles = StyleSheet.create({
   panelTabSelected: {
     backgroundColor: '#D9F04A',
   },
-  panelTabEmpty: {
-    opacity: 0.35,
+  panelTabDisabled: {
+    opacity: 0.5,
   },
   panelTabText: {
     color: '#E5E7EB',
@@ -1567,6 +1678,9 @@ const styles = StyleSheet.create({
   panelTabTextSelected: {
     color: '#111827',
     fontWeight: '400',
+  },
+  panelTabTextDisabled: {
+    color: '#6B7280',
   },
   helpFab: {
     width: 42,
@@ -1583,6 +1697,94 @@ const styles = StyleSheet.create({
   },
   helpFabSelected: {
     backgroundColor: '#D9F04A',
+  },
+  effectsList: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingBottom: 2,
+  },
+  effectCard: {
+    width: 116,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2F3644',
+    backgroundColor: '#202632',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  effectCardSelected: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  effectCardPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.985 }],
+  },
+  effectPreview: {
+    width: '100%',
+    aspectRatio: 1.33,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#3A4356',
+    backgroundColor: '#1B2130',
+  },
+  effectPreviewBg: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  effectPreviewDepth: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  effectPreviewBgOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  effectPreviewSubject: {
+    position: 'absolute',
+    left: 18,
+    right: 18,
+    bottom: 10,
+    top: 18,
+    borderRadius: 9,
+  },
+  effectPreviewSubjectOverlay: {
+    position: 'absolute',
+    left: 18,
+    right: 18,
+    bottom: 10,
+    top: 18,
+    borderRadius: 9,
+  },
+  effectPreviewStats: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    bottom: 6,
+    gap: 4,
+  },
+  effectPreviewStatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  effectPreviewStatLineLg: {
+    alignSelf: 'center',
+    width: '62%',
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.82)',
+  },
+  effectPreviewStatLineSm: {
+    width: 18,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+  },
+  effectTitle: {
+    color: '#E5E7EB',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 15,
+    paddingHorizontal: 1,
   },
   mediaPickRow: {
     flexDirection: 'row',

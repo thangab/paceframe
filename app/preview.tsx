@@ -124,6 +124,145 @@ const SUNSET_PRIMARY_GRADIENT_PRESETS: SunsetPrimaryGradient[] = [
   ['#E0F2FE', '#38BDF8', '#2563EB'],
   ['#E2E8F0', '#94A3B8', '#334155'],
 ];
+type VisualEffectId =
+  | 'none'
+  | 'black-and-white'
+  | 'bw-soft'
+  | 'warm-sunset'
+  | 'cool-night'
+  | 'background-blur'
+  | 'background-radial-blur'
+  | 'background-motion-blur';
+type FilterEffectId =
+  | 'none'
+  | 'black-and-white'
+  | 'bw-soft'
+  | 'warm-sunset'
+  | 'cool-night';
+type BlurEffectId =
+  | 'none'
+  | 'background-blur'
+  | 'background-radial-blur'
+  | 'background-motion-blur';
+type VisualFilterStep =
+  | { brightness: number }
+  | { contrast: number }
+  | { grayscale: number }
+  | { hueRotate: string }
+  | { opacity: number }
+  | { saturate: number }
+  | { sepia: number };
+type VisualEffectPreset = {
+  id: VisualEffectId;
+  label: string;
+  description: string;
+  backgroundBlurRadius?: number;
+  backgroundRadialFocus?: boolean;
+  backgroundFilter?: VisualFilterStep[];
+  subjectFilter?: VisualFilterStep[];
+  backgroundOverlayColor: string;
+  backgroundOverlayOpacity: number;
+  subjectOverlayColor: string;
+  subjectOverlayOpacity: number;
+};
+const VISUAL_EFFECT_PRESETS: VisualEffectPreset[] = [
+  {
+    id: 'none',
+    label: 'No Filter',
+    description: 'Original look',
+    backgroundOverlayColor: '#000000',
+    backgroundOverlayOpacity: 0,
+    subjectOverlayColor: '#000000',
+    subjectOverlayOpacity: 0,
+  },
+  {
+    id: 'black-and-white',
+    label: 'Black & White',
+    description: 'Black and white',
+    backgroundOverlayColor: '#000000',
+    backgroundOverlayOpacity: 0,
+    subjectOverlayColor: '#000000',
+    subjectOverlayOpacity: 0,
+  },
+  {
+    id: 'bw-soft',
+    label: 'B&W Soft',
+    description: 'Soft editorial black and white',
+    backgroundOverlayColor: '#F3F3F3',
+    backgroundOverlayOpacity: 0.08,
+    subjectOverlayColor: '#E9E9E9',
+    subjectOverlayOpacity: 0.06,
+  },
+  {
+    id: 'warm-sunset',
+    label: 'Warm Sunset',
+    description: 'Warm golden tone',
+    backgroundOverlayColor: '#FF8A3D',
+    backgroundOverlayOpacity: 0.16,
+    subjectOverlayColor: '#FFC67D',
+    subjectOverlayOpacity: 0.12,
+  },
+  {
+    id: 'cool-night',
+    label: 'Cool Night',
+    description: 'Cool blue night tone',
+    backgroundOverlayColor: '#1F4D8A',
+    backgroundOverlayOpacity: 0.16,
+    subjectOverlayColor: '#5D9CE8',
+    subjectOverlayOpacity: 0.1,
+  },
+  {
+    id: 'background-blur',
+    label: 'Background Blur',
+    description: 'Blur only on background',
+    backgroundBlurRadius: 3,
+    backgroundOverlayColor: '#000000',
+    backgroundOverlayOpacity: 0.06,
+    subjectOverlayColor: '#000000',
+    subjectOverlayOpacity: 0,
+  },
+  {
+    id: 'background-radial-blur',
+    label: 'Background Radial Blur',
+    description: 'Radial blur on background',
+    backgroundBlurRadius: 18,
+    backgroundRadialFocus: true,
+    backgroundOverlayColor: '#111111',
+    backgroundOverlayOpacity: 0.14,
+    subjectOverlayColor: '#000000',
+    subjectOverlayOpacity: 0,
+  },
+  {
+    id: 'background-motion-blur',
+    label: 'Background Motion Blur',
+    description: 'Directional blur on background',
+    backgroundOverlayColor: '#111111',
+    backgroundOverlayOpacity: 0.1,
+    subjectOverlayColor: '#000000',
+    subjectOverlayOpacity: 0,
+  },
+];
+const FILTER_EFFECT_IDS: FilterEffectId[] = [
+  'none',
+  'black-and-white',
+  'bw-soft',
+  'warm-sunset',
+  'cool-night',
+];
+const BLUR_EFFECT_IDS: BlurEffectId[] = [
+  'none',
+  'background-blur',
+  'background-radial-blur',
+  'background-motion-blur',
+];
+
+function isFilterEffectId(value: string): value is FilterEffectId {
+  return FILTER_EFFECT_IDS.includes(value as FilterEffectId);
+}
+
+function isBlurEffectId(value: string): value is BlurEffectId {
+  return BLUR_EFFECT_IDS.includes(value as BlurEffectId);
+}
 type StyleLayerId = 'meta' | 'stats' | 'route' | 'primary';
 type StyleLayerSettings = {
   color: string;
@@ -259,6 +398,10 @@ export default function PreviewScreen() {
     useState<LayerStyleMapByLayout>({});
   const [sunsetPrimaryGradient, setSunsetPrimaryGradient] =
     useState<SunsetPrimaryGradient>(DEFAULT_SUNSET_PRIMARY_GRADIENT);
+  const [selectedFilterEffectId, setSelectedFilterEffectId] =
+    useState<FilterEffectId>('none');
+  const [selectedBlurEffectId, setSelectedBlurEffectId] =
+    useState<BlurEffectId>('none');
 
   const exportRef = useRef<View>(null);
   const managedTempUrisRef = useRef<Set<string>>(new Set());
@@ -273,6 +416,21 @@ export default function PreviewScreen() {
       layerStyleMapByLayout[template.layout] ??
       getDefaultLayerStyleMapForLayout(template.layout),
     [layerStyleMapByLayout, template.layout],
+  );
+  const hasFilterableBackground = Boolean(
+    media?.uri && (media.type === 'image' || media.type === 'video'),
+  );
+  const selectedFilterEffect = useMemo(
+    () =>
+      VISUAL_EFFECT_PRESETS.find((item) => item.id === selectedFilterEffectId) ??
+      VISUAL_EFFECT_PRESETS[0],
+    [selectedFilterEffectId],
+  );
+  const selectedBlurEffect = useMemo(
+    () =>
+      VISUAL_EFFECT_PRESETS.find((item) => item.id === selectedBlurEffectId) ??
+      VISUAL_EFFECT_PRESETS[0],
+    [selectedBlurEffectId],
   );
   const supportsPrimaryLayer = useMemo(
     () =>
@@ -676,6 +834,8 @@ export default function PreviewScreen() {
         getDefaultLayerStyleMapForLayout(nextTemplateLayout),
     });
     setSunsetPrimaryGradient(DEFAULT_SUNSET_PRIMARY_GRADIENT);
+    setSelectedFilterEffectId('none');
+    setSelectedBlurEffectId('none');
     setSelectedLayer(null);
     setOutlinedLayer(null);
     setActiveLayer(null);
@@ -726,6 +886,20 @@ export default function PreviewScreen() {
     setSunsetPrimaryGradient(
       draft.sunsetPrimaryGradient ?? DEFAULT_SUNSET_PRIMARY_GRADIENT,
     );
+    const legacySelectedEffect = draft.selectedVisualEffectId ?? 'none';
+    const nextFilterId = isFilterEffectId(
+      draft.selectedFilterEffectId ?? legacySelectedEffect,
+    )
+      ? (draft.selectedFilterEffectId ??
+          legacySelectedEffect) as FilterEffectId
+      : 'none';
+    const nextBlurId = isBlurEffectId(
+      draft.selectedBlurEffectId ?? legacySelectedEffect,
+    )
+      ? (draft.selectedBlurEffectId ?? legacySelectedEffect) as BlurEffectId
+      : 'none';
+    setSelectedFilterEffectId(nextFilterId);
+    setSelectedBlurEffectId(nextBlurId);
     setSelectedLayer(null);
     setOutlinedLayer(null);
     setActiveLayer(null);
@@ -831,6 +1005,12 @@ export default function PreviewScreen() {
       layerStyleMap,
       layerStyleMapByLayout,
       sunsetPrimaryGradient,
+      selectedFilterEffectId,
+      selectedBlurEffectId,
+      selectedVisualEffectId:
+        selectedBlurEffectId !== 'none'
+          ? selectedBlurEffectId
+          : selectedFilterEffectId,
     };
 
     const timeout = setTimeout(() => {
@@ -863,6 +1043,8 @@ export default function PreviewScreen() {
     layerStyleMap,
     layerStyleMapByLayout,
     sunsetPrimaryGradient,
+    selectedFilterEffectId,
+    selectedBlurEffectId,
     isHydratingDraft,
   ]);
 
@@ -951,6 +1133,24 @@ export default function PreviewScreen() {
     if (activePanel !== 'help' || !panelOpen) return;
     void refreshAppCacheUsage();
   }, [activePanel, panelOpen]);
+
+  useEffect(() => {
+    if (hasFilterableBackground) return;
+    if (selectedFilterEffectId !== 'none') {
+      setSelectedFilterEffectId('none');
+    }
+    if (selectedBlurEffectId !== 'none') {
+      setSelectedBlurEffectId('none');
+    }
+    if (activePanel === 'effects') {
+      setActivePanel('background');
+    }
+  }, [
+    activePanel,
+    hasFilterableBackground,
+    selectedBlurEffectId,
+    selectedFilterEffectId,
+  ]);
 
   if (!activity) {
     return (
@@ -1654,20 +1854,16 @@ export default function PreviewScreen() {
 
   function confirmResetToDefault() {
     if (busy) return;
-    Alert.alert(
-      'Reset design?',
-      'All your modifications will be lost.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: () => {
-            void resetToDefault();
-          },
+    Alert.alert('Reset design?', 'All your modifications will be lost.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reset',
+        style: 'destructive',
+        onPress: () => {
+          void resetToDefault();
         },
-      ],
-    );
+      },
+    ]);
   }
 
   function toggleSquareFormat() {
@@ -1796,6 +1992,10 @@ export default function PreviewScreen() {
           avgHeartRateText={avgHeartRateText}
           layerStyleSettings={layerStyleMap}
           sunsetPrimaryGradient={sunsetPrimaryGradient}
+          selectedFilterEffect={selectedFilterEffect}
+          selectedBlurEffect={selectedBlurEffect}
+          selectedFilterEffectId={selectedFilterEffectId}
+          selectedBlurEffectId={selectedBlurEffectId}
           centeredStatsXDisplay={centeredStatsXDisplay}
           dynamicStatsWidthDisplay={dynamicStatsWidthDisplay}
           canvasScaleX={canvasScaleX}
@@ -1869,6 +2069,16 @@ export default function PreviewScreen() {
           sunsetPrimaryGradient={sunsetPrimaryGradient}
           sunsetPrimaryGradientPresets={SUNSET_PRIMARY_GRADIENT_PRESETS}
           onSetSunsetPrimaryGradient={applySunsetPrimaryGradient}
+          visualEffectPresets={VISUAL_EFFECT_PRESETS}
+          selectedFilterEffectId={selectedFilterEffectId}
+          selectedBlurEffectId={selectedBlurEffectId}
+          onSetFilterEffect={(effectId) =>
+            setSelectedFilterEffectId(effectId as FilterEffectId)
+          }
+          onSetBlurEffect={(effectId) =>
+            setSelectedBlurEffectId(effectId as BlurEffectId)
+          }
+          effectsEnabled={hasFilterableBackground}
           isPremium={isPremium}
           message={message}
           appCacheUsageLabel={appCacheUsageLabel}

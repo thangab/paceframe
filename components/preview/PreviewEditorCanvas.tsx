@@ -1,8 +1,19 @@
-import { RefObject } from 'react';
+import { RefObject, useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type * as ImagePicker from 'expo-image-picker';
 import { ResizeMode, Video } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
+import {
+  AlphaType,
+  Canvas,
+  ColorType,
+  Fill,
+  ImageShader,
+  RuntimeShader,
+  Skia,
+  useImage,
+} from '@shopify/react-native-skia';
+import { DirectionalBackgroundBlur } from '@/components/preview/DirectionalBackgroundBlur';
 import { DraggableBlock } from '@/components/DraggableBlock';
 import { RouteLayer } from '@/components/RouteLayer';
 import {
@@ -36,6 +47,19 @@ type LayerStyleSettings = {
   stats: { color: string; opacity: number };
   route: { color: string; opacity: number };
   primary: { color: string; opacity: number };
+};
+type VisualEffectPreset = {
+  id: string;
+  label: string;
+  description?: string;
+  backgroundBlurRadius?: number;
+  backgroundRadialFocus?: boolean;
+  backgroundFilter?: Array<Record<string, number | string>>;
+  subjectFilter?: Array<Record<string, number | string>>;
+  backgroundOverlayColor: string;
+  backgroundOverlayOpacity: number;
+  subjectOverlayColor: string;
+  subjectOverlayOpacity: number;
 };
 
 type Props = {
@@ -80,6 +104,10 @@ type Props = {
   avgHeartRateText: string;
   layerStyleSettings: LayerStyleSettings;
   sunsetPrimaryGradient: [string, string, string];
+  selectedFilterEffect: VisualEffectPreset;
+  selectedBlurEffect: VisualEffectPreset;
+  selectedFilterEffectId: string;
+  selectedBlurEffectId: string;
   centeredStatsXDisplay: number;
   dynamicStatsWidthDisplay: number;
   canvasScaleX: number;
@@ -109,6 +137,37 @@ type Props = {
   onDragGuideChange: (guides: GuideState) => void;
   onRotationGuideChange: (active: boolean) => void;
 };
+
+const RADIAL_BLUR_EFFECT = Skia.RuntimeEffect.Make(`
+uniform shader image;
+uniform float2 resolution;
+uniform float2 center;
+uniform float intensity;
+uniform float radius;
+
+half4 main(float2 xy) {
+  float2 clampedXY = clamp(xy, float2(0.0), resolution);
+  float2 dir = clampedXY - center;
+  float dist = length(dir);
+  float2 nDir = dist > 0.0001 ? dir / dist : float2(0.0);
+
+  float falloff = smoothstep(0.0, radius, dist);
+  float blurAmount = falloff * intensity;
+
+  half4 color = half4(0.0);
+  float total = 0.0;
+
+  for (int i = 0; i < 10; i++) {
+    float t = float(i) / 9.0;
+    float2 samplePos = clampedXY - nDir * blurAmount * t;
+    samplePos = clamp(samplePos, float2(0.0), resolution);
+    color += image.eval(samplePos);
+    total += 1.0;
+  }
+
+  return color / total;
+}
+`);
 
 export function PreviewEditorCanvas({
   exportRef,
@@ -152,6 +211,10 @@ export function PreviewEditorCanvas({
   avgHeartRateText,
   layerStyleSettings,
   sunsetPrimaryGradient,
+  selectedFilterEffect,
+  selectedBlurEffect,
+  selectedFilterEffectId,
+  selectedBlurEffectId,
   centeredStatsXDisplay,
   dynamicStatsWidthDisplay,
   canvasScaleX,
@@ -173,7 +236,141 @@ export function PreviewEditorCanvas({
   onDragGuideChange,
   onRotationGuideChange,
 }: Props) {
+  const [subjectRadialCenter, setSubjectRadialCenter] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const showSelectionOutline = !isCapturingOverlay && !isExportingPng;
+  const mergedBackgroundFilter = [
+    ...(selectedFilterEffect.backgroundFilter ?? []),
+    ...(selectedBlurEffect.backgroundFilter ?? []),
+  ];
+  const mergedSubjectFilter = [
+    ...(selectedFilterEffect.subjectFilter ?? []),
+    ...(selectedBlurEffect.subjectFilter ?? []),
+  ];
+  const useTrueBlackAndWhite =
+    selectedFilterEffectId === 'black-and-white' ||
+    selectedFilterEffectId === 'bw-soft';
+  const useRadialBlurShader =
+    selectedBlurEffectId === 'background-radial-blur' &&
+    media?.type === 'image' &&
+    Boolean(media?.uri);
+  const useMotionBlurShader =
+    selectedBlurEffectId === 'background-motion-blur' &&
+    media?.type === 'image' &&
+    Boolean(media?.uri);
+  const useBackgroundSkiaShader = useRadialBlurShader || useMotionBlurShader;
+  const skiaBackgroundImage = useImage(
+    useBackgroundSkiaShader ? media?.uri ?? null : null,
+  );
+  const skiaSubjectImage = useImage(
+    useRadialBlurShader && autoSubjectUri ? autoSubjectUri : null,
+  );
+  const fallbackRadialCenter = useMemo(
+    () => ({
+      x: canvasDisplayWidth * 0.5,
+      y: canvasDisplayHeight * 0.56,
+    }),
+    [canvasDisplayWidth, canvasDisplayHeight],
+  );
+  const resolvedRadialCenter = subjectRadialCenter ?? fallbackRadialCenter;
+
+  useEffect(() => {
+    if (!useRadialBlurShader || !skiaSubjectImage) {
+      setSubjectRadialCenter(null);
+      return;
+    }
+
+    const rasterImage = skiaSubjectImage.makeNonTextureImage();
+    const imageWidth = rasterImage.width();
+    const imageHeight = rasterImage.height();
+    if (imageWidth <= 0 || imageHeight <= 0) {
+      setSubjectRadialCenter(null);
+      return;
+    }
+
+    const pixels = rasterImage.readPixels(0, 0, {
+      width: imageWidth,
+      height: imageHeight,
+      alphaType: AlphaType.Unpremul,
+      colorType: ColorType.RGBA_8888,
+    });
+    if (!pixels || pixels.length < imageWidth * imageHeight * 4) {
+      setSubjectRadialCenter(null);
+      return;
+    }
+
+    // Scan alpha channel to locate the subject center from transparency mask.
+    const stride = Math.max(1, Math.floor(Math.max(imageWidth, imageHeight) / 720));
+    let sumX = 0;
+    let sumY = 0;
+    let sumA = 0;
+    let minY = imageHeight;
+    let maxX = -1;
+    let maxY = -1;
+    for (let y = 0; y < imageHeight; y += stride) {
+      for (let x = 0; x < imageWidth; x += stride) {
+        const alpha = pixels[(y * imageWidth + x) * 4 + 3];
+        if (alpha <= 10) continue;
+        sumX += x * alpha;
+        sumY += y * alpha;
+        sumA += alpha;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+
+    if (sumA <= 0 || maxX < 0 || maxY < 0) {
+      setSubjectRadialCenter(null);
+      return;
+    }
+
+    const centerXImage = sumX / sumA;
+    const centroidYImage = sumY / sumA;
+    const subjectHeight = Math.max(1, maxY - minY);
+    // Slightly lift the focus so the blur center sits closer to bust/head.
+    const centerYImage = Math.max(
+      minY,
+      Math.min(maxY, centroidYImage - subjectHeight * 0.14),
+    );
+    const scale = Math.max(
+      canvasDisplayWidth / imageWidth,
+      canvasDisplayHeight / imageHeight,
+    );
+    const scaledWidth = imageWidth * scale;
+    const scaledHeight = imageHeight * scale;
+    const offsetX = (canvasDisplayWidth - scaledWidth) / 2;
+    const offsetY = (canvasDisplayHeight - scaledHeight) / 2;
+    const nextCenter = {
+      x: Math.max(
+        0,
+        Math.min(canvasDisplayWidth, offsetX + centerXImage * scale),
+      ),
+      y: Math.max(
+        0,
+        Math.min(canvasDisplayHeight, offsetY + centerYImage * scale),
+      ),
+    };
+
+    setSubjectRadialCenter((prev) => {
+      if (
+        prev &&
+        Math.abs(prev.x - nextCenter.x) < 0.5 &&
+        Math.abs(prev.y - nextCenter.y) < 0.5
+      ) {
+        return prev;
+      }
+      return nextCenter;
+    });
+  }, [
+    autoSubjectUri,
+    canvasDisplayHeight,
+    canvasDisplayWidth,
+    skiaSubjectImage,
+    useRadialBlurShader,
+  ]);
   const usesSunsetHeader =
     template.layout === 'sunset-hero' || template.layout === 'morning-glass';
   const usesTemplateHeader =
@@ -356,6 +553,9 @@ export function PreviewEditorCanvas({
               source={{ uri: media.uri }}
               style={[
                 styles.media,
+                mergedBackgroundFilter.length > 0
+                  ? ({ filter: mergedBackgroundFilter } as any)
+                  : null,
                 (isCapturingOverlay ||
                   (isExportingPng && pngTransparentOnly)) &&
                   styles.hiddenForCapture,
@@ -366,14 +566,61 @@ export function PreviewEditorCanvas({
               resizeMode={ResizeMode.COVER}
             />
           ) : media?.uri ? (
-            <Image
-              source={{ uri: media.uri }}
-              style={[
-                styles.media,
-                isExportingPng && pngTransparentOnly && styles.hiddenForCapture,
-              ]}
-              resizeMode="cover"
-            />
+            useRadialBlurShader && skiaBackgroundImage && RADIAL_BLUR_EFFECT ? (
+              <Canvas
+                style={[
+                  styles.media,
+                  isExportingPng && pngTransparentOnly && styles.hiddenForCapture,
+                ]}
+              >
+                <Fill>
+                  <RuntimeShader
+                    source={RADIAL_BLUR_EFFECT}
+                    uniforms={{
+                      resolution: [canvasDisplayWidth, canvasDisplayHeight],
+                      center: [resolvedRadialCenter.x, resolvedRadialCenter.y],
+                      intensity: Math.min(canvasDisplayWidth, canvasDisplayHeight) * 0.26,
+                      radius: Math.min(canvasDisplayWidth, canvasDisplayHeight) * 0.58,
+                    }}
+                  >
+                    <ImageShader
+                      image={skiaBackgroundImage}
+                      x={0}
+                      y={0}
+                      width={canvasDisplayWidth}
+                      height={canvasDisplayHeight}
+                      fit="cover"
+                    />
+                  </RuntimeShader>
+                </Fill>
+              </Canvas>
+            ) : useMotionBlurShader && skiaBackgroundImage ? (
+              <DirectionalBackgroundBlur
+                image={skiaBackgroundImage}
+                width={canvasDisplayWidth}
+                height={canvasDisplayHeight}
+                direction={{ x: 1, y: 0 }}
+                intensity={Math.min(canvasDisplayWidth, canvasDisplayHeight) * 0.11}
+                samples={12}
+                style={[
+                  styles.media,
+                  isExportingPng && pngTransparentOnly && styles.hiddenForCapture,
+                ]}
+              />
+            ) : (
+              <Image
+                source={{ uri: media.uri }}
+                blurRadius={selectedBlurEffect.backgroundBlurRadius ?? 0}
+                style={[
+                  styles.media,
+                  mergedBackgroundFilter.length > 0
+                    ? ({ filter: mergedBackgroundFilter } as any)
+                    : null,
+                  isExportingPng && pngTransparentOnly && styles.hiddenForCapture,
+                ]}
+                resizeMode="cover"
+              />
+            )
           ) : null}
           {!media && backgroundGradient ? (
             <LinearGradient
@@ -395,17 +642,78 @@ export function PreviewEditorCanvas({
               ]}
             />
           ) : null}
+          {selectedFilterEffect.backgroundOverlayOpacity > 0 ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.backgroundFilterLayer,
+                {
+                  backgroundColor: selectedFilterEffect.backgroundOverlayColor,
+                  opacity: selectedFilterEffect.backgroundOverlayOpacity,
+                },
+                isExportingPng && pngTransparentOnly && styles.hiddenForCapture,
+              ]}
+            />
+          ) : null}
+          {selectedBlurEffect.backgroundOverlayOpacity > 0 ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.backgroundFilterLayer,
+                {
+                  backgroundColor: selectedBlurEffect.backgroundOverlayColor,
+                  opacity: selectedBlurEffect.backgroundOverlayOpacity,
+                },
+                isExportingPng && pngTransparentOnly && styles.hiddenForCapture,
+              ]}
+            />
+          ) : null}
 
           {autoSubjectUri ? (
             <View pointerEvents="none" style={styles.autoSubjectLayer}>
               <Image
                 source={{ uri: autoSubjectUri }}
-                style={styles.media}
+                style={[
+                  styles.media,
+                  mergedSubjectFilter.length > 0
+                    ? ({ filter: mergedSubjectFilter } as any)
+                    : null,
+                ]}
                 resizeMode="cover"
               />
+              {selectedFilterEffect.subjectOverlayOpacity > 0 ? (
+                <View
+                  style={[
+                    styles.subjectFilterOverlay,
+                    {
+                      backgroundColor: selectedFilterEffect.subjectOverlayColor,
+                      opacity: selectedFilterEffect.subjectOverlayOpacity,
+                    },
+                  ]}
+                />
+              ) : null}
+              {selectedBlurEffect.subjectOverlayOpacity > 0 ? (
+                <View
+                  style={[
+                    styles.subjectFilterOverlay,
+                    {
+                      backgroundColor: selectedBlurEffect.subjectOverlayColor,
+                      opacity: selectedBlurEffect.subjectOverlayOpacity,
+                    },
+                  ]}
+                />
+              ) : null}
             </View>
           ) : null}
-
+          {useTrueBlackAndWhite ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.trueBlackWhiteBlendLayer,
+                isExportingPng && pngTransparentOnly && styles.hiddenForCapture,
+              ]}
+            />
+          ) : null}
           <Pressable style={styles.canvasTapCatcher} onPress={onCanvasTouch} />
 
           {visibleLayers.meta && hasHeaderContent ? (
@@ -810,6 +1118,25 @@ const styles = StyleSheet.create({
     height: '100%',
     zIndex: 5,
     elevation: 5,
+  },
+  backgroundFilterLayer: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    zIndex: 4,
+    elevation: 4,
+  },
+  subjectFilterOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  trueBlackWhiteBlendLayer: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    zIndex: 6,
+    elevation: 6,
+    backgroundColor: '#000000',
+    mixBlendMode: 'saturation',
   },
   canvasTapCatcher: {
     position: 'absolute',

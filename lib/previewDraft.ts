@@ -25,6 +25,26 @@ type LayerStyleSettings = {
   opacity: number;
 };
 type LayerStyleMap = Record<StyleLayerId, LayerStyleSettings>;
+type VisualEffectId =
+  | 'none'
+  | 'black-and-white'
+  | 'bw-soft'
+  | 'warm-sunset'
+  | 'cool-night'
+  | 'background-blur'
+  | 'background-radial-blur'
+  | 'background-motion-blur';
+type FilterEffectId =
+  | 'none'
+  | 'black-and-white'
+  | 'bw-soft'
+  | 'warm-sunset'
+  | 'cool-night';
+type BlurEffectId =
+  | 'none'
+  | 'background-blur'
+  | 'background-radial-blur'
+  | 'background-motion-blur';
 
 export type PreviewDraft = {
   v: 1;
@@ -52,6 +72,9 @@ export type PreviewDraft = {
   layerStyleMap?: LayerStyleMap;
   layerStyleMapByLayout?: Partial<Record<StatsLayout, LayerStyleMap>>;
   sunsetPrimaryGradient?: [string, string, string];
+  selectedFilterEffectId?: FilterEffectId;
+  selectedBlurEffectId?: BlurEffectId;
+  selectedVisualEffectId?: VisualEffectId;
 };
 
 type SanitizeOptions = {
@@ -290,6 +313,47 @@ function sanitizeSunsetPrimaryGradient(
   return colors as [string, string, string];
 }
 
+function sanitizeVisualEffectId(input: unknown): VisualEffectId | undefined {
+  if (
+    input === 'none' ||
+    input === 'black-and-white' ||
+    input === 'bw-soft' ||
+    input === 'warm-sunset' ||
+    input === 'cool-night' ||
+    input === 'background-blur' ||
+    input === 'background-radial-blur' ||
+    input === 'background-motion-blur'
+  ) {
+    return input;
+  }
+  return undefined;
+}
+
+function sanitizeFilterEffectId(input: unknown): FilterEffectId | undefined {
+  if (
+    input === 'none' ||
+    input === 'black-and-white' ||
+    input === 'bw-soft' ||
+    input === 'warm-sunset' ||
+    input === 'cool-night'
+  ) {
+    return input;
+  }
+  return undefined;
+}
+
+function sanitizeBlurEffectId(input: unknown): BlurEffectId | undefined {
+  if (
+    input === 'none' ||
+    input === 'background-blur' ||
+    input === 'background-radial-blur' ||
+    input === 'background-motion-blur'
+  ) {
+    return input;
+  }
+  return undefined;
+}
+
 function sanitizeVisible(
   input: unknown,
   fallback: Record<FieldId, boolean>,
@@ -372,6 +436,17 @@ export function sanitizePreviewDraft(
   const sunsetPrimaryGradient = sanitizeSunsetPrimaryGradient(
     input.sunsetPrimaryGradient,
   );
+  const selectedVisualEffectId = sanitizeVisualEffectId(
+    input.selectedVisualEffectId,
+  );
+  const selectedFilterEffectId =
+    sanitizeFilterEffectId(input.selectedFilterEffectId) ??
+    sanitizeFilterEffectId(selectedVisualEffectId) ??
+    'none';
+  const selectedBlurEffectId =
+    sanitizeBlurEffectId(input.selectedBlurEffectId) ??
+    sanitizeBlurEffectId(selectedVisualEffectId) ??
+    'none';
 
   return {
     v: 1,
@@ -416,5 +491,8 @@ export function sanitizePreviewDraft(
     layerStyleMap,
     layerStyleMapByLayout,
     sunsetPrimaryGradient,
+    selectedFilterEffectId,
+    selectedBlurEffectId,
+    selectedVisualEffectId,
   };
 }
