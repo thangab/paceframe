@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  Alert,
   Platform,
   Pressable,
   StyleSheet,
@@ -1651,6 +1652,24 @@ export default function PreviewScreen() {
     setMessage('Reset to default.');
   }
 
+  function confirmResetToDefault() {
+    if (busy) return;
+    Alert.alert(
+      'Reset design?',
+      'All your modifications will be lost.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            void resetToDefault();
+          },
+        },
+      ],
+    );
+  }
+
   function toggleSquareFormat() {
     if (!isSquareFormat && media?.type === 'video') {
       setMessage('Switch to an image background before square mode.');
@@ -1671,7 +1690,7 @@ export default function PreviewScreen() {
             <View style={styles.headerActions}>
               <Pressable
                 onPress={() => {
-                  void resetToDefault();
+                  confirmResetToDefault();
                 }}
                 hitSlop={8}
                 style={[

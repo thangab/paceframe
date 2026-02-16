@@ -176,7 +176,7 @@ export default function LoginScreen() {
 
       {Platform.OS === 'ios' ? (
         <PrimaryButton
-          label="Import from HealthKit"
+          label="Import from Health"
           onPress={handleHealthKitImport}
           variant="secondary"
           disabled={isBusy}
