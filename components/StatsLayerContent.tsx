@@ -18,6 +18,8 @@ type Props = {
   template: StatsTemplate;
   fontPreset: FontPreset;
   visible: VisibleFields;
+  layerTextColor?: string;
+  sunsetPrimaryGradient?: [string, string, string];
   primaryInSeparateLayer?: boolean;
   distanceText: string;
   durationText: string;
@@ -38,6 +40,8 @@ export function StatsLayerContent({
   template,
   fontPreset,
   visible,
+  layerTextColor,
+  sunsetPrimaryGradient,
   primaryInSeparateLayer = false,
   distanceText,
   durationText,
@@ -47,6 +51,10 @@ export function StatsLayerContent({
   caloriesText,
   avgHeartRateText,
 }: Props) {
+  const textColorOverride = layerTextColor ? { color: layerTextColor } : null;
+  const useSunsetSolidPrimaryColor = layerTextColor
+    ? !isDefaultSunsetHeroColor(layerTextColor)
+    : false;
   const metrics = [
     visible.distance
       ? { id: 'distance', label: 'Distance', value: distanceText }
@@ -73,6 +81,9 @@ export function StatsLayerContent({
             <GradientValueWithUnit
               value={metrics[0].value}
               fontPreset={fontPreset}
+              valueStyleOverride={textColorOverride}
+              disableGradient={useSunsetSolidPrimaryColor}
+              gradientColors={sunsetPrimaryGradient}
             />
           </View>
         ) : null}
@@ -85,6 +96,7 @@ export function StatsLayerContent({
                 <Text
                   style={[
                     styles.sunsetCardLabel,
+                    textColorOverride,
                     { fontFamily: fontPreset.family },
                   ]}
                 >
@@ -95,6 +107,8 @@ export function StatsLayerContent({
                   fontPreset={fontPreset}
                   valueStyle={styles.sunsetCardValue}
                   unitStyle={styles.sunsetCardUnit}
+                  textStyleOverride={textColorOverride}
+                  unitStyleOverride={textColorOverride}
                   numberOfLines={1}
                   autoFit={false}
                   minimumFontScale={1}
@@ -125,6 +139,8 @@ export function StatsLayerContent({
               fontPreset={fontPreset}
               valueStyle={styles.morningDistanceValue}
               unitStyle={styles.morningDistanceUnit}
+              textStyleOverride={textColorOverride}
+              unitStyleOverride={textColorOverride}
               numberOfLines={1}
               autoFit
               minimumFontScale={0.78}
@@ -140,10 +156,12 @@ export function StatsLayerContent({
                   icon={metricIcon(metric.id)}
                   value={metric.value}
                   fontPreset={fontPreset}
-                  iconColor={metricIconColor(metric.id)}
+                  iconColor={layerTextColor ?? metricIconColor(metric.id)}
                   iconSize={22}
                   textStyle={styles.morningCardValue}
                   unitStyle={styles.morningCardUnit}
+                  textStyleOverride={textColorOverride}
+                  unitStyleOverride={textColorOverride}
                 />
               </View>
             ))}
@@ -158,10 +176,12 @@ export function StatsLayerContent({
                   icon={metricIcon(metric.id)}
                   value={metric.value}
                   fontPreset={fontPreset}
-                  iconColor={metricIconColor(metric.id)}
+                  iconColor={layerTextColor ?? metricIconColor(metric.id)}
                   iconSize={22}
                   textStyle={styles.morningCardValue}
                   unitStyle={styles.morningCardUnit}
+                  textStyleOverride={textColorOverride}
+                  unitStyleOverride={textColorOverride}
                 />
               </View>
             ))}
@@ -186,6 +206,7 @@ export function StatsLayerContent({
             <SplitBoldPrimaryValue
               value={metrics[0]?.value ?? '--'}
               fontPreset={fontPreset}
+              textStyleOverride={textColorOverride}
             />
           </View>
         ) : null}
@@ -195,6 +216,7 @@ export function StatsLayerContent({
               <Text
                 style={[
                   styles.splitBoldMetricLabel,
+                  textColorOverride,
                   { fontFamily: fontPreset.family },
                 ]}
               >
@@ -205,6 +227,8 @@ export function StatsLayerContent({
                 fontPreset={fontPreset}
                 valueStyle={styles.splitBoldMetricValue}
                 unitStyle={styles.splitBoldMetricUnit}
+                textStyleOverride={textColorOverride}
+                unitStyleOverride={textColorOverride}
                 numberOfLines={1}
                 autoFit
                 minimumFontScale={0.94}
@@ -227,6 +251,7 @@ export function StatsLayerContent({
               <Text
                 style={[
                   styles.heroLabel,
+                  textColorOverride,
                   TEXT_SHADOW_STYLE,
                   { fontFamily: fontPreset.family },
                 ]}
@@ -238,6 +263,8 @@ export function StatsLayerContent({
                 fontPreset={fontPreset}
                 valueStyle={styles.heroDistanceValue}
                 unitStyle={styles.heroUnit}
+                textStyleOverride={textColorOverride}
+                unitStyleOverride={textColorOverride}
                 numberOfLines={1}
                 autoFit={false}
                 minimumFontScale={0.86}
@@ -251,6 +278,9 @@ export function StatsLayerContent({
                 label={metric.label}
                 value={metric.value}
                 fontPreset={fontPreset}
+                labelStyleOverride={textColorOverride}
+                valueStyleOverride={textColorOverride}
+                unitStyleOverride={textColorOverride}
               />
             ))}
           </View>
@@ -265,6 +295,9 @@ export function StatsLayerContent({
               label={metric.label}
               value={metric.value}
               fontPreset={fontPreset}
+              labelStyleOverride={textColorOverride}
+              valueStyleOverride={textColorOverride}
+              unitStyleOverride={textColorOverride}
             />
           ))}
         </View>
@@ -278,6 +311,8 @@ export function StatsLayerContent({
               fontPreset={fontPreset}
               valueStyle={styles.compactDistanceValue}
               unitStyle={styles.compactUnit}
+              textStyleOverride={textColorOverride}
+              unitStyleOverride={textColorOverride}
               numberOfLines={1}
               autoFit
               minimumFontScale={0.82}
@@ -292,9 +327,12 @@ export function StatsLayerContent({
                     icon={metricIcon(metric.id)}
                     value={metric.value}
                     fontPreset={fontPreset}
+                    iconColor={layerTextColor ?? undefined}
+                    textStyleOverride={textColorOverride}
+                    unitStyleOverride={textColorOverride}
                   />
                   {index < arr.length - 1 ? (
-                    <Text style={styles.separator}>|</Text>
+                    <Text style={[styles.separator, textColorOverride]}>|</Text>
                   ) : null}
                 </View>
               ))}
@@ -310,6 +348,9 @@ export function StatsLayerContent({
               label={metric.label}
               value={metric.value}
               fontPreset={fontPreset}
+              labelStyleOverride={textColorOverride}
+              valueStyleOverride={textColorOverride}
+              unitStyleOverride={textColorOverride}
             />
           ))}
         </View>
@@ -324,6 +365,9 @@ export function StatsLayerContent({
               value={metric.value}
               fontPreset={fontPreset}
               columnCount={metrics.length >= 3 ? 2 : 1}
+              labelStyleOverride={textColorOverride}
+              valueStyleOverride={textColorOverride}
+              unitStyleOverride={textColorOverride}
             />
           ))}
         </View>
@@ -361,6 +405,8 @@ function InlineMetric({
   iconSize = 14,
   textStyle,
   unitStyle,
+  textStyleOverride,
+  unitStyleOverride,
 }: {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   value: string;
@@ -369,6 +415,8 @@ function InlineMetric({
   iconSize?: number;
   textStyle?: any;
   unitStyle?: any;
+  textStyleOverride?: any;
+  unitStyleOverride?: any;
 }) {
   const { main, unit } = splitMetricValue(value);
   return (
@@ -383,6 +431,7 @@ function InlineMetric({
         style={[
           styles.inlineText,
           textStyle,
+          textStyleOverride,
           { fontFamily: fontPreset.family },
         ]}
       >
@@ -392,6 +441,7 @@ function InlineMetric({
             style={[
               styles.inlineUnit,
               unitStyle,
+              unitStyleOverride,
               { fontFamily: fontPreset.family },
             ]}
           >
@@ -408,14 +458,26 @@ function MetricCell({
   label,
   value,
   fontPreset,
+  labelStyleOverride,
+  valueStyleOverride,
+  unitStyleOverride,
 }: {
   label: string;
   value: string;
   fontPreset: FontPreset;
+  labelStyleOverride?: any;
+  valueStyleOverride?: any;
+  unitStyleOverride?: any;
 }) {
   return (
     <View style={styles.metricCell}>
-      <Text style={[styles.metricLabel, { fontFamily: fontPreset.family }]}>
+      <Text
+        style={[
+          styles.metricLabel,
+          labelStyleOverride,
+          { fontFamily: fontPreset.family },
+        ]}
+      >
         {label}
       </Text>
       <ValueWithUnit
@@ -423,6 +485,8 @@ function MetricCell({
         fontPreset={fontPreset}
         valueStyle={styles.metricValue}
         unitStyle={styles.metricUnit}
+        textStyleOverride={valueStyleOverride}
+        unitStyleOverride={unitStyleOverride}
         numberOfLines={1}
         autoFit
         minimumFontScale={0.82}
@@ -435,14 +499,26 @@ function StackMetric({
   label,
   value,
   fontPreset,
+  labelStyleOverride,
+  valueStyleOverride,
+  unitStyleOverride,
 }: {
   label: string;
   value: string;
   fontPreset: FontPreset;
+  labelStyleOverride?: any;
+  valueStyleOverride?: any;
+  unitStyleOverride?: any;
 }) {
   return (
     <>
-      <Text style={[styles.metricLabel, { fontFamily: fontPreset.family }]}>
+      <Text
+        style={[
+          styles.metricLabel,
+          labelStyleOverride,
+          { fontFamily: fontPreset.family },
+        ]}
+      >
         {label}
       </Text>
       <ValueWithUnit
@@ -450,6 +526,8 @@ function StackMetric({
         fontPreset={fontPreset}
         valueStyle={styles.verticalValue}
         unitStyle={styles.verticalUnit}
+        textStyleOverride={valueStyleOverride}
+        unitStyleOverride={unitStyleOverride}
         numberOfLines={1}
         autoFit
         minimumFontScale={0.82}
@@ -514,16 +592,31 @@ export function PrimaryStatLayerContent({
   fontPreset,
   primaryField,
   value,
+  layerTextColor,
+  sunsetPrimaryGradient,
 }: {
   template: StatsTemplate;
   fontPreset: FontPreset;
   primaryField: FieldId;
   value: string;
+  layerTextColor?: string;
+  sunsetPrimaryGradient?: [string, string, string];
 }) {
+  const textColorOverride = layerTextColor ? { color: layerTextColor } : null;
+  const useSunsetSolidPrimaryColor = layerTextColor
+    ? !isDefaultSunsetHeroColor(layerTextColor)
+    : false;
   if (template.layout === 'sunset-hero') {
     return (
       <View style={styles.morningDistanceWrap}>
-        <GradientValueWithUnit value={value} fontPreset={fontPreset} />
+        <GradientValueWithUnit
+          value={value}
+          fontPreset={fontPreset}
+          valueStyleOverride={textColorOverride}
+          unitStyle={textColorOverride}
+          disableGradient={useSunsetSolidPrimaryColor}
+          gradientColors={sunsetPrimaryGradient}
+        />
       </View>
     );
   }
@@ -536,6 +629,8 @@ export function PrimaryStatLayerContent({
           fontPreset={fontPreset}
           valueStyle={styles.morningDistanceValue}
           unitStyle={styles.morningDistanceUnit}
+          textStyleOverride={textColorOverride}
+          unitStyleOverride={textColorOverride}
           numberOfLines={1}
           autoFit
           minimumFontScale={0.78}
@@ -547,7 +642,11 @@ export function PrimaryStatLayerContent({
   if (template.layout === 'split-bold') {
     return (
       <View style={styles.splitBoldPrimaryOnly}>
-        <SplitBoldPrimaryValue value={value} fontPreset={fontPreset} />
+        <SplitBoldPrimaryValue
+          value={value}
+          fontPreset={fontPreset}
+          textStyleOverride={textColorOverride}
+        />
       </View>
     );
   }
@@ -559,14 +658,26 @@ function ColumnMetric({
   label,
   value,
   fontPreset,
+  labelStyleOverride,
+  valueStyleOverride,
+  unitStyleOverride,
 }: {
   label: string;
   value: string;
   fontPreset: FontPreset;
+  labelStyleOverride?: any;
+  valueStyleOverride?: any;
+  unitStyleOverride?: any;
 }) {
   return (
     <View style={styles.columnItem}>
-      <Text style={[styles.metricLabel, { fontFamily: fontPreset.family }]}>
+      <Text
+        style={[
+          styles.metricLabel,
+          labelStyleOverride,
+          { fontFamily: fontPreset.family },
+        ]}
+      >
         {label}
       </Text>
       <ValueWithUnit
@@ -574,6 +685,8 @@ function ColumnMetric({
         fontPreset={fontPreset}
         valueStyle={styles.columnValue}
         unitStyle={styles.columnUnit}
+        textStyleOverride={valueStyleOverride}
+        unitStyleOverride={unitStyleOverride}
       />
     </View>
   );
@@ -584,15 +697,27 @@ function GridMetric({
   value,
   fontPreset,
   columnCount,
+  labelStyleOverride,
+  valueStyleOverride,
+  unitStyleOverride,
 }: {
   label: string;
   value: string;
   fontPreset: FontPreset;
   columnCount: 1 | 2;
+  labelStyleOverride?: any;
+  valueStyleOverride?: any;
+  unitStyleOverride?: any;
 }) {
   return (
     <View style={[styles.gridItem, columnCount === 1 && styles.gridItemSingle]}>
-      <Text style={[styles.gridLabel, { fontFamily: fontPreset.family }]}>
+      <Text
+        style={[
+          styles.gridLabel,
+          labelStyleOverride,
+          { fontFamily: fontPreset.family },
+        ]}
+      >
         {label}
       </Text>
       <ValueWithUnit
@@ -600,6 +725,8 @@ function GridMetric({
         fontPreset={fontPreset}
         valueStyle={styles.gridValue}
         unitStyle={styles.gridUnit}
+        textStyleOverride={valueStyleOverride}
+        unitStyleOverride={unitStyleOverride}
       />
     </View>
   );
@@ -610,6 +737,8 @@ function ValueWithUnit({
   fontPreset,
   valueStyle,
   unitStyle,
+  textStyleOverride,
+  unitStyleOverride,
   numberOfLines,
   autoFit = true,
   minimumFontScale = 0.8,
@@ -618,6 +747,8 @@ function ValueWithUnit({
   fontPreset: FontPreset;
   valueStyle: any;
   unitStyle: any;
+  textStyleOverride?: any;
+  unitStyleOverride?: any;
   numberOfLines?: number;
   autoFit?: boolean;
   minimumFontScale?: number;
@@ -640,6 +771,7 @@ function ValueWithUnit({
       minimumFontScale={effectiveMinimumFontScale}
       style={[
         valueStyle,
+        textStyleOverride,
         TEXT_SHADOW_STYLE,
         { fontFamily: fontPreset.family, fontWeight: fontPreset.weightValue },
       ]}
@@ -649,6 +781,7 @@ function ValueWithUnit({
         <Text
           style={[
             unitStyle,
+            unitStyleOverride,
             TEXT_SHADOW_STYLE,
             { fontFamily: fontPreset.family },
           ]}
@@ -673,9 +806,11 @@ function splitMetricValue(value: string) {
 function SplitBoldPrimaryValue({
   value,
   fontPreset,
+  textStyleOverride,
 }: {
   value: string;
   fontPreset: FontPreset;
+  textStyleOverride?: any;
 }) {
   const { main: leftMain, unit: leftUnitRaw } = splitMetricValue(value);
   const leftMainLines = leftMain.includes('.')
@@ -690,6 +825,7 @@ function SplitBoldPrimaryValue({
           key={`${line}-${index}`}
           style={[
             styles.splitBoldLeftValue,
+            textStyleOverride,
             {
               fontFamily: fontPreset.family,
               fontWeight: fontPreset.weightValue,
@@ -703,6 +839,7 @@ function SplitBoldPrimaryValue({
         <Text
           style={[
             styles.splitBoldLeftUnit,
+            textStyleOverride,
             {
               fontFamily: fontPreset.family,
               fontWeight: fontPreset.weightValue,
@@ -719,9 +856,17 @@ function SplitBoldPrimaryValue({
 function GradientValueWithUnit({
   value,
   fontPreset,
+  unitStyle,
+  valueStyleOverride,
+  disableGradient = false,
+  gradientColors,
 }: {
   value: string;
   fontPreset: FontPreset;
+  unitStyle?: any;
+  valueStyleOverride?: any;
+  disableGradient?: boolean;
+  gradientColors?: [string, string, string];
 }) {
   const { main, unit } = splitMetricValue(value);
   const estimatedMaskWidth = Math.max(
@@ -731,37 +876,57 @@ function GradientValueWithUnit({
 
   return (
     <View style={styles.sunsetDistanceGradientRow}>
-      <MaskedView
-        style={[styles.sunsetDistanceMasked, { width: estimatedMaskWidth }]}
-        maskElement={
-          <Text
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.78}
-            style={[
-              styles.morningDistanceValue,
-              {
-                fontFamily: fontPreset.family,
-                fontWeight: fontPreset.weightValue,
-              },
-            ]}
-          >
-            {main}
-          </Text>
-        }
-      >
-        <LinearGradient
-          colors={['#FFF4B5', '#FFC84A', '#FF8A00']}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={styles.sunsetDistanceGradientFill}
-        />
-      </MaskedView>
+      {disableGradient ? (
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.78}
+          style={[
+            styles.morningDistanceValue,
+            valueStyleOverride,
+            TEXT_SHADOW_STYLE,
+            {
+              fontFamily: fontPreset.family,
+              fontWeight: fontPreset.weightValue,
+            },
+          ]}
+        >
+          {main}
+        </Text>
+      ) : (
+        <MaskedView
+          style={[styles.sunsetDistanceMasked, { width: estimatedMaskWidth }]}
+          maskElement={
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
+              style={[
+                styles.morningDistanceValue,
+                {
+                  fontFamily: fontPreset.family,
+                  fontWeight: fontPreset.weightValue,
+                },
+              ]}
+            >
+              {main}
+            </Text>
+          }
+        >
+          <LinearGradient
+            colors={gradientColors ?? ['#FFF4B5', '#FFC84A', '#FF8A00']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={styles.sunsetDistanceGradientFill}
+          />
+        </MaskedView>
+      )}
       {unit ? (
         <Text
           style={[
             styles.morningDistanceUnit,
             styles.sunsetDistanceUnitAdjust,
+            unitStyle,
             TEXT_SHADOW_STYLE,
             { fontFamily: fontPreset.family },
           ]}
@@ -772,6 +937,11 @@ function GradientValueWithUnit({
       ) : null}
     </View>
   );
+}
+
+function isDefaultSunsetHeroColor(color: string) {
+  const normalized = color.trim().toUpperCase();
+  return normalized === '#FFFFFF' || normalized === '#FFF';
 }
 
 const styles = StyleSheet.create({
@@ -938,7 +1108,7 @@ const styles = StyleSheet.create({
     paddingLeft: 2,
   },
   splitBoldLeftValue: {
-    color: 'rgba(255,255,255,0.6)',
+    color: '#FFFFFF',
     fontSize: 136,
     lineHeight: 144,
     letterSpacing: -6,
@@ -950,7 +1120,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   splitBoldLeftUnit: {
-    color: 'rgba(255,255,255,0.6)',
+    color: '#FFFFFF',
     fontSize: 110,
     lineHeight: 120,
     letterSpacing: -3,
@@ -976,19 +1146,19 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   splitBoldMetricLabel: {
-    color: 'rgba(255,255,255,0.6)',
+    color: '#FFFFFF',
     fontSize: 20,
     letterSpacing: 1.4,
     marginBottom: 2,
   },
   splitBoldMetricValue: {
-    color: 'rgba(255,255,255,0.6)',
+    color: '#FFFFFF',
     fontSize: 56,
     lineHeight: 66,
     paddingTop: 3,
   },
   splitBoldMetricUnit: {
-    color: 'rgba(255,255,255,0.6)',
+    color: '#FFFFFF',
     fontSize: 26,
     fontWeight: '700',
   },

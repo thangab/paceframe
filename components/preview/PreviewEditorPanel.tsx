@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   Image,
+  LayoutChangeEvent,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { StatsLayerContent } from '@/components/StatsLayerContent';
@@ -15,6 +19,7 @@ import { colors, spacing } from '@/constants/theme';
 import type { DistanceUnit } from '@/lib/format';
 import { FONT_PRESETS, TEMPLATES } from '@/lib/previewConfig';
 import type {
+  BackgroundGradient,
   FieldId,
   LayerId,
   RouteMode,
@@ -41,6 +46,9 @@ type Props = {
   onUseActivityPhotoBackground: () => void;
   onClearBackground: () => void;
   onGenerateGradient: () => void;
+  currentBackgroundGradient?: BackgroundGradient | null;
+  gradientPresets: BackgroundGradient[];
+  onApplyGradientPreset: (gradient: BackgroundGradient) => void;
   onAddImageOverlay: () => void;
   onCreateSticker: () => void;
   isSquareFormat: boolean;
@@ -72,6 +80,21 @@ type Props = {
   onToggleHeaderField: (field: HeaderFieldId, value: boolean) => void;
   distanceUnit: DistanceUnit;
   onSetDistanceUnit: (unit: DistanceUnit) => void;
+  layerStyleMap: Record<
+    'meta' | 'stats' | 'route' | 'primary',
+    { color: string; opacity: number }
+  >;
+  onSetLayerStyleColor: (
+    layerId: 'meta' | 'stats' | 'route' | 'primary',
+    color: string,
+  ) => void;
+  onSetLayerStyleOpacity: (
+    layerId: 'meta' | 'stats' | 'route' | 'primary',
+    opacity: number,
+  ) => void;
+  sunsetPrimaryGradient: [string, string, string];
+  sunsetPrimaryGradientPresets: [string, string, string][];
+  onSetSunsetPrimaryGradient: (gradient: [string, string, string]) => void;
   isPremium: boolean;
   message: string | null;
   appCacheUsageLabel?: string;
@@ -92,6 +115,9 @@ export function PreviewEditorPanel({
   onUseActivityPhotoBackground,
   onClearBackground,
   onGenerateGradient,
+  currentBackgroundGradient,
+  gradientPresets,
+  onApplyGradientPreset,
   onAddImageOverlay,
   onCreateSticker,
   isSquareFormat,
@@ -121,12 +147,168 @@ export function PreviewEditorPanel({
   onToggleHeaderField,
   distanceUnit,
   onSetDistanceUnit,
+  layerStyleMap,
+  onSetLayerStyleColor,
+  onSetLayerStyleOpacity,
+  sunsetPrimaryGradient,
+  sunsetPrimaryGradientPresets,
+  onSetSunsetPrimaryGradient,
   isPremium,
   message,
   appCacheUsageLabel,
   onClearAppCache,
   onOpenPaywall,
 }: Props) {
+  const [selectedStyleLayer, setSelectedStyleLayer] = useState<
+    'meta' | 'stats' | 'route' | 'primary'
+  >('meta');
+  const [stylePickerOpen, setStylePickerOpen] = useState(false);
+  const styleLayerButtons: {
+    id: 'meta' | 'stats' | 'route' | 'primary';
+    label: string;
+  }[] = [
+    { id: 'meta', label: 'Header' },
+    { id: 'stats', label: 'Stats' },
+    { id: 'route', label: 'Route' },
+    ...(supportsPrimaryLayer && visibleLayers.primary
+      ? [{ id: 'primary' as const, label: 'Primary' }]
+      : []),
+  ];
+  const colorPresets = [
+    '#FFFFFF',
+    '#F8FAFC',
+    '#E2E8F0',
+    '#94A3B8',
+    '#64748B',
+    '#334155',
+    '#111827',
+    '#000000',
+    '#FEE2E2',
+    '#FCA5A5',
+    '#EF4444',
+    '#B91C1C',
+    '#7F1D1D',
+    '#FFEDD5',
+    '#FDBA74',
+    '#F97316',
+    '#C2410C',
+    '#9A3412',
+    '#FEF3C7',
+    '#FCD34D',
+    '#EAB308',
+    '#CA8A04',
+    '#854D0E',
+    '#ECFCCB',
+    '#86EFAC',
+    '#22C55E',
+    '#15803D',
+    '#14532D',
+    '#CCFBF1',
+    '#5EEAD4',
+    '#14B8A6',
+    '#0F766E',
+    '#134E4A',
+    '#DBEAFE',
+    '#93C5FD',
+    '#60A5FA',
+    '#2563EB',
+    '#1E3A8A',
+    '#E0E7FF',
+    '#A5B4FC',
+    '#6366F1',
+    '#4F46E5',
+    '#312E81',
+    '#F3E8FF',
+    '#D8B4FE',
+    '#A855F7',
+    '#7E22CE',
+    '#581C87',
+    '#FCE7F3',
+    '#F9A8D4',
+    '#EC4899',
+    '#BE185D',
+    colors.primary,
+  ];
+  const selectedLayerStyle = layerStyleMap[selectedStyleLayer];
+  const isSunsetPrimaryStyleSelected =
+    selectedStyleLayer === 'primary' && template.layout === 'sunset-hero';
+  const [opacityTrackWidth, setOpacityTrackWidth] = useState(0);
+  const popoverAnim = useRef(new Animated.Value(0)).current;
+  const gridHues = [200, 220, 250, 280, 330, 8, 22, 38, 48, 62, 75, 95];
+  const grayscaleRow = gridHues.map((_, index) => {
+    const value = 100 - (index / (gridHues.length - 1)) * 100;
+    return hsvToHex(0, 0, value);
+  });
+  const gridToneRows = [
+    { s: 100, v: 26 },
+    { s: 98, v: 38 },
+    { s: 96, v: 52 },
+    { s: 92, v: 64 },
+    { s: 90, v: 78 },
+    { s: 72, v: 92 },
+    { s: 52, v: 90 },
+    { s: 36, v: 88 },
+    { s: 18, v: 86 },
+  ];
+  const colorGrid = [
+    grayscaleRow,
+    ...gridToneRows.map((tone) =>
+      gridHues.map((hue) => hsvToHex(hue, tone.s, tone.v)),
+    ),
+  ];
+
+  function handleOpacityTrackLayout(event: LayoutChangeEvent) {
+    setOpacityTrackWidth(event.nativeEvent.layout.width);
+  }
+
+  function applyOpacityAtPosition(x: number) {
+    if (!opacityTrackWidth) return;
+    const clampedX = clamp(x, 0, opacityTrackWidth);
+    onSetLayerStyleOpacity(
+      selectedStyleLayer,
+      Number((clampedX / opacityTrackWidth).toFixed(2)),
+    );
+  }
+
+  const opacityResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: (event) => {
+      applyOpacityAtPosition(event.nativeEvent.locationX);
+    },
+    onPanResponderMove: (event) => {
+      applyOpacityAtPosition(event.nativeEvent.locationX);
+    },
+  });
+  const opacityHandleLeft = opacityTrackWidth
+    ? (selectedLayerStyle?.opacity ?? 1) * opacityTrackWidth
+    : 0;
+
+  useEffect(() => {
+    if (
+      selectedStyleLayer === 'primary' &&
+      !(supportsPrimaryLayer && visibleLayers.primary)
+    ) {
+      setSelectedStyleLayer('meta');
+    }
+  }, [selectedStyleLayer, supportsPrimaryLayer, visibleLayers.primary]);
+
+  useEffect(() => {
+    if (!panelOpen || activePanel !== 'design') {
+      setStylePickerOpen(false);
+    }
+  }, [activePanel, panelOpen]);
+
+  useEffect(() => {
+    const show = panelOpen && activePanel === 'design' && stylePickerOpen;
+    Animated.spring(popoverAnim, {
+      toValue: show ? 1 : 0,
+      tension: 70,
+      friction: 10,
+      useNativeDriver: true,
+    }).start();
+  }, [activePanel, panelOpen, popoverAnim, stylePickerOpen]);
+
   const mainTabs = [
     { id: 'background', label: 'Background', icon: 'image-area-close' },
     { id: 'content', label: 'Content', icon: 'layers-outline' },
@@ -602,6 +784,155 @@ export function PreviewEditorPanel({
                   })}
                 </ScrollView>
 
+                <Text style={styles.sectionTitle}>Colors</Text>
+                <View style={styles.styleLayerButtonsRow}>
+                  {styleLayerButtons.map((item) => {
+                    const selected = item.id === selectedStyleLayer;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        style={[
+                          styles.styleLayerButton,
+                          selected && styles.styleLayerButtonSelected,
+                        ]}
+                        onPress={() => setSelectedStyleLayer(item.id)}
+                      >
+                        <View
+                          style={[
+                            styles.styleLayerButtonDot,
+                            {
+                              backgroundColor: layerStyleMap[item.id].color,
+                              opacity: layerStyleMap[item.id].opacity,
+                            },
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.styleLayerButtonText,
+                            selected && styles.styleLayerButtonTextSelected,
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={styles.stylePickerHint}>
+                  Choose a layer, then pick a default color or open the picker.
+                </Text>
+                <View style={styles.stylePickerMetaRow}>
+                  <View style={styles.stylePickerPreviewSwatch}>
+                    <View style={styles.stylePickerPreviewSwatchChecker}>
+                      {Array.from({ length: 2 }).map((_, row) => (
+                        <View
+                          key={`preview-row-${row}`}
+                          style={styles.opacityCheckerRow}
+                        >
+                          {Array.from({ length: 4 }).map((__, col) => (
+                            <View
+                              key={`preview-cell-${row}-${col}`}
+                              style={[
+                                styles.opacityCheckerCell,
+                                (row + col) % 2 === 0
+                                  ? styles.opacityCheckerCellDark
+                                  : styles.opacityCheckerCellLight,
+                              ]}
+                            />
+                          ))}
+                        </View>
+                      ))}
+                    </View>
+                    <View
+                      style={[
+                        styles.stylePickerPreviewSwatchTint,
+                        {
+                          backgroundColor: selectedLayerStyle?.color ?? '#FFFFFF',
+                          opacity: selectedLayerStyle?.opacity ?? 1,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.stylePickerMetaText}>
+                    {(selectedLayerStyle?.color ?? '#FFFFFF').toUpperCase()} •{' '}
+                    {Math.round((selectedLayerStyle?.opacity ?? 1) * 100)}%
+                  </Text>
+                </View>
+                {isSunsetPrimaryStyleSelected ? (
+                  <>
+                    <Text style={styles.sectionTitle}>Primary Gradient</Text>
+                    <Text style={styles.stylePickerHint}>
+                      Sunset primary can stay gradient. Tap a preset.
+                    </Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.sunsetGradientPresetRow}
+                    >
+                      {sunsetPrimaryGradientPresets.map((preset, index) => {
+                        const isSelected = isSameSunsetPrimaryGradient(
+                          sunsetPrimaryGradient,
+                          preset,
+                        );
+                        return (
+                          <Pressable
+                            key={`sunset-primary-gradient-${index}`}
+                            onPress={() => onSetSunsetPrimaryGradient(preset)}
+                            style={[
+                              styles.sunsetGradientPresetCard,
+                              isSelected &&
+                                styles.sunsetGradientPresetCardSelected,
+                            ]}
+                          >
+                            <LinearGradient
+                              colors={preset}
+                              start={{ x: 0.5, y: 0 }}
+                              end={{ x: 0.5, y: 1 }}
+                              style={styles.sunsetGradientPresetFill}
+                            />
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </>
+                ) : null}
+                <View style={styles.quickColorRow}>
+                  <Pressable
+                    onPress={() => setStylePickerOpen(true)}
+                    style={({ pressed }) => [
+                      styles.openPickerButton,
+                      pressed && styles.openPickerButtonPressed,
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name="palette-outline"
+                      size={14}
+                      color="#E5E7EB"
+                    />
+                    <Text style={styles.openPickerButtonText}>Color Picker</Text>
+                  </Pressable>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.styleControlsRow}
+                  >
+                    {colorPresets.map((color) => (
+                      <Pressable
+                        key={color}
+                        style={[
+                          styles.colorSwatch,
+                          { backgroundColor: color },
+                          selectedLayerStyle?.color === color &&
+                            styles.colorSwatchSelected,
+                        ]}
+                        onPress={() =>
+                          onSetLayerStyleColor(selectedStyleLayer, color)
+                        }
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+
                 <Text style={styles.sectionTitle}>Unit</Text>
                 <View style={styles.mediaPickRow}>
                   {(
@@ -673,6 +1004,143 @@ export function PreviewEditorPanel({
         </View>
       ) : null}
 
+      {panelOpen && activePanel === 'design' && stylePickerOpen ? (
+        <Animated.View
+          style={[
+            styles.stylePickerPopover,
+            {
+              opacity: popoverAnim,
+              transform: [
+                {
+                  translateY: popoverAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                },
+                {
+                  scale: popoverAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.96, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={styles.stylePickerCard}>
+            <View style={styles.stylePickerHeaderRow}>
+              <View style={styles.stylePickerTitleWrap}>
+                <Text style={styles.stylePickerTitle}>Color Grid</Text>
+                <Text style={styles.stylePickerSubtitle}>
+                  Pick a color, then tune opacity.
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => {
+                  setStylePickerOpen(false);
+                }}
+                style={({ pressed }) => [
+                  styles.stylePickerCloseBtn,
+                  pressed && styles.stylePickerCloseBtnPressed,
+                ]}
+                hitSlop={8}
+              >
+                <MaterialCommunityIcons name="close" size={18} color="#30343B" />
+              </Pressable>
+            </View>
+
+            <View style={styles.colorGrid}>
+              {colorGrid.map((row, rowIndex) => (
+                <View key={`row-${rowIndex}`} style={styles.colorGridRow}>
+                  {row.map((color) => {
+                    const selected = selectedLayerStyle?.color === color;
+                    return (
+                      <Pressable
+                        key={`${rowIndex}-${color}`}
+                        onPress={() =>
+                          onSetLayerStyleColor(selectedStyleLayer, color)
+                        }
+                        style={({ pressed }) => [
+                          styles.colorGridCell,
+                          { backgroundColor: color },
+                          pressed && styles.colorGridCellPressed,
+                        ]}
+                      >
+                        {selected ? (
+                          <View style={styles.colorGridCellSelectionRing} />
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+
+            <Text style={styles.opacityTitle}>Opacity</Text>
+            <View style={styles.opacityControlRow}>
+              <View
+                style={styles.opacitySliderTrack}
+                onLayout={handleOpacityTrackLayout}
+                {...opacityResponder.panHandlers}
+              >
+                {Array.from({ length: 2 }).map((_, row) => (
+                  <View key={`chip-row-${row}`} style={styles.opacityCheckerRow}>
+                    {Array.from({ length: 22 }).map((__, col) => (
+                      <View
+                        key={`chip-${row}-${col}`}
+                        style={[
+                          styles.opacityCheckerCell,
+                          (row + col) % 2 === 0
+                            ? styles.opacityCheckerCellDark
+                            : styles.opacityCheckerCellLight,
+                        ]}
+                      />
+                    ))}
+                  </View>
+                ))}
+                <View
+                  style={[
+                    styles.opacitySliderTint,
+                    {
+                      opacity: 1,
+                    },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={[
+                      'rgba(255,255,255,0)',
+                      selectedLayerStyle?.color ?? '#FFFFFF',
+                    ]}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.opacitySliderGradient}
+                  />
+                </View>
+                {opacityTrackWidth ? (
+                  <View
+                    pointerEvents="none"
+                    style={[
+                      styles.opacitySliderHandle,
+                      {
+                        left: clamp(
+                          opacityHandleLeft - 12,
+                          0,
+                          Math.max(0, opacityTrackWidth - 24),
+                        ),
+                      },
+                    ]}
+                  />
+                ) : null}
+              </View>
+              <Text style={styles.opacityValueBadge}>
+                {Math.round((selectedLayerStyle?.opacity ?? 1) * 100)}%
+              </Text>
+            </View>
+            <Text style={styles.opacityHelpText}>Drag left or right</Text>
+          </View>
+        </Animated.View>
+      ) : null}
+
       <View style={styles.panelTabs}>
         <View style={styles.mainTabsRow}>
           {mainTabs.map((tab) => {
@@ -730,10 +1198,32 @@ export function PreviewEditorPanel({
   );
 }
 
+function isSameGradient(
+  a: BackgroundGradient | null | undefined,
+  b: BackgroundGradient,
+) {
+  if (!a) return false;
+  return (
+    a.direction === b.direction &&
+    a.colors[0] === b.colors[0] &&
+    a.colors[1] === b.colors[1] &&
+    a.colors[2] === b.colors[2]
+  );
+}
+
+function isSameSunsetPrimaryGradient(
+  a: [string, string, string],
+  b: [string, string, string],
+) {
+  return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+}
+
 function TemplateLayoutPreview({ template }: { template: StatsTemplate }) {
   const rawWidth = template.width;
   const rawHeight = getTemplatePreviewHeight(template.layout);
   const scale = Math.min(92 / rawWidth, 52 / rawHeight);
+  const previewLayerTextColor =
+    template.layout === 'split-bold' ? 'rgba(255,255,255,0.6)' : undefined;
 
   return (
     <View style={styles.previewFrame}>
@@ -763,6 +1253,7 @@ function TemplateLayoutPreview({ template }: { template: StatsTemplate }) {
             <StatsLayerContent
               template={template}
               fontPreset={FONT_PRESETS[0]}
+              layerTextColor={previewLayerTextColor}
               visible={{
                 distance: true,
                 time: true,
@@ -810,6 +1301,49 @@ function getTemplatePreviewHeight(layout: StatsTemplate['layout']) {
     default:
       return 186;
   }
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function hsvToHex(h: number, s: number, v: number) {
+  const normalizedHue = ((h % 360) + 360) % 360;
+  const sat = clamp(s, 0, 100) / 100;
+  const value = clamp(v, 0, 100) / 100;
+  const c = value * sat;
+  const x = c * (1 - Math.abs(((normalizedHue / 60) % 2) - 1));
+  const m = value - c;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (normalizedHue < 60) {
+    r = c;
+    g = x;
+  } else if (normalizedHue < 120) {
+    r = x;
+    g = c;
+  } else if (normalizedHue < 180) {
+    g = c;
+    b = x;
+  } else if (normalizedHue < 240) {
+    g = x;
+    b = c;
+  } else if (normalizedHue < 300) {
+    r = x;
+    b = c;
+  } else {
+    r = c;
+    b = x;
+  }
+
+  const toHex = (channel: number) =>
+    Math.round((channel + m) * 255)
+      .toString(16)
+      .padStart(2, '0')
+      .toUpperCase();
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
 const styles = StyleSheet.create({
@@ -1060,6 +1594,45 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'stretch',
   },
+  gradientPresetRow: {
+    gap: 8,
+    paddingBottom: 2,
+  },
+  gradientPresetCard: {
+    width: 74,
+    height: 54,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2F3644',
+    overflow: 'hidden',
+  },
+  gradientPresetCardSelected: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  gradientPresetFill: {
+    flex: 1,
+  },
+  sunsetGradientPresetRow: {
+    gap: 8,
+    paddingBottom: 2,
+  },
+  sunsetGradientPresetCard: {
+    width: 58,
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2F3644',
+    overflow: 'hidden',
+    backgroundColor: '#1F2430',
+  },
+  sunsetGradientPresetCardSelected: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  sunsetGradientPresetFill: {
+    flex: 1,
+  },
   backgroundActionCell: {
     width: '23%',
     minWidth: 0,
@@ -1254,6 +1827,274 @@ const styles = StyleSheet.create({
   },
   statsPillTextSelected: {
     color: '#111500',
+  },
+  styleLayerButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginBottom: 4,
+  },
+  styleLayerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#2E3442',
+    backgroundColor: '#252B38',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 78,
+  },
+  styleLayerButtonSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  styleLayerButtonDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  styleLayerButtonText: {
+    color: '#D6DAE3',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  styleLayerButtonTextSelected: {
+    color: '#111500',
+  },
+  stylePickerPopover: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    bottom: 76,
+    zIndex: 40,
+  },
+  stylePickerCard: {
+    borderWidth: 1,
+    borderColor: '#E5E7EC',
+    borderRadius: 24,
+    backgroundColor: '#F7F6F8',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    gap: 12,
+    shadowColor: '#000000',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+  stylePickerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  stylePickerTitleWrap: {
+    flex: 1,
+    gap: 1,
+  },
+  stylePickerTitle: {
+    color: '#111827',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  stylePickerSubtitle: {
+    color: '#6B7280',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  stylePickerCloseBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#D9DCE3',
+    backgroundColor: '#ECEEF2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stylePickerCloseBtnPressed: {
+    opacity: 0.65,
+  },
+  stylePickerHint: {
+    color: '#A0A8B8',
+    fontSize: 11,
+  },
+  colorGrid: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#DDE0E7',
+  },
+  colorGridRow: {
+    flexDirection: 'row',
+    marginBottom: -StyleSheet.hairlineWidth,
+  },
+  colorGridCell: {
+    flex: 1,
+    aspectRatio: 1,
+    position: 'relative',
+    marginRight: -StyleSheet.hairlineWidth,
+  },
+  colorGridCellSelectionRing: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    bottom: 2,
+    left: 2,
+    borderWidth: 2,
+    borderColor: '#111827',
+    borderRadius: 2,
+  },
+  colorGridCellPressed: {
+    opacity: 0.8,
+  },
+  opacityTitle: {
+    color: '#5B6270',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  opacityControlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  opacitySliderTrack: {
+    flex: 1,
+    height: 32,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#D8DCE3',
+    overflow: 'hidden',
+    backgroundColor: '#ECEFF3',
+  },
+  opacitySliderTint: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 1,
+  },
+  opacitySliderGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  opacityCheckerRow: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  opacityCheckerCell: {
+    flex: 1,
+  },
+  opacityCheckerCellDark: {
+    backgroundColor: '#C9CDD4',
+  },
+  opacityCheckerCellLight: {
+    backgroundColor: '#E7EAEE',
+  },
+  opacityValueBadge: {
+    width: 52,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#D8DCE3',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 6,
+    textAlign: 'right',
+    color: '#111827',
+    fontSize: 14,
+    fontWeight: '600',
+    paddingRight: 8,
+  },
+  opacitySliderHandle: {
+    position: 'absolute',
+    top: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#111827',
+    shadowColor: '#000000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  opacityHelpText: {
+    color: '#6B7280',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: -2,
+  },
+  stylePickerMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  stylePickerPreviewSwatch: {
+    width: 20,
+    height: 20,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#2F3644',
+    overflow: 'hidden',
+  },
+  stylePickerPreviewSwatchChecker: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  stylePickerPreviewSwatchTint: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  stylePickerMetaText: {
+    color: '#5B6270',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  styleControlsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    paddingRight: 6,
+    minWidth: 0,
+  },
+  quickColorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  openPickerButton: {
+    minWidth: 108,
+    height: 34,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#3A4356',
+    backgroundColor: '#252B38',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+  },
+  openPickerButtonPressed: {
+    opacity: 0.72,
+  },
+  openPickerButtonText: {
+    color: '#E5E7EB',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  colorSwatch: {
+    width: 20,
+    height: 20,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#2F3644',
+  },
+  colorSwatchSelected: {
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   controlLabel: {
     color: '#F3F4F6',

@@ -7,6 +7,7 @@ import type {
   LayerId,
   RouteMapVariant,
   RouteMode,
+  StatsLayout,
 } from '@/types/preview';
 
 export const BASE_LAYER_ORDER: LayerId[] = ['route', 'stats', 'primary', 'meta'];
@@ -17,6 +18,13 @@ export type LayerTransform = {
   scale: number;
   rotationDeg: number;
 };
+
+type StyleLayerId = 'meta' | 'stats' | 'route' | 'primary';
+type LayerStyleSettings = {
+  color: string;
+  opacity: number;
+};
+type LayerStyleMap = Record<StyleLayerId, LayerStyleSettings>;
 
 export type PreviewDraft = {
   v: 1;
@@ -41,6 +49,9 @@ export type PreviewDraft = {
   behindSubjectLayers: Partial<Record<LayerId, boolean>>;
   layerTransforms: Partial<Record<LayerId, LayerTransform>>;
   isSquareFormat: boolean;
+  layerStyleMap?: LayerStyleMap;
+  layerStyleMapByLayout?: Partial<Record<StatsLayout, LayerStyleMap>>;
+  sunsetPrimaryGradient?: [string, string, string];
 };
 
 type SanitizeOptions = {
@@ -200,6 +211,85 @@ function sanitizeLayerTransforms(
   return next;
 }
 
+function isStyleLayerId(value: string): value is StyleLayerId {
+  return (
+    value === 'meta' ||
+    value === 'stats' ||
+    value === 'route' ||
+    value === 'primary'
+  );
+}
+
+function sanitizeLayerStyleMap(input: unknown): LayerStyleMap | undefined {
+  if (!isObject(input)) return undefined;
+  const defaults: LayerStyleMap = {
+    meta: { color: '#FFFFFF', opacity: 1 },
+    stats: { color: '#FFFFFF', opacity: 1 },
+    route: { color: '#D4FF54', opacity: 1 },
+    primary: { color: '#FFFFFF', opacity: 1 },
+  };
+  const next: LayerStyleMap = { ...defaults };
+
+  Object.entries(input).forEach(([key, value]) => {
+    if (!isStyleLayerId(key) || !isObject(value)) return;
+    const rawColor = asString(value.color).trim();
+    const color = /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/.test(rawColor)
+      ? rawColor
+      : defaults[key].color;
+    const opacity = Math.min(1, Math.max(0, asNumber(value.opacity, 1)));
+    next[key] = { color, opacity };
+  });
+
+  return next;
+}
+
+function isStatsLayout(value: string): value is StatsLayout {
+  return (
+    value === 'hero' ||
+    value === 'vertical' ||
+    value === 'compact' ||
+    value === 'columns' ||
+    value === 'grid-2x2' ||
+    value === 'glass-row' ||
+    value === 'soft-stack' ||
+    value === 'pill-inline' ||
+    value === 'card-columns' ||
+    value === 'panel-grid' ||
+    value === 'sunset-hero' ||
+    value === 'morning-glass' ||
+    value === 'split-bold'
+  );
+}
+
+function sanitizeLayerStyleMapByLayout(
+  input: unknown,
+): Partial<Record<StatsLayout, LayerStyleMap>> | undefined {
+  if (!isObject(input)) return undefined;
+  const next: Partial<Record<StatsLayout, LayerStyleMap>> = {};
+  Object.entries(input).forEach(([key, value]) => {
+    if (!isStatsLayout(key)) return;
+    const sanitized = sanitizeLayerStyleMap(value);
+    if (!sanitized) return;
+    next[key] = sanitized;
+  });
+  return Object.keys(next).length ? next : undefined;
+}
+
+function sanitizeSunsetPrimaryGradient(
+  input: unknown,
+): [string, string, string] | undefined {
+  if (!Array.isArray(input) || input.length !== 3) return undefined;
+  const colors = input.map((value) => asString(value).trim());
+  if (
+    colors.some(
+      (color) => !/^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/.test(color),
+    )
+  ) {
+    return undefined;
+  }
+  return colors as [string, string, string];
+}
+
 function sanitizeVisible(
   input: unknown,
   fallback: Record<FieldId, boolean>,
@@ -275,6 +365,13 @@ export function sanitizePreviewDraft(
   const visibleLayers = sanitizeLayerBoolMap(input.visibleLayers);
   const behindSubjectLayers = sanitizeLayerBoolMap(input.behindSubjectLayers);
   const layerTransforms = sanitizeLayerTransforms(input.layerTransforms);
+  const layerStyleMap = sanitizeLayerStyleMap(input.layerStyleMap);
+  const layerStyleMapByLayout = sanitizeLayerStyleMapByLayout(
+    input.layerStyleMapByLayout,
+  );
+  const sunsetPrimaryGradient = sanitizeSunsetPrimaryGradient(
+    input.sunsetPrimaryGradient,
+  );
 
   return {
     v: 1,
@@ -316,5 +413,8 @@ export function sanitizePreviewDraft(
       input.isSquareFormat,
       options.defaults.isSquareFormat,
     ),
+    layerStyleMap,
+    layerStyleMapByLayout,
+    sunsetPrimaryGradient,
   };
 }

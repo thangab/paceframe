@@ -31,6 +31,12 @@ type HeaderVisibility = {
   date: boolean;
   location: boolean;
 };
+type LayerStyleSettings = {
+  meta: { color: string; opacity: number };
+  stats: { color: string; opacity: number };
+  route: { color: string; opacity: number };
+  primary: { color: string; opacity: number };
+};
 
 type Props = {
   exportRef: RefObject<View | null>;
@@ -72,6 +78,8 @@ type Props = {
   cadenceText: string;
   caloriesText: string;
   avgHeartRateText: string;
+  layerStyleSettings: LayerStyleSettings;
+  sunsetPrimaryGradient: [string, string, string];
   centeredStatsXDisplay: number;
   dynamicStatsWidthDisplay: number;
   canvasScaleX: number;
@@ -142,6 +150,8 @@ export function PreviewEditorCanvas({
   cadenceText,
   caloriesText,
   avgHeartRateText,
+  layerStyleSettings,
+  sunsetPrimaryGradient,
   centeredStatsXDisplay,
   dynamicStatsWidthDisplay,
   canvasScaleX,
@@ -427,6 +437,7 @@ export function PreviewEditorCanvas({
               style={[
                 styles.metaBlock,
                 usesTemplateHeader ? styles.metaBlockSunset : null,
+                { opacity: layerStyleSettings.meta.opacity },
                 { zIndex: baseLayerZ('meta'), elevation: baseLayerZ('meta') },
               ]}
             >
@@ -435,6 +446,7 @@ export function PreviewEditorCanvas({
                   style={[
                     styles.metaTitle,
                     usesTemplateHeader ? styles.metaTitleSunset : null,
+                    { color: layerStyleSettings.meta.color },
                     {
                       fontFamily: fontPreset.family,
                       fontWeight: fontPreset.weightTitle,
@@ -447,12 +459,18 @@ export function PreviewEditorCanvas({
                 </Text>
               ) : null}
               {usesTemplateHeader && headerVisible.title ? (
-                <View style={styles.metaDividerSunset} />
+                <View
+                  style={[
+                    styles.metaDividerSunset,
+                    { backgroundColor: `${layerStyleSettings.meta.color}66` },
+                  ]}
+                />
               ) : null}
               {!usesTemplateHeader && headerMetaLine ? (
                 <Text
                   style={[
                     styles.metaSubtitle,
+                    { color: layerStyleSettings.meta.color },
                     {
                       fontFamily: fontPreset.family,
                       fontWeight: '400',
@@ -467,6 +485,7 @@ export function PreviewEditorCanvas({
                   style={[
                     styles.metaSubtitle,
                     styles.metaSubtitleSunset,
+                    { color: layerStyleSettings.meta.color },
                     {
                       fontFamily: fontPreset.family,
                       fontWeight: '400',
@@ -506,6 +525,7 @@ export function PreviewEditorCanvas({
                   borderColor: template.borderColor,
                   borderWidth: template.borderWidth,
                   borderRadius: template.radius,
+                  opacity: layerStyleSettings.stats.opacity,
                   zIndex: baseLayerZ('stats'),
                   elevation: baseLayerZ('stats'),
                 },
@@ -515,6 +535,8 @@ export function PreviewEditorCanvas({
                 template={template}
                 fontPreset={fontPreset}
                 visible={effectiveVisible}
+                layerTextColor={layerStyleSettings.stats.color}
+                sunsetPrimaryGradient={sunsetPrimaryGradient}
                 primaryInSeparateLayer={supportsPrimaryLayer && primaryVisible}
                 distanceText={distanceText}
                 durationText={durationText}
@@ -555,6 +577,7 @@ export function PreviewEditorCanvas({
                         ? 344
                         : 250) * canvasScaleX,
                   ),
+                  opacity: layerStyleSettings.primary.opacity,
                   zIndex: baseLayerZ('primary'),
                   elevation: baseLayerZ('primary'),
                 },
@@ -565,6 +588,8 @@ export function PreviewEditorCanvas({
                 fontPreset={fontPreset}
                 primaryField={primaryField}
                 value={primaryValueText}
+                layerTextColor={layerStyleSettings.primary.color}
+                sunsetPrimaryGradient={sunsetPrimaryGradient}
               />
             </DraggableBlock>
           ) : null}
@@ -590,6 +615,7 @@ export function PreviewEditorCanvas({
               onTransformEnd={(next) => onLayerTransformChange('route', next)}
               style={[
                 styles.routeBlock,
+                { opacity: layerStyleSettings.route.opacity },
                 { zIndex: baseLayerZ('route'), elevation: baseLayerZ('route') },
               ]}
             >
@@ -599,6 +625,7 @@ export function PreviewEditorCanvas({
                 mapVariant={routeMapVariant}
                 width={routeLayerWidthDisplay}
                 height={routeLayerHeightDisplay}
+                traceColor={layerStyleSettings.route.color}
               />
             </DraggableBlock>
           ) : null}

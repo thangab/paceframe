@@ -71,6 +71,15 @@ const DEFAULT_VISIBLE_FIELDS: Record<FieldId, boolean> = {
   calories: false,
   avgHr: false,
 };
+const SUNSET_HERO_DEFAULT_VISIBLE_FIELDS: Record<FieldId, boolean> = {
+  distance: true,
+  time: true,
+  pace: true,
+  elev: true,
+  cadence: false,
+  calories: false,
+  avgHr: true,
+};
 const DEFAULT_HEADER_VISIBLE = {
   title: true,
   date: true,
@@ -80,9 +89,81 @@ const DEFAULT_VISIBLE_LAYERS: Partial<Record<LayerId, boolean>> = {
   meta: true,
   stats: true,
   primary: true,
-  route: true,
+  route: false,
 };
 const PREVIEW_DRAFT_KEY_PREFIX = 'paceframe.preview.draft.';
+const BACKGROUND_GRADIENT_PRESETS: BackgroundGradient[] = [
+  { colors: ['#0F172A', '#1D4ED8', '#38BDF8'], direction: 'vertical' },
+  { colors: ['#111827', '#7C3AED', '#F97316'], direction: 'horizontal' },
+  { colors: ['#052E16', '#16A34A', '#86EFAC'], direction: 'vertical' },
+  { colors: ['#3F1D2E', '#DB2777', '#FBCFE8'], direction: 'horizontal' },
+  { colors: ['#1C1917', '#EA580C', '#FACC15'], direction: 'vertical' },
+  { colors: ['#0B132B', '#1C2541', '#5BC0BE'], direction: 'horizontal' },
+  { colors: ['#1F2937', '#374151', '#9CA3AF'], direction: 'vertical' },
+  { colors: ['#164E63', '#0E7490', '#67E8F9'], direction: 'horizontal' },
+  { colors: ['#0A0A0A', '#3B0764', '#C4B5FD'], direction: 'vertical' },
+  { colors: ['#312E81', '#4F46E5', '#A5B4FC'], direction: 'horizontal' },
+];
+type SunsetPrimaryGradient = [string, string, string];
+const DEFAULT_SUNSET_PRIMARY_GRADIENT: SunsetPrimaryGradient = [
+  '#FFF4B5',
+  '#FFC84A',
+  '#FF8A00',
+];
+const SPLIT_BOLD_DEFAULT_TEXT_OPACITY = 0.6;
+const SUNSET_PRIMARY_GRADIENT_PRESETS: SunsetPrimaryGradient[] = [
+  DEFAULT_SUNSET_PRIMARY_GRADIENT,
+  ['#FFE8CC', '#FF9F43', '#FF6B00'],
+  ['#FDF2F8', '#FB7185', '#E11D48'],
+  ['#FEF9C3', '#FACC15', '#EAB308'],
+  ['#ECFEFF', '#22D3EE', '#0EA5E9'],
+  ['#EEF2FF', '#818CF8', '#4F46E5'],
+  ['#F3E8FF', '#C084FC', '#7E22CE'],
+  ['#DCFCE7', '#4ADE80', '#16A34A'],
+  ['#E0F2FE', '#38BDF8', '#2563EB'],
+  ['#E2E8F0', '#94A3B8', '#334155'],
+];
+type StyleLayerId = 'meta' | 'stats' | 'route' | 'primary';
+type StyleLayerSettings = {
+  color: string;
+  opacity: number;
+};
+type LayerStyleMap = Record<StyleLayerId, StyleLayerSettings>;
+type LayerStyleMapByLayout = Partial<
+  Record<StatsTemplate['layout'], LayerStyleMap>
+>;
+const DEFAULT_LAYER_STYLE_MAP: LayerStyleMap = {
+  meta: { color: '#FFFFFF', opacity: 1 },
+  stats: { color: '#FFFFFF', opacity: 1 },
+  route: { color: '#D4FF54', opacity: 1 },
+  primary: { color: '#FFFFFF', opacity: 1 },
+};
+
+function getDefaultLayerStyleMapForLayout(
+  layout: StatsTemplate['layout'],
+): LayerStyleMap {
+  if (layout !== 'split-bold') {
+    return {
+      meta: { ...DEFAULT_LAYER_STYLE_MAP.meta },
+      stats: { ...DEFAULT_LAYER_STYLE_MAP.stats },
+      route: { ...DEFAULT_LAYER_STYLE_MAP.route },
+      primary: { ...DEFAULT_LAYER_STYLE_MAP.primary },
+    };
+  }
+
+  return {
+    meta: { ...DEFAULT_LAYER_STYLE_MAP.meta },
+    stats: {
+      ...DEFAULT_LAYER_STYLE_MAP.stats,
+      opacity: SPLIT_BOLD_DEFAULT_TEXT_OPACITY,
+    },
+    route: { ...DEFAULT_LAYER_STYLE_MAP.route },
+    primary: {
+      ...DEFAULT_LAYER_STYLE_MAP.primary,
+      opacity: SPLIT_BOLD_DEFAULT_TEXT_OPACITY,
+    },
+  };
+}
 
 type ApplyImageBackgroundOptions = {
   silent?: boolean;
@@ -109,6 +190,12 @@ function isAppOwnedCacheFile(uri: string) {
   const cacheDir = FileSystem.cacheDirectory;
   if (!cacheDir) return false;
   return uri.startsWith(cacheDir) || uri.includes('/Library/Caches/');
+}
+
+function getDefaultVisibleLayersForLayout(
+  _layout: StatsTemplate['layout'],
+): Partial<Record<LayerId, boolean>> {
+  return { ...DEFAULT_VISIBLE_LAYERS };
 }
 
 export default function PreviewScreen() {
@@ -167,6 +254,10 @@ export default function PreviewScreen() {
   const [draftReady, setDraftReady] = useState(false);
   const [isHydratingDraft, setIsHydratingDraft] = useState(false);
   const [appCacheUsageLabel, setAppCacheUsageLabel] = useState('Cache: --');
+  const [layerStyleMapByLayout, setLayerStyleMapByLayout] =
+    useState<LayerStyleMapByLayout>({});
+  const [sunsetPrimaryGradient, setSunsetPrimaryGradient] =
+    useState<SunsetPrimaryGradient>(DEFAULT_SUNSET_PRIMARY_GRADIENT);
 
   const exportRef = useRef<View>(null);
   const managedTempUrisRef = useRef<Set<string>>(new Set());
@@ -175,6 +266,12 @@ export default function PreviewScreen() {
     () =>
       TEMPLATES.find((item) => item.id === selectedTemplateId) ?? TEMPLATES[0],
     [selectedTemplateId],
+  );
+  const layerStyleMap = useMemo(
+    () =>
+      layerStyleMapByLayout[template.layout] ??
+      getDefaultLayerStyleMapForLayout(template.layout),
+    [layerStyleMapByLayout, template.layout],
   );
   const supportsPrimaryLayer = useMemo(
     () =>
@@ -206,7 +303,7 @@ export default function PreviewScreen() {
   );
   const hasCalories = Boolean(
     (activity?.calories && activity.calories > 0) ||
-      (activity?.kilojoules && activity.kilojoules > 0),
+    (activity?.kilojoules && activity.kilojoules > 0),
   );
   const caloriesText = `${Math.max(
     0,
@@ -265,51 +362,48 @@ export default function PreviewScreen() {
     [template],
   );
   const maxSelectableMetrics = Math.max(1, templateMetricLimit);
-  const effectiveVisible = useMemo<Record<FieldId, boolean>>(
-    () => {
-      if (!supportsFullStatsPreview) {
-        return {
-          distance: false,
-          time: true,
-          pace: false,
-          elev: false,
-          cadence: false,
-          calories: false,
-          avgHr: false,
-        };
-      }
-
-      const orderedFields: FieldId[] = [
-        'distance',
-        'time',
-        'pace',
-        'elev',
-        'cadence',
-        'calories',
-        'avgHr',
-      ];
-      const picked = orderedFields.filter(
-        (field) => Boolean(visible[field]) && statsFieldAvailability[field],
-      );
-      const allowed = new Set(picked.slice(0, maxSelectableMetrics));
-
+  const effectiveVisible = useMemo<Record<FieldId, boolean>>(() => {
+    if (!supportsFullStatsPreview) {
       return {
-        distance: allowed.has('distance'),
-        time: allowed.has('time'),
-        pace: allowed.has('pace'),
-        elev: allowed.has('elev'),
-        cadence: allowed.has('cadence'),
-        calories: allowed.has('calories'),
-        avgHr: allowed.has('avgHr'),
+        distance: false,
+        time: true,
+        pace: false,
+        elev: false,
+        cadence: false,
+        calories: false,
+        avgHr: false,
       };
-    },
-    [
-      maxSelectableMetrics,
-      statsFieldAvailability,
-      supportsFullStatsPreview,
-      visible,
-    ],
-  );
+    }
+
+    const orderedFields: FieldId[] = [
+      'distance',
+      'time',
+      'pace',
+      'elev',
+      'cadence',
+      'calories',
+      'avgHr',
+    ];
+    const picked = orderedFields.filter(
+      (field) => Boolean(visible[field]) && statsFieldAvailability[field],
+    );
+    const allowed = new Set(picked.slice(0, maxSelectableMetrics));
+
+    return {
+      distance: allowed.has('distance'),
+      time: allowed.has('time'),
+      pace: allowed.has('pace'),
+      elev: allowed.has('elev'),
+      cadence: allowed.has('cadence'),
+      calories: allowed.has('calories'),
+      avgHr: allowed.has('avgHr'),
+    };
+  }, [
+    maxSelectableMetrics,
+    statsFieldAvailability,
+    supportsFullStatsPreview,
+    visible,
+  ]);
   const metricTextByField = useMemo<Record<FieldId, string>>(
     () => ({
       distance: distanceText,
@@ -332,14 +426,30 @@ export default function PreviewScreen() {
   );
   const primaryFieldEffective = useMemo<FieldId>(() => {
     if (!supportsPrimaryLayer) return 'distance';
-    if (effectiveVisible[primaryField] && statsFieldAvailability[primaryField]) {
+    if (
+      effectiveVisible[primaryField] &&
+      statsFieldAvailability[primaryField]
+    ) {
       return primaryField;
     }
     const fallback = (
-      ['distance', 'time', 'pace', 'elev', 'cadence', 'calories', 'avgHr'] as FieldId[]
+      [
+        'distance',
+        'time',
+        'pace',
+        'elev',
+        'cadence',
+        'calories',
+        'avgHr',
+      ] as FieldId[]
     ).find((field) => effectiveVisible[field] && statsFieldAvailability[field]);
     return fallback ?? 'distance';
-  }, [effectiveVisible, primaryField, statsFieldAvailability, supportsPrimaryLayer]);
+  }, [
+    effectiveVisible,
+    primaryField,
+    statsFieldAvailability,
+    supportsPrimaryLayer,
+  ]);
   const statsVisibleForLayer = useMemo<Record<FieldId, boolean>>(
     () =>
       supportsPrimaryLayer
@@ -491,6 +601,40 @@ export default function PreviewScreen() {
     return tiles;
   }, [canvasDisplayHeight, canvasDisplayWidth]);
 
+  function getDefaultVisibleFieldsForLayout(layout: StatsTemplate['layout']) {
+    if (layout === 'sunset-hero') {
+      return SUNSET_HERO_DEFAULT_VISIBLE_FIELDS;
+    }
+
+    if (layout === 'morning-glass') {
+      const orderedFields: FieldId[] = [
+        'distance',
+        'time',
+        'pace',
+        'elev',
+        'avgHr',
+        'calories',
+        'cadence',
+      ];
+      const availableFields = orderedFields.filter(
+        (field) => statsFieldAvailability[field],
+      );
+      const targetCount = availableFields.length >= 6 ? 6 : 4;
+      const selectedFields = new Set(availableFields.slice(0, targetCount));
+      return {
+        distance: selectedFields.has('distance'),
+        time: selectedFields.has('time'),
+        pace: selectedFields.has('pace'),
+        elev: selectedFields.has('elev'),
+        cadence: selectedFields.has('cadence'),
+        calories: selectedFields.has('calories'),
+        avgHr: selectedFields.has('avgHr'),
+      };
+    }
+
+    return DEFAULT_VISIBLE_FIELDS;
+  }
+
   const activityDraftKey = useMemo(
     () =>
       activity ? `${PREVIEW_DRAFT_KEY_PREFIX}${String(activity.id)}` : null,
@@ -501,33 +645,45 @@ export default function PreviewScreen() {
     const templateIdToKeep = options?.keepTemplateId;
     const hasTemplateToKeep = Boolean(
       templateIdToKeep &&
-        TEMPLATES.some((item) => item.id === templateIdToKeep),
+      TEMPLATES.some((item) => item.id === templateIdToKeep),
     );
+    const nextTemplateId = hasTemplateToKeep
+      ? (templateIdToKeep as string)
+      : TEMPLATES[0].id;
+    const nextTemplateLayout =
+      TEMPLATES.find((item) => item.id === nextTemplateId)?.layout ??
+      TEMPLATES[0].layout;
     setMedia(null);
     setBackgroundGradient(null);
     setAutoSubjectUri(null);
     setImageOverlays([]);
-    setSelectedTemplateId(
-      hasTemplateToKeep ? (templateIdToKeep as string) : TEMPLATES[0].id,
-    );
+    setSelectedTemplateId(nextTemplateId);
     setSelectedFontId(FONT_PRESETS[0].id);
     setDistanceUnit('km');
     setRouteMode('trace');
     setRouteMapVariant('standard');
     setPrimaryField('distance');
-    setVisible(DEFAULT_VISIBLE_FIELDS);
+    setVisible(getDefaultVisibleFieldsForLayout(nextTemplateLayout));
     setHeaderVisible(DEFAULT_HEADER_VISIBLE);
     setLayerOrder(BASE_LAYER_ORDER);
-    setVisibleLayers(DEFAULT_VISIBLE_LAYERS);
+    setVisibleLayers(getDefaultVisibleLayersForLayout(nextTemplateLayout));
     setBehindSubjectLayers({});
     setLayerTransforms({});
     setIsSquareFormat(false);
+    setLayerStyleMapByLayout({
+      [nextTemplateLayout]:
+        getDefaultLayerStyleMapForLayout(nextTemplateLayout),
+    });
+    setSunsetPrimaryGradient(DEFAULT_SUNSET_PRIMARY_GRADIENT);
     setSelectedLayer(null);
     setOutlinedLayer(null);
     setActiveLayer(null);
   }
 
   function applyDraft(draft: PreviewDraft) {
+    const selectedTemplateLayout =
+      TEMPLATES.find((item) => item.id === (draft.selectedTemplateId ?? ''))
+        ?.layout ?? TEMPLATES[0].layout;
     setMedia(draft.media ?? null);
     setBackgroundGradient(draft.backgroundGradient ?? null);
     setAutoSubjectUri(draft.autoSubjectUri ?? null);
@@ -543,10 +699,32 @@ export default function PreviewScreen() {
     setLayerOrder(
       draft.layerOrder?.length ? draft.layerOrder : BASE_LAYER_ORDER,
     );
-    setVisibleLayers({ ...DEFAULT_VISIBLE_LAYERS, ...(draft.visibleLayers ?? {}) });
+    setVisibleLayers({
+      ...getDefaultVisibleLayersForLayout(selectedTemplateLayout),
+      ...(draft.visibleLayers ?? {}),
+    });
     setBehindSubjectLayers(draft.behindSubjectLayers ?? {});
     setLayerTransforms(draft.layerTransforms ?? {});
     setIsSquareFormat(Boolean(draft.isSquareFormat));
+    if (draft.layerStyleMapByLayout) {
+      setLayerStyleMapByLayout(draft.layerStyleMapByLayout);
+    } else if (draft.layerStyleMap) {
+      setLayerStyleMapByLayout({
+        [selectedTemplateLayout]: {
+          ...getDefaultLayerStyleMapForLayout(selectedTemplateLayout),
+          ...draft.layerStyleMap,
+        },
+      });
+    } else {
+      setLayerStyleMapByLayout({
+        [selectedTemplateLayout]: getDefaultLayerStyleMapForLayout(
+          selectedTemplateLayout,
+        ),
+      });
+    }
+    setSunsetPrimaryGradient(
+      draft.sunsetPrimaryGradient ?? DEFAULT_SUNSET_PRIMARY_GRADIENT,
+    );
     setSelectedLayer(null);
     setOutlinedLayer(null);
     setActiveLayer(null);
@@ -649,6 +827,9 @@ export default function PreviewScreen() {
       behindSubjectLayers,
       layerTransforms,
       isSquareFormat,
+      layerStyleMap,
+      layerStyleMapByLayout,
+      sunsetPrimaryGradient,
     };
 
     const timeout = setTimeout(() => {
@@ -678,6 +859,9 @@ export default function PreviewScreen() {
     visible,
     visibleLayers,
     layerTransforms,
+    layerStyleMap,
+    layerStyleMapByLayout,
+    sunsetPrimaryGradient,
     isHydratingDraft,
   ]);
 
@@ -706,9 +890,7 @@ export default function PreviewScreen() {
   useEffect(() => {
     if (hasRouteLayer) return;
     setRouteMode('off');
-    setVisibleLayers((prev) =>
-      prev.route ? { ...prev, route: false } : prev,
-    );
+    setVisibleLayers((prev) => (prev.route ? { ...prev, route: false } : prev));
     setBehindSubjectLayers((prev) =>
       prev.route ? { ...prev, route: false } : prev,
     );
@@ -1092,9 +1274,7 @@ export default function PreviewScreen() {
       !effectiveVisible[field] &&
       selectedVisibleMetrics >= maxSelectableMetrics
     ) {
-      setMessage(
-        `This template supports ${templateMetricLimit} metrics max.`,
-      );
+      setMessage(`This template supports ${templateMetricLimit} metrics max.`);
       return;
     }
     setVisible((prev) => ({ ...prev, [field]: value }));
@@ -1125,6 +1305,9 @@ export default function PreviewScreen() {
       return;
     }
     setSelectedTemplateId(next.id);
+    if (next.layout === 'sunset-hero' || next.layout === 'morning-glass') {
+      setVisible(getDefaultVisibleFieldsForLayout(next.layout));
+    }
     if (
       next.layout === 'sunset-hero' ||
       next.layout === 'morning-glass' ||
@@ -1191,6 +1374,52 @@ export default function PreviewScreen() {
     next: { x: number; y: number; scale: number; rotationDeg: number },
   ) {
     setLayerTransforms((prev) => ({ ...prev, [layerId]: next }));
+  }
+
+  function setLayerStyleColor(layerId: StyleLayerId, color: string) {
+    setLayerStyleMapByLayout((prev) => {
+      const current =
+        prev[template.layout] ??
+        getDefaultLayerStyleMapForLayout(template.layout);
+      return {
+        ...prev,
+        [template.layout]: {
+          ...current,
+          [layerId]: { ...current[layerId], color },
+        },
+      };
+    });
+  }
+
+  function setLayerStyleOpacity(layerId: StyleLayerId, opacity: number) {
+    setLayerStyleMapByLayout((prev) => {
+      const current =
+        prev[template.layout] ??
+        getDefaultLayerStyleMapForLayout(template.layout);
+      return {
+        ...prev,
+        [template.layout]: {
+          ...current,
+          [layerId]: { ...current[layerId], opacity },
+        },
+      };
+    });
+  }
+
+  function applySunsetPrimaryGradient(nextGradient: SunsetPrimaryGradient) {
+    setSunsetPrimaryGradient(nextGradient);
+    setLayerStyleMapByLayout((prev) => {
+      const current =
+        prev[template.layout] ??
+        getDefaultLayerStyleMapForLayout(template.layout);
+      return {
+        ...prev,
+        [template.layout]: {
+          ...current,
+          primary: { ...current.primary, color: '#FFFFFF' },
+        },
+      };
+    });
   }
 
   function toggleLayer(layerId: LayerId, value: boolean) {
@@ -1375,14 +1604,23 @@ export default function PreviewScreen() {
   }
 
   function generateRandomGradientBackground() {
+    applyGradientBackground(createRandomGradient());
+    setMessage('Random gradient background generated.');
+  }
+
+  function applyGradientBackground(nextGradient: BackgroundGradient) {
     const previousMedia = media;
     const previousAutoSubjectUri = autoSubjectUri;
     setMedia(null);
     setAutoSubjectUri(null);
-    setBackgroundGradient(createRandomGradient());
+    setBackgroundGradient(nextGradient);
     void cleanupMediaIfTemp(previousMedia);
     void cleanupTempUriIfOwned(previousAutoSubjectUri);
-    setMessage('Random gradient background generated.');
+  }
+
+  function applyGradientPreset(gradient: BackgroundGradient) {
+    applyGradientBackground(gradient);
+    setMessage('Gradient applied.');
   }
 
   async function resetToDefault() {
@@ -1537,6 +1775,8 @@ export default function PreviewScreen() {
           cadenceText={cadenceText}
           caloriesText={caloriesText}
           avgHeartRateText={avgHeartRateText}
+          layerStyleSettings={layerStyleMap}
+          sunsetPrimaryGradient={sunsetPrimaryGradient}
           centeredStatsXDisplay={centeredStatsXDisplay}
           dynamicStatsWidthDisplay={dynamicStatsWidthDisplay}
           canvasScaleX={canvasScaleX}
@@ -1572,6 +1812,9 @@ export default function PreviewScreen() {
           onUseActivityPhotoBackground={useActivityPhotoAsBackground}
           onClearBackground={clearBackgroundMedia}
           onGenerateGradient={generateRandomGradientBackground}
+          currentBackgroundGradient={backgroundGradient}
+          gradientPresets={BACKGROUND_GRADIENT_PRESETS}
+          onApplyGradientPreset={applyGradientPreset}
           onAddImageOverlay={addImageOverlay}
           onCreateSticker={createStickerOverlay}
           isSquareFormat={isSquareFormat}
@@ -1601,6 +1844,12 @@ export default function PreviewScreen() {
           onToggleHeaderField={toggleHeaderField}
           distanceUnit={distanceUnit}
           onSetDistanceUnit={setDistanceUnit}
+          layerStyleMap={layerStyleMap}
+          onSetLayerStyleColor={setLayerStyleColor}
+          onSetLayerStyleOpacity={setLayerStyleOpacity}
+          sunsetPrimaryGradient={sunsetPrimaryGradient}
+          sunsetPrimaryGradientPresets={SUNSET_PRIMARY_GRADIENT_PRESETS}
+          onSetSunsetPrimaryGradient={applySunsetPrimaryGradient}
           isPremium={isPremium}
           message={message}
           appCacheUsageLabel={appCacheUsageLabel}

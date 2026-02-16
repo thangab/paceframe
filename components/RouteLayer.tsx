@@ -13,6 +13,7 @@ type Props = {
   mapVariant?: RouteMapVariant;
   width?: number;
   height?: number;
+  traceColor?: string;
 };
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
@@ -24,6 +25,7 @@ export function RouteLayer({
   mapVariant = 'standard',
   width = 250,
   height = 150,
+  traceColor = '#D4FF54',
 }: Props) {
   const [mapLoadFailed, setMapLoadFailed] = useState(false);
   const [iosMapUri, setIosMapUri] = useState<string | null>(null);
@@ -87,7 +89,8 @@ export function RouteLayer({
           : 'mapbox/streets-v12';
     const sampled = sampleForStaticMap(latLngs, 50);
     const encodedPolyline = encodeURIComponent(encodePolyline(sampled));
-    const overlay = `path-4+d4ff54-0.95(${encodedPolyline})`;
+    const overlayColor = traceColor.replace('#', '').toLowerCase();
+    const overlay = `path-4+${overlayColor}-0.95(${encodedPolyline})`;
     const pixelRatioSuffix = '@2x';
 
     return (
@@ -97,7 +100,7 @@ export function RouteLayer({
       `${Math.round(width)}x${Math.round(height)}${pixelRatioSuffix}` +
       `?access_token=${encodeURIComponent(MAPBOX_TOKEN)}`
     );
-  }, [polyline, latLngs, viewport, width, height, mapVariant]);
+  }, [polyline, latLngs, viewport, width, height, mapVariant, traceColor]);
 
   useEffect(() => {
     setMapLoadFailed(false);
@@ -121,7 +124,7 @@ export function RouteLayer({
       polyline,
       width,
       height,
-      strokeColorHex: '#D4FF54',
+      strokeColorHex: traceColor,
       mapVariant,
     })
       .then((uri) => {
@@ -141,7 +144,7 @@ export function RouteLayer({
     return () => {
       cancelled = true;
     };
-  }, [polyline, width, height, iosMapUri, mapVariant]);
+  }, [polyline, width, height, iosMapUri, mapVariant, traceColor]);
 
   if (!routePath) {
     return (
@@ -185,7 +188,7 @@ export function RouteLayer({
         path={routePath.path}
         style="stroke"
         strokeWidth={TRACE_STROKE_WIDTH}
-        color="#D4FF54"
+        color={traceColor}
         strokeJoin="round"
         strokeCap="round"
       />
