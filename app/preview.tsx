@@ -54,7 +54,8 @@ import {
   LayerId,
   RouteMapVariant,
   RouteMode,
-  StatsTemplate,
+  StatsLayout,
+  StatsLayoutKind,
 } from '@/types/preview';
 
 const ROUTE_LAYER_WIDTH = 280;
@@ -270,7 +271,7 @@ type StyleLayerSettings = {
 };
 type LayerStyleMap = Record<StyleLayerId, StyleLayerSettings>;
 type LayerStyleMapByLayout = Partial<
-  Record<StatsTemplate['layout'], LayerStyleMap>
+  Record<StatsLayoutKind, LayerStyleMap>
 >;
 const DEFAULT_LAYER_STYLE_MAP: LayerStyleMap = {
   meta: { color: '#FFFFFF', opacity: 1 },
@@ -280,7 +281,7 @@ const DEFAULT_LAYER_STYLE_MAP: LayerStyleMap = {
 };
 
 function getDefaultLayerStyleMapForLayout(
-  layout: StatsTemplate['layout'],
+  layout: StatsLayoutKind,
 ): LayerStyleMap {
   if (layout !== 'split-bold') {
     return {
@@ -333,7 +334,7 @@ function isAppOwnedCacheFile(uri: string) {
 }
 
 function getDefaultVisibleLayersForLayout(
-  _layout: StatsTemplate['layout'],
+  _layout: StatsLayoutKind,
 ): Partial<Record<LayerId, boolean>> {
   return { ...DEFAULT_VISIBLE_LAYERS };
 }
@@ -358,7 +359,7 @@ export default function PreviewScreen() {
     useState<BackgroundGradient | null>(null);
   const [autoSubjectUri, setAutoSubjectUri] = useState<string | null>(null);
   const [imageOverlays, setImageOverlays] = useState<ImageOverlay[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState(TEMPLATES[0].id);
+  const [selectedLayoutId, setSelectedLayoutId] = useState(TEMPLATES[0].id);
   const [selectedFontId, setSelectedFontId] = useState(FONT_PRESETS[0].id);
   const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>('km');
   const [routeMode, setRouteMode] = useState<RouteMode>('trace');
@@ -408,8 +409,8 @@ export default function PreviewScreen() {
 
   const template = useMemo(
     () =>
-      TEMPLATES.find((item) => item.id === selectedTemplateId) ?? TEMPLATES[0],
-    [selectedTemplateId],
+      TEMPLATES.find((item) => item.id === selectedLayoutId) ?? TEMPLATES[0],
+    [selectedLayoutId],
   );
   const layerStyleMap = useMemo(
     () =>
@@ -420,6 +421,7 @@ export default function PreviewScreen() {
   const hasFilterableBackground = Boolean(
     media?.uri && (media.type === 'image' || media.type === 'video'),
   );
+  const hasSubjectFree = Boolean(autoSubjectUri);
   const selectedFilterEffect = useMemo(
     () =>
       VISUAL_EFFECT_PRESETS.find((item) => item.id === selectedFilterEffectId) ??
@@ -517,7 +519,7 @@ export default function PreviewScreen() {
     );
   }, [activity?.type]);
   const templateMetricLimit = useMemo(
-    () => getTemplateMetricLimit(template),
+    () => getLayoutMetricLimit(template),
     [template],
   );
   const maxSelectableMetrics = Math.max(1, templateMetricLimit);
@@ -760,7 +762,7 @@ export default function PreviewScreen() {
     return tiles;
   }, [canvasDisplayHeight, canvasDisplayWidth]);
 
-  function getDefaultVisibleFieldsForLayout(layout: StatsTemplate['layout']) {
+  function getDefaultVisibleFieldsForLayout(layout: StatsLayoutKind) {
     if (layout === 'sunset-hero') {
       return SUNSET_HERO_DEFAULT_VISIBLE_FIELDS;
     }
@@ -800,38 +802,38 @@ export default function PreviewScreen() {
     [activity],
   );
 
-  function resetDraftStateToDefaults(options?: { keepTemplateId?: string }) {
-    const templateIdToKeep = options?.keepTemplateId;
-    const hasTemplateToKeep = Boolean(
+  function resetDraftStateToDefaults(options?: { keepLayoutId?: string }) {
+    const templateIdToKeep = options?.keepLayoutId;
+    const hasLayoutToKeep = Boolean(
       templateIdToKeep &&
       TEMPLATES.some((item) => item.id === templateIdToKeep),
     );
-    const nextTemplateId = hasTemplateToKeep
+    const nextLayoutId = hasLayoutToKeep
       ? (templateIdToKeep as string)
       : TEMPLATES[0].id;
-    const nextTemplateLayout =
-      TEMPLATES.find((item) => item.id === nextTemplateId)?.layout ??
+    const nextLayoutLayout =
+      TEMPLATES.find((item) => item.id === nextLayoutId)?.layout ??
       TEMPLATES[0].layout;
     setMedia(null);
     setBackgroundGradient(null);
     setAutoSubjectUri(null);
     setImageOverlays([]);
-    setSelectedTemplateId(nextTemplateId);
+    setSelectedLayoutId(nextLayoutId);
     setSelectedFontId(FONT_PRESETS[0].id);
     setDistanceUnit('km');
     setRouteMode('trace');
     setRouteMapVariant('standard');
     setPrimaryField('distance');
-    setVisible(getDefaultVisibleFieldsForLayout(nextTemplateLayout));
+    setVisible(getDefaultVisibleFieldsForLayout(nextLayoutLayout));
     setHeaderVisible(DEFAULT_HEADER_VISIBLE);
     setLayerOrder(BASE_LAYER_ORDER);
-    setVisibleLayers(getDefaultVisibleLayersForLayout(nextTemplateLayout));
+    setVisibleLayers(getDefaultVisibleLayersForLayout(nextLayoutLayout));
     setBehindSubjectLayers({});
     setLayerTransforms({});
     setIsSquareFormat(false);
     setLayerStyleMapByLayout({
-      [nextTemplateLayout]:
-        getDefaultLayerStyleMapForLayout(nextTemplateLayout),
+      [nextLayoutLayout]:
+        getDefaultLayerStyleMapForLayout(nextLayoutLayout),
     });
     setSunsetPrimaryGradient(DEFAULT_SUNSET_PRIMARY_GRADIENT);
     setSelectedFilterEffectId('none');
@@ -842,14 +844,14 @@ export default function PreviewScreen() {
   }
 
   function applyDraft(draft: PreviewDraft) {
-    const selectedTemplateLayout =
-      TEMPLATES.find((item) => item.id === (draft.selectedTemplateId ?? ''))
+    const selectedLayoutLayout =
+      TEMPLATES.find((item) => item.id === (draft.selectedLayoutId ?? ''))
         ?.layout ?? TEMPLATES[0].layout;
     setMedia(draft.media ?? null);
     setBackgroundGradient(draft.backgroundGradient ?? null);
     setAutoSubjectUri(draft.autoSubjectUri ?? null);
     setImageOverlays(draft.imageOverlays ?? []);
-    setSelectedTemplateId(draft.selectedTemplateId ?? TEMPLATES[0].id);
+    setSelectedLayoutId(draft.selectedLayoutId ?? TEMPLATES[0].id);
     setSelectedFontId(draft.selectedFontId ?? FONT_PRESETS[0].id);
     setDistanceUnit(draft.distanceUnit ?? 'km');
     setRouteMode(draft.routeMode ?? 'trace');
@@ -861,7 +863,7 @@ export default function PreviewScreen() {
       draft.layerOrder?.length ? draft.layerOrder : BASE_LAYER_ORDER,
     );
     setVisibleLayers({
-      ...getDefaultVisibleLayersForLayout(selectedTemplateLayout),
+      ...getDefaultVisibleLayersForLayout(selectedLayoutLayout),
       ...(draft.visibleLayers ?? {}),
     });
     setBehindSubjectLayers(draft.behindSubjectLayers ?? {});
@@ -871,15 +873,15 @@ export default function PreviewScreen() {
       setLayerStyleMapByLayout(draft.layerStyleMapByLayout);
     } else if (draft.layerStyleMap) {
       setLayerStyleMapByLayout({
-        [selectedTemplateLayout]: {
-          ...getDefaultLayerStyleMapForLayout(selectedTemplateLayout),
+        [selectedLayoutLayout]: {
+          ...getDefaultLayerStyleMapForLayout(selectedLayoutLayout),
           ...draft.layerStyleMap,
         },
       });
     } else {
       setLayerStyleMapByLayout({
-        [selectedTemplateLayout]: getDefaultLayerStyleMapForLayout(
-          selectedTemplateLayout,
+        [selectedLayoutLayout]: getDefaultLayerStyleMapForLayout(
+          selectedLayoutLayout,
         ),
       });
     }
@@ -931,7 +933,7 @@ export default function PreviewScreen() {
             templateIds: TEMPLATES.map((item) => item.id),
             fontIds: FONT_PRESETS.map((item) => item.id),
             defaults: {
-              selectedTemplateId: TEMPLATES[0].id,
+              selectedLayoutId: TEMPLATES[0].id,
               selectedFontId: FONT_PRESETS[0].id,
               distanceUnit: 'km',
               routeMode: 'trace',
@@ -989,7 +991,7 @@ export default function PreviewScreen() {
       backgroundGradient,
       autoSubjectUri,
       imageOverlays,
-      selectedTemplateId,
+      selectedLayoutId,
       selectedFontId,
       distanceUnit,
       routeMode,
@@ -1036,7 +1038,7 @@ export default function PreviewScreen() {
     routeMode,
     primaryField,
     selectedFontId,
-    selectedTemplateId,
+    selectedLayoutId,
     visible,
     visibleLayers,
     layerTransforms,
@@ -1133,6 +1135,13 @@ export default function PreviewScreen() {
     if (activePanel !== 'help' || !panelOpen) return;
     void refreshAppCacheUsage();
   }, [activePanel, panelOpen]);
+
+  useEffect(() => {
+    if (hasSubjectFree) return;
+    if (selectedBlurEffectId !== 'none') {
+      setSelectedBlurEffectId('none');
+    }
+  }, [hasSubjectFree, selectedBlurEffectId]);
 
   useEffect(() => {
     if (hasFilterableBackground) return;
@@ -1500,12 +1509,12 @@ export default function PreviewScreen() {
     setHeaderVisible((prev) => ({ ...prev, [field]: value }));
   }
 
-  function selectTemplate(next: StatsTemplate) {
+  function selectLayout(next: StatsLayout) {
     if (next.premium && !isPremium) {
       router.push('/paywall');
       return;
     }
-    setSelectedTemplateId(next.id);
+    setSelectedLayoutId(next.id);
     if (next.layout === 'sunset-hero' || next.layout === 'morning-glass') {
       setVisible(getDefaultVisibleFieldsForLayout(next.layout));
     }
@@ -1521,11 +1530,11 @@ export default function PreviewScreen() {
     }
   }
 
-  function cycleStatsTemplate() {
+  function cycleStatsLayout() {
     const currentIndex = TEMPLATES.findIndex((item) => item.id === template.id);
     const nextIndex =
       currentIndex >= 0 ? (currentIndex + 1) % TEMPLATES.length : 0;
-    selectTemplate(TEMPLATES[nextIndex]);
+    selectLayout(TEMPLATES[nextIndex]);
   }
 
   function cycleRouteMode() {
@@ -1830,7 +1839,7 @@ export default function PreviewScreen() {
     const previousMedia = media;
     const previousAutoSubjectUri = autoSubjectUri;
     const previousOverlayUris = imageOverlays.map((item) => item.uri);
-    resetDraftStateToDefaults({ keepTemplateId: selectedTemplateId });
+    resetDraftStateToDefaults({ keepLayoutId: selectedLayoutId });
     void cleanupMediaIfTemp(previousMedia);
     void cleanupTempUriIfOwned(previousAutoSubjectUri);
     previousOverlayUris.forEach((uri) => {
@@ -2000,7 +2009,7 @@ export default function PreviewScreen() {
           dynamicStatsWidthDisplay={dynamicStatsWidthDisplay}
           canvasScaleX={canvasScaleX}
           canvasScaleY={canvasScaleY}
-          cycleStatsTemplate={cycleStatsTemplate}
+          cycleStatsLayout={cycleStatsLayout}
           routeMode={routeMode}
           routeMapVariant={routeMapVariant}
           layerTransforms={layerTransforms}
@@ -2047,7 +2056,7 @@ export default function PreviewScreen() {
           onSetLayerBehindSubject={setLayerBehindSubject}
           onRemoveLayer={removeLayer}
           template={template}
-          onSelectTemplate={selectTemplate}
+          onSelectLayout={selectLayout}
           selectedFontId={selectedFontId}
           onSelectFont={setSelectedFontId}
           effectiveVisible={effectiveVisible}
@@ -2078,6 +2087,7 @@ export default function PreviewScreen() {
           onSetBlurEffect={(effectId) =>
             setSelectedBlurEffectId(effectId as BlurEffectId)
           }
+          hasSubjectFree={hasSubjectFree}
           effectsEnabled={hasFilterableBackground}
           isPremium={isPremium}
           message={message}
@@ -2152,7 +2162,7 @@ function formatCadence(
   return `${Math.round(raw)} rpm`;
 }
 
-function getDynamicStatsWidth(template: StatsTemplate, visibleCount: number) {
+function getDynamicStatsWidth(template: StatsLayout, visibleCount: number) {
   const count = Math.max(1, visibleCount);
   const compactCount = Math.min(4, count);
 
@@ -2205,7 +2215,7 @@ function getDynamicStatsWidth(template: StatsTemplate, visibleCount: number) {
   }
 }
 
-function getTemplateMetricLimit(template: StatsTemplate) {
+function getLayoutMetricLimit(template: StatsLayout) {
   switch (template.layout) {
     case 'sunset-hero':
       return 5;

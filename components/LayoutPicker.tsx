@@ -1,34 +1,34 @@
 import { ScrollView, Pressable, StyleSheet, Text, View } from 'react-native';
-import { templates } from '@/lib/templates';
+import { templates } from '@/lib/layouts';
 import { colors, radius, spacing } from '@/constants/theme';
 
 type Props = {
-  selectedTemplateId: string;
+  selectedLayoutId: string;
   isPremium: boolean;
   onSelect: (templateId: string) => void;
-  onPremiumTemplatePress: () => void;
+  onPremiumLayoutPress: () => void;
 };
 
-export function TemplatePicker({
-  selectedTemplateId,
+export function LayoutPicker({
+  selectedLayoutId,
   isPremium,
   onSelect,
-  onPremiumTemplatePress,
+  onPremiumLayoutPress,
 }: Props) {
   return (
     <View>
-      <Text style={styles.label}>Template</Text>
+      <Text style={styles.label}>Layout</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {templates.map((template, idx) => {
           const isLocked = !isPremium && idx > 0;
           return (
             <Pressable
               key={template.id}
-              onPress={() => (isLocked ? onPremiumTemplatePress() : onSelect(template.id))}
+              onPress={() => (isLocked ? onPremiumLayoutPress() : onSelect(template.id))}
               style={[
                 styles.card,
                 { backgroundColor: template.backgroundBottom },
-                selectedTemplateId === template.id && styles.selected,
+                selectedLayoutId === template.id && styles.selected,
               ]}
             >
               <Text style={styles.name}>{template.name}</Text>

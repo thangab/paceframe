@@ -30,7 +30,7 @@ import type {
   LayerId,
   RouteMapVariant,
   RouteMode,
-  StatsTemplate,
+  StatsLayout,
 } from '@/types/preview';
 
 type GuideState = {
@@ -88,7 +88,7 @@ type Props = {
   dateText: string;
   locationText: string;
   headerVisible: HeaderVisibility;
-  template: StatsTemplate;
+  template: StatsLayout;
   fontPreset: FontPreset;
   effectiveVisible: Record<FieldId, boolean>;
   supportsPrimaryLayer: boolean;
@@ -112,7 +112,7 @@ type Props = {
   dynamicStatsWidthDisplay: number;
   canvasScaleX: number;
   canvasScaleY: number;
-  cycleStatsTemplate: () => void;
+  cycleStatsLayout: () => void;
   routeMode: RouteMode;
   routeMapVariant: RouteMapVariant;
   layerTransforms: Partial<
@@ -219,7 +219,7 @@ export function PreviewEditorCanvas({
   dynamicStatsWidthDisplay,
   canvasScaleX,
   canvasScaleY,
-  cycleStatsTemplate,
+  cycleStatsLayout,
   routeMode,
   routeMapVariant,
   layerTransforms,
@@ -373,7 +373,7 @@ export function PreviewEditorCanvas({
   ]);
   const usesSunsetHeader =
     template.layout === 'sunset-hero' || template.layout === 'morning-glass';
-  const usesTemplateHeader =
+  const usesLayoutHeader =
     usesSunsetHeader || template.layout === 'split-bold';
   const hasHeaderContent =
     (headerVisible.title && activityName.length > 0) ||
@@ -385,7 +385,7 @@ export function PreviewEditorCanvas({
   ]
     .filter(Boolean)
     .join(' · ');
-  const defaultMetaWidth = usesTemplateHeader ? 280 : 240;
+  const defaultMetaWidth = usesLayoutHeader ? 280 : 240;
   const splitBoldStatsCount = (() => {
     if (template.layout !== 'split-bold') return 0;
     return (
@@ -744,7 +744,7 @@ export function PreviewEditorCanvas({
               onTransformEnd={(next) => onLayerTransformChange('meta', next)}
               style={[
                 styles.metaBlock,
-                usesTemplateHeader ? styles.metaBlockSunset : null,
+                usesLayoutHeader ? styles.metaBlockSunset : null,
                 { opacity: layerStyleSettings.meta.opacity },
                 { zIndex: baseLayerZ('meta'), elevation: baseLayerZ('meta') },
               ]}
@@ -753,7 +753,7 @@ export function PreviewEditorCanvas({
                 <Text
                   style={[
                     styles.metaTitle,
-                    usesTemplateHeader ? styles.metaTitleSunset : null,
+                    usesLayoutHeader ? styles.metaTitleSunset : null,
                     { color: layerStyleSettings.meta.color },
                     {
                       fontFamily: fontPreset.family,
@@ -761,12 +761,12 @@ export function PreviewEditorCanvas({
                     },
                   ]}
                 >
-                  {usesTemplateHeader
+                  {usesLayoutHeader
                     ? activityName.toUpperCase()
                     : activityName}
                 </Text>
               ) : null}
-              {usesTemplateHeader && headerVisible.title ? (
+              {usesLayoutHeader && headerVisible.title ? (
                 <View
                   style={[
                     styles.metaDividerSunset,
@@ -774,7 +774,7 @@ export function PreviewEditorCanvas({
                   ]}
                 />
               ) : null}
-              {!usesTemplateHeader && headerMetaLine ? (
+              {!usesLayoutHeader && headerMetaLine ? (
                 <Text
                   style={[
                     styles.metaSubtitle,
@@ -788,7 +788,7 @@ export function PreviewEditorCanvas({
                   {headerMetaLine}
                 </Text>
               ) : null}
-              {usesTemplateHeader && headerMetaLine ? (
+              {usesLayoutHeader && headerMetaLine ? (
                 <Text
                   style={[
                     styles.metaSubtitle,
@@ -820,7 +820,7 @@ export function PreviewEditorCanvas({
               onDragGuideChange={onDragGuideChange}
               onRotationGuideChange={onRotationGuideChange}
               onSelect={() => setSelectedLayer('stats')}
-              onTap={cycleStatsTemplate}
+              onTap={cycleStatsLayout}
               onInteractionChange={(active) =>
                 setActiveLayer(active ? 'stats' : null)
               }
@@ -1193,9 +1193,11 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   metaTitle: {
+    width: '100%',
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '800',
+    textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,

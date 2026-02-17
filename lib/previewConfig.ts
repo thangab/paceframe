@@ -1,11 +1,11 @@
-import { FontPreset, StatsTemplate } from '@/types/preview';
+import { FontPreset, StatsLayout } from '@/types/preview';
 
 export const STORY_WIDTH = 360;
 export const STORY_HEIGHT = 640;
 export const MAX_VIDEO_DURATION_SECONDS = 30;
 export const CHECKER_SIZE = 20;
 
-export const TEMPLATES: StatsTemplate[] = [
+export const TEMPLATES: StatsLayout[] = [
   {
     id: 'hero',
     name: 'Hero',

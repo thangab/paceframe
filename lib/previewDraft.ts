@@ -7,7 +7,7 @@ import type {
   LayerId,
   RouteMapVariant,
   RouteMode,
-  StatsLayout,
+  StatsLayoutKind,
 } from '@/types/preview';
 
 export const BASE_LAYER_ORDER: LayerId[] = ['route', 'stats', 'primary', 'meta'];
@@ -52,7 +52,7 @@ export type PreviewDraft = {
   backgroundGradient: BackgroundGradient | null;
   autoSubjectUri: string | null;
   imageOverlays: ImageOverlay[];
-  selectedTemplateId: string;
+  selectedLayoutId: string;
   selectedFontId: string;
   distanceUnit: DistanceUnit;
   routeMode: RouteMode;
@@ -70,7 +70,7 @@ export type PreviewDraft = {
   layerTransforms: Partial<Record<LayerId, LayerTransform>>;
   isSquareFormat: boolean;
   layerStyleMap?: LayerStyleMap;
-  layerStyleMapByLayout?: Partial<Record<StatsLayout, LayerStyleMap>>;
+  layerStyleMapByLayout?: Partial<Record<StatsLayoutKind, LayerStyleMap>>;
   sunsetPrimaryGradient?: [string, string, string];
   selectedFilterEffectId?: FilterEffectId;
   selectedBlurEffectId?: BlurEffectId;
@@ -81,7 +81,7 @@ type SanitizeOptions = {
   templateIds: string[];
   fontIds: string[];
   defaults: {
-    selectedTemplateId: string;
+    selectedLayoutId: string;
     selectedFontId: string;
     distanceUnit: DistanceUnit;
     routeMode: RouteMode;
@@ -266,7 +266,7 @@ function sanitizeLayerStyleMap(input: unknown): LayerStyleMap | undefined {
   return next;
 }
 
-function isStatsLayout(value: string): value is StatsLayout {
+function isStatsLayout(value: string): value is StatsLayoutKind {
   return (
     value === 'hero' ||
     value === 'vertical' ||
@@ -286,9 +286,9 @@ function isStatsLayout(value: string): value is StatsLayout {
 
 function sanitizeLayerStyleMapByLayout(
   input: unknown,
-): Partial<Record<StatsLayout, LayerStyleMap>> | undefined {
+): Partial<Record<StatsLayoutKind, LayerStyleMap>> | undefined {
   if (!isObject(input)) return undefined;
-  const next: Partial<Record<StatsLayout, LayerStyleMap>> = {};
+  const next: Partial<Record<StatsLayoutKind, LayerStyleMap>> = {};
   Object.entries(input).forEach(([key, value]) => {
     if (!isStatsLayout(key)) return;
     const sanitized = sanitizeLayerStyleMap(value);
@@ -388,11 +388,11 @@ export function sanitizePreviewDraft(
 ): PreviewDraft | null {
   if (!isObject(input) || input.v !== 1) return null;
 
-  const selectedTemplateId = asString(input.selectedTemplateId);
+  const selectedLayoutId = asString(input.selectedLayoutId);
   const selectedFontId = asString(input.selectedFontId);
-  const sanitizedTemplateId = options.templateIds.includes(selectedTemplateId)
-    ? selectedTemplateId
-    : options.defaults.selectedTemplateId;
+  const sanitizedLayoutId = options.templateIds.includes(selectedLayoutId)
+    ? selectedLayoutId
+    : options.defaults.selectedLayoutId;
   const sanitizedFontId = options.fontIds.includes(selectedFontId)
     ? selectedFontId
     : options.defaults.selectedFontId;
@@ -454,7 +454,7 @@ export function sanitizePreviewDraft(
     backgroundGradient: sanitizeGradient(input.backgroundGradient),
     autoSubjectUri: asString(input.autoSubjectUri) || null,
     imageOverlays,
-    selectedTemplateId: sanitizedTemplateId,
+    selectedLayoutId: sanitizedLayoutId,
     selectedFontId: sanitizedFontId,
     distanceUnit,
     routeMode,

@@ -11,7 +11,7 @@ import {
   matchFont,
 } from '@shopify/react-native-skia';
 import { StravaActivity } from '@/types/strava';
-import { templates } from '@/lib/templates';
+import { templates } from '@/lib/layouts';
 import { decodePolyline, normalizePoints } from '@/lib/polyline';
 import { formatDistanceMeters, formatDuration, formatPace } from '@/lib/format';
 

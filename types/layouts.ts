@@ -1,4 +1,4 @@
-export type PremiumTemplate = {
+export type PremiumLayout = {
   id: string;
   name: string;
   backgroundTop: string;

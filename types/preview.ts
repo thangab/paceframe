@@ -8,7 +8,7 @@ export type FieldId =
   | 'avgHr';
 export type RouteMode = 'off' | 'map' | 'trace';
 export type RouteMapVariant = 'standard' | 'dark' | 'satellite';
-export type StatsLayout =
+export type StatsLayoutKind =
   | 'hero'
   | 'vertical'
   | 'compact'
@@ -25,10 +25,10 @@ export type StatsLayout =
 export type BaseLayerId = 'meta' | 'stats' | 'route' | 'primary';
 export type LayerId = BaseLayerId | `image:${string}`;
 
-export type StatsTemplate = {
+export type StatsLayout = {
   id: string;
   name: string;
-  layout: StatsLayout;
+  layout: StatsLayoutKind;
   premium?: boolean;
   x: number;
   y: number;

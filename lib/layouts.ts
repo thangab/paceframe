@@ -1,6 +1,6 @@
-import { PremiumTemplate } from '@/types/templates';
+import { PremiumLayout } from '@/types/layouts';
 
-export const templates: PremiumTemplate[] = [
+export const templates: PremiumLayout[] = [
   {
     id: 'summit',
     name: 'Summit',

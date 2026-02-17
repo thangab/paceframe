@@ -2,7 +2,12 @@ import { StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FieldId, FontPreset, StatsTemplate } from '@/types/preview';
+import {
+  FieldId,
+  FontPreset,
+  StatsLayout,
+  StatsLayoutKind,
+} from '@/types/preview';
 
 type VisibleFields = {
   distance: boolean;
@@ -15,7 +20,7 @@ type VisibleFields = {
 };
 
 type Props = {
-  template: StatsTemplate;
+  template: StatsLayout;
   fontPreset: FontPreset;
   visible: VisibleFields;
   layerTextColor?: string;
@@ -376,7 +381,7 @@ export function StatsLayerContent({
   );
 }
 
-function resolveLayoutKind(layout: StatsTemplate['layout']) {
+function resolveLayoutKind(layout: StatsLayoutKind) {
   switch (layout) {
     case 'hero':
     case 'glass-row':
@@ -595,7 +600,7 @@ export function PrimaryStatLayerContent({
   layerTextColor,
   sunsetPrimaryGradient,
 }: {
-  template: StatsTemplate;
+  template: StatsLayout;
   fontPreset: FontPreset;
   primaryField: FieldId;
   value: string;

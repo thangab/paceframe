@@ -23,7 +23,8 @@ import type {
   FieldId,
   LayerId,
   RouteMode,
-  StatsTemplate,
+  StatsLayout,
+  StatsLayoutKind,
 } from '@/types/preview';
 
 export type PreviewPanelTab =
@@ -73,8 +74,8 @@ type Props = {
   ) => void;
   onSetLayerBehindSubject: (layer: LayerId, value: boolean) => void;
   onRemoveLayer: (layer: LayerId) => void;
-  template: StatsTemplate;
-  onSelectTemplate: (t: StatsTemplate) => void;
+  template: StatsLayout;
+  onSelectLayout: (t: StatsLayout) => void;
   selectedFontId: string;
   onSelectFont: (fontId: string) => void;
   effectiveVisible: Record<FieldId, boolean>;
@@ -110,6 +111,7 @@ type Props = {
   selectedBlurEffectId: string;
   onSetFilterEffect: (effectId: string) => void;
   onSetBlurEffect: (effectId: string) => void;
+  hasSubjectFree: boolean;
   effectsEnabled: boolean;
   isPremium: boolean;
   message: string | null;
@@ -147,7 +149,7 @@ export function PreviewEditorPanel({
   onSetLayerBehindSubject,
   onRemoveLayer,
   template,
-  onSelectTemplate,
+  onSelectLayout,
   selectedFontId,
   onSelectFont,
   effectiveVisible,
@@ -174,6 +176,7 @@ export function PreviewEditorPanel({
   selectedBlurEffectId,
   onSetFilterEffect,
   onSetBlurEffect,
+  hasSubjectFree,
   effectsEnabled,
   isPremium,
   message,
@@ -700,7 +703,7 @@ export function PreviewEditorPanel({
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.controls}>
-                <Text style={styles.sectionTitle}>Templates</Text>
+                <Text style={styles.sectionTitle}>Layouts</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -713,7 +716,7 @@ export function PreviewEditorPanel({
                       <Pressable
                         key={item.id}
                         style={styles.templateItem}
-                        onPress={() => onSelectTemplate(item)}
+                        onPress={() => onSelectLayout(item)}
                         accessibilityLabel={item.name}
                       >
                         <View
@@ -722,7 +725,7 @@ export function PreviewEditorPanel({
                             selected && styles.templateCardSelected,
                           ]}
                         >
-                          <TemplateLayoutPreview template={item} />
+                          <LayoutLayoutPreview template={item} />
                           {isLocked ? (
                             <Text style={styles.templatePremiumBadge}>
                               Premium
@@ -1056,10 +1059,16 @@ export function PreviewEditorPanel({
                   onSetFilterEffect,
                 )}
               </View>
-              <View style={[styles.controls, styles.effectsSectionSpacing]}>
-                <Text style={styles.sectionTitle}>Blur</Text>
-                {renderEffectsRow(blurEffects, selectedBlurEffectId, onSetBlurEffect)}
-              </View>
+              {hasSubjectFree ? (
+                <View style={[styles.controls, styles.effectsSectionSpacing]}>
+                  <Text style={styles.sectionTitle}>Blur</Text>
+                  {renderEffectsRow(
+                    blurEffects,
+                    selectedBlurEffectId,
+                    onSetBlurEffect,
+                  )}
+                </View>
+              ) : null}
             </ScrollView>
           ) : null}
 
@@ -1095,7 +1104,7 @@ export function PreviewEditorPanel({
                 ) : null}
                 {!isPremium ? (
                   <PrimaryButton
-                    label="Unlock Premium Templates"
+                    label="Unlock Premium Layouts"
                     onPress={onOpenPaywall}
                     variant="secondary"
                   />
@@ -1326,9 +1335,9 @@ function isSameSunsetPrimaryGradient(
   return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 }
 
-function TemplateLayoutPreview({ template }: { template: StatsTemplate }) {
+function LayoutLayoutPreview({ template }: { template: StatsLayout }) {
   const rawWidth = template.width;
-  const rawHeight = getTemplatePreviewHeight(template.layout);
+  const rawHeight = getLayoutPreviewHeight(template.layout);
   const scale = Math.min(92 / rawWidth, 52 / rawHeight);
   const previewLayerTextColor =
     template.layout === 'split-bold' ? 'rgba(255,255,255,0.6)' : undefined;
@@ -1386,7 +1395,7 @@ function TemplateLayoutPreview({ template }: { template: StatsTemplate }) {
   );
 }
 
-function getTemplatePreviewHeight(layout: StatsTemplate['layout']) {
+function getLayoutPreviewHeight(layout: StatsLayoutKind) {
   switch (layout) {
     case 'hero':
     case 'glass-row':
