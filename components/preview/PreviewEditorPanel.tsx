@@ -4,6 +4,7 @@ import {
   Easing,
   Image,
   LayoutChangeEvent,
+  Modal,
   PanResponder,
   Pressable,
   ScrollView,
@@ -14,6 +15,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import DraggableFlatList from 'react-native-draggable-flatlist';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { StatsLayerContent } from '@/components/StatsLayerContent';
 import { layout, spacing, type ThemeColors } from '@/constants/theme';
@@ -121,6 +123,10 @@ type Props = {
   appCacheUsageLabel?: string;
   onClearAppCache?: () => void;
   onOpenPaywall: () => void;
+  onQuickExport: () => void;
+  quickExportBusy?: boolean;
+  helpPopoverOpen?: boolean;
+  onCloseHelpPopover?: () => void;
 };
 
 export function PreviewEditorPanel({
@@ -186,9 +192,14 @@ export function PreviewEditorPanel({
   appCacheUsageLabel,
   onClearAppCache,
   onOpenPaywall,
+  onQuickExport,
+  quickExportBusy = false,
+  helpPopoverOpen = false,
+  onCloseHelpPopover,
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
   const themeMode = useThemeStore((s) => s.mode);
   const setThemeMode = useThemeStore((s) => s.setMode);
   const [selectedStyleLayer, setSelectedStyleLayer] = useState<
@@ -268,6 +279,7 @@ export function PreviewEditorPanel({
   const [renderPanelBody, setRenderPanelBody] = useState(panelOpen);
   const panelBodyAnim = useRef(new Animated.Value(panelOpen ? 1 : 0)).current;
   const popoverAnim = useRef(new Animated.Value(0)).current;
+  const helpPopoverAnim = useRef(new Animated.Value(0)).current;
   const gridHues = [200, 220, 250, 280, 330, 8, 22, 38, 48, 62, 75, 95];
   const grayscaleRow = gridHues.map((_, index) => {
     const value = 100 - (index / (gridHues.length - 1)) * 100;
@@ -389,6 +401,15 @@ export function PreviewEditorPanel({
     }).start();
   }, [activePanel, panelOpen, popoverAnim, stylePickerOpen]);
 
+  useEffect(() => {
+    Animated.spring(helpPopoverAnim, {
+      toValue: helpPopoverOpen ? 1 : 0,
+      tension: 70,
+      friction: 10,
+      useNativeDriver: true,
+    }).start();
+  }, [helpPopoverAnim, helpPopoverOpen]);
+
   const mainTabs = [
     { id: 'background', label: 'Background', icon: 'image-area-close' },
     { id: 'content', label: 'Content', icon: 'layers-outline' },
@@ -414,6 +435,7 @@ export function PreviewEditorPanel({
 
   function onPressTab(tabId: PreviewPanelTab, disabled?: boolean) {
     if (disabled) return;
+    onCloseHelpPopover?.();
     if (panelOpen && activePanel === tabId) {
       setPanelOpen(false);
       return;
@@ -1392,6 +1414,136 @@ export function PreviewEditorPanel({
         </Animated.View>
       ) : null}
 
+      <Modal
+        visible={helpPopoverOpen}
+        transparent
+        animationType="none"
+        onRequestClose={() => onCloseHelpPopover?.()}
+      >
+        <View style={styles.helpModalRoot}>
+          <Pressable
+            style={styles.helpModalBackdrop}
+            onPress={() => onCloseHelpPopover?.()}
+          />
+          <Animated.View
+            style={[
+              styles.helpPopoverTop,
+              { top: insets.top + 54 },
+              {
+                opacity: helpPopoverAnim,
+                transform: [
+                  {
+                    translateY: helpPopoverAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [20, 0],
+                    }),
+                  },
+                  {
+                    scale: helpPopoverAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.96, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View style={[styles.stylePickerCard, styles.helpPopoverCard]}>
+              <View style={styles.stylePickerHeaderRow}>
+                <View style={styles.stylePickerTitleWrap}>
+                  <Text style={styles.stylePickerTitle}>Help</Text>
+                  <Text style={styles.stylePickerSubtitle}>
+                    Quick settings and tips
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    onCloseHelpPopover?.();
+                  }}
+                  style={({ pressed }) => [
+                    styles.stylePickerCloseBtn,
+                    pressed && styles.stylePickerCloseBtnPressed,
+                  ]}
+                  hitSlop={8}
+                >
+                  <MaterialCommunityIcons
+                    name="close"
+                    size={18}
+                    color={colors.textMuted}
+                  />
+                </Pressable>
+              </View>
+
+              <Text style={styles.sectionTitle}>Settings</Text>
+              <View style={styles.themeModeRow}>
+                {(
+                  [
+                    { id: 'light', label: 'Light' },
+                    { id: 'dark', label: 'Dark' },
+                  ] as { id: AppThemeMode; label: string }[]
+                ).map((item) => {
+                  const selected = item.id === themeMode;
+                  return (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => {
+                        void setThemeMode(item.id);
+                      }}
+                      style={[
+                        styles.themeModeChip,
+                        selected && styles.themeModeChipSelected,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.themeModeChipText,
+                          selected && styles.themeModeChipTextSelected,
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.note}>
+                Pinch/rotate/drag blocks. Center and rotation guides appear
+                during move.
+              </Text>
+              {message ? <Text style={styles.note}>{message}</Text> : null}
+              {appCacheUsageLabel ? (
+                <Text style={styles.note}>{appCacheUsageLabel}</Text>
+              ) : null}
+              {onClearAppCache ? (
+                <PrimaryButton
+                  label="Clear cache"
+                  icon="broom"
+                  onPress={onClearAppCache}
+                  variant="secondary"
+                  colorScheme="panel"
+                />
+              ) : null}
+              {!supportsFullStatsPreview ? (
+                <Text style={styles.note}>
+                  For this activity type, preview shows Time only.
+                </Text>
+              ) : null}
+              {!isPremium ? (
+                <PrimaryButton
+                  label="Unlock Premium Layouts"
+                  onPress={() => {
+                    onCloseHelpPopover?.();
+                    onOpenPaywall();
+                  }}
+                  variant="secondary"
+                />
+              ) : null}
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+
       <View style={styles.panelTabs}>
         <View style={styles.mainTabsRow}>
           <LinearGradient
@@ -1448,15 +1600,15 @@ export function PreviewEditorPanel({
           })}
         </View>
         <Pressable
-          onPress={() => onPressTab('help')}
+          onPress={onQuickExport}
+          disabled={quickExportBusy}
           style={[
             styles.helpFab,
-            activePanel === 'help'
-              ? styles.helpFabSelected
-              : styles.helpFabIdle,
+            styles.helpFabExport,
+            quickExportBusy ? styles.helpFabDisabled : null,
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Help"
+          accessibilityLabel="Export"
         >
           <LinearGradient
             pointerEvents="none"
@@ -1466,9 +1618,9 @@ export function PreviewEditorPanel({
             style={styles.helpFabGlassBg}
           />
           <MaterialCommunityIcons
-            name="help-circle-outline"
+            name={quickExportBusy ? 'dots-horizontal' : 'export-variant'}
             size={20}
-            color={activePanel === 'help' ? colors.text : colors.textMuted}
+            color={colors.primaryText}
           />
         </Pressable>
       </View>
@@ -1868,6 +2020,7 @@ function createStyles(colors: ThemeColors) {
   },
     panelTab: {
       flex: 1,
+      height: 50,
       borderRadius: 999,
       paddingVertical: 10,
       alignItems: 'center',
@@ -1907,12 +2060,12 @@ function createStyles(colors: ThemeColors) {
     color: colors.textSubtle,
   },
     helpFab: {
-      width: 44,
-      height: 44,
+      width: 50,
+      height: 50,
       borderRadius: 999,
       alignItems: 'center',
       justifyContent: 'center',
-      marginTop: -6,
+      marginTop: 0,
       overflow: 'hidden',
       borderWidth: 1,
       borderColor: colors.glassStroke,
@@ -1924,10 +2077,17 @@ function createStyles(colors: ThemeColors) {
     helpFabIdle: {
       backgroundColor: 'transparent',
     },
-  helpFabSelected: {
-    backgroundColor: colors.surface,
-    borderColor: colors.borderStrong,
-  },
+    helpFabSelected: {
+      backgroundColor: colors.surface,
+      borderColor: colors.borderStrong,
+    },
+    helpFabExport: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primaryBorderOnLight,
+    },
+    helpFabDisabled: {
+      opacity: 0.6,
+    },
   effectsList: {
     flexDirection: 'row',
     gap: 8,
@@ -2305,6 +2465,19 @@ function createStyles(colors: ThemeColors) {
     bottom: 76,
     zIndex: 40,
   },
+    helpModalRoot: {
+      flex: 1,
+      justifyContent: 'flex-start',
+    },
+    helpModalBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.16)',
+    },
+    helpPopoverTop: {
+      position: 'absolute',
+      left: spacing.md,
+      right: spacing.md,
+    },
     stylePickerCard: {
       borderWidth: 1,
       borderColor: colors.border,
@@ -2318,6 +2491,10 @@ function createStyles(colors: ThemeColors) {
       shadowRadius: 20,
       shadowOffset: { width: 0, height: 10 },
       elevation: 12,
+    },
+    helpPopoverCard: {
+      backgroundColor: colors.panelSurfaceOverlay,
+      borderColor: colors.glassStroke,
     },
   stylePickerHeaderRow: {
     flexDirection: 'row',

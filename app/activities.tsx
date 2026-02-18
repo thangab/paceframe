@@ -35,6 +35,7 @@ export default function ActivitiesScreen() {
   const setActivities = useActivityStore((s) => s.setActivities);
   const selectActivity = useActivityStore((s) => s.selectActivity);
   const isHealthKitSource = source === 'healthkit';
+  const refreshColor = themeMode === 'dark' ? colors.primary : colors.textMuted;
   const firstName = tokens?.athleteFirstName?.trim();
   const welcomeTitle = firstName ? `Welcome ${firstName} !` : 'Welcome !';
 
@@ -168,7 +169,9 @@ export default function ActivitiesScreen() {
                   style={styles.themeToggleGlassSheen}
                 />
                 <MaterialCommunityIcons
-                  name={themeMode === 'dark' ? 'weather-sunny' : 'weather-night'}
+                  name={
+                    themeMode === 'dark' ? 'weather-sunny' : 'weather-night'
+                  }
                   size={16}
                   color={colors.text}
                 />
@@ -178,10 +181,39 @@ export default function ActivitiesScreen() {
         }}
       />
       <View style={styles.container}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerCopy}>
-            <Text style={styles.title}>{welcomeTitle}</Text>
-            <Text style={styles.subtitle}>Pick one activity to start your design</Text>
+        <LinearGradient
+          pointerEvents="none"
+          colors={[colors.background, colors.surfaceAlt, colors.background]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.sportBg}
+        />
+        <View pointerEvents="none" style={styles.trackLinesWrap}>
+          <View style={[styles.trackLine, styles.trackLineOne]} />
+          <View style={[styles.trackLine, styles.trackLineTwo]} />
+          <View style={[styles.trackLine, styles.trackLineThree]} />
+        </View>
+        <View style={styles.bgOrbTop} />
+        <View style={styles.bgOrbBottom} />
+
+        <View style={styles.heroCard}>
+          <View style={styles.headerRow}>
+            <View style={styles.headerCopy}>
+              <Text style={styles.title}>{welcomeTitle}</Text>
+              <Text style={styles.subtitle}>
+                Pick one activity to start your design
+              </Text>
+            </View>
+            <View style={styles.sourcePill}>
+              <MaterialCommunityIcons
+                name={isHealthKitSource ? 'heart-pulse' : 'fire'}
+                size={13}
+                color={colors.text}
+              />
+              <Text style={styles.sourcePillText}>
+                {isHealthKitSource ? 'Health' : 'Strava'}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -197,7 +229,13 @@ export default function ActivitiesScreen() {
             keyExtractor={(item) => String(item.id)}
             contentContainerStyle={styles.listContent}
             refreshControl={
-              <RefreshControl refreshing={loading} onRefresh={loadActivities} />
+              <RefreshControl
+                refreshing={loading}
+                onRefresh={loadActivities}
+                tintColor={refreshColor}
+                colors={[refreshColor]}
+                progressBackgroundColor={colors.surface}
+              />
             }
             renderItem={({ item }) => (
               <ActivityCard
@@ -244,10 +282,68 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.md,
       backgroundColor: colors.background,
     },
+    sportBg: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    trackLinesWrap: {
+      ...StyleSheet.absoluteFillObject,
+      transform: [{ rotate: '-12deg' }],
+      opacity: 0.4,
+    },
+    trackLine: {
+      position: 'absolute',
+      left: -120,
+      right: -120,
+      height: 2,
+      backgroundColor: colors.borderStrong,
+    },
+    trackLineOne: {
+      top: 116,
+    },
+    trackLineTwo: {
+      top: 174,
+      opacity: 0.72,
+    },
+    trackLineThree: {
+      top: 232,
+      opacity: 0.5,
+    },
+    bgOrbTop: {
+      position: 'absolute',
+      top: -110,
+      right: -90,
+      width: 260,
+      height: 260,
+      borderRadius: 999,
+      backgroundColor: `${colors.primary}2A`,
+    },
+    bgOrbBottom: {
+      position: 'absolute',
+      bottom: 120,
+      left: -90,
+      width: 220,
+      height: 220,
+      borderRadius: 999,
+      backgroundColor: `${colors.accent}22`,
+    },
+    heroCard: {
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md - 2,
+      marginBottom: spacing.md,
+      shadowColor: colors.text,
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 7 },
+      elevation: 2,
+    },
     headerRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',
-      marginBottom: spacing.md,
+      gap: spacing.sm,
     },
     headerCopy: {
       flex: 1,
@@ -269,21 +365,25 @@ function createStyles(colors: ThemeColors) {
       gap: 8,
     },
     themeToggleBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 999,
+      width: 34,
+      height: 34,
+      aspectRatio: 1,
+      borderRadius: 17,
       borderWidth: 1,
       borderColor: colors.glassStroke,
       backgroundColor: 'transparent',
       overflow: 'hidden',
       alignItems: 'center',
       justifyContent: 'center',
+      padding: 0,
     },
     themeToggleGlassBg: {
       ...StyleSheet.absoluteFillObject,
+      borderRadius: 17,
     },
     themeToggleGlassSheen: {
       ...StyleSheet.absoluteFillObject,
+      borderRadius: 17,
     },
     navAvatar: {
       width: '100%',
@@ -315,6 +415,23 @@ function createStyles(colors: ThemeColors) {
       color: colors.textMuted,
       fontSize: 14,
       fontWeight: '600',
+    },
+    sourcePill: {
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      backgroundColor: colors.surfaceAlt,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 4,
+    },
+    sourcePillText: {
+      color: colors.text,
+      fontSize: 12,
+      fontWeight: '700',
     },
     logoutBtn: {
       paddingHorizontal: 10,

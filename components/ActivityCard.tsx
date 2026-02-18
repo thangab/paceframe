@@ -57,42 +57,44 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
             <Text style={styles.title} numberOfLines={1}>
               {activity.name}
             </Text>
+            <View
+              style={[
+                styles.selectionPill,
+                selected && styles.selectionPillActive,
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={selected ? 'check' : 'plus'}
+                size={12}
+                color={selected ? colors.primaryText : colors.textSubtle}
+              />
+            </View>
           </View>
           <Text style={styles.date}>{whenText}</Text>
           {detailedMetrics ? (
-            <>
-              <View style={styles.metricLabels}>
+            <View style={styles.metrics}>
+              <View style={styles.metricCard}>
                 <Text style={styles.metricLabel}>DISTANCE</Text>
-                <Text style={styles.metricLabel}>{secondaryMetric.label}</Text>
-                <Text style={styles.metricLabel}>TIME</Text>
-              </View>
-              <View style={styles.metrics}>
                 <Text style={styles.metric}>{distanceText}</Text>
+              </View>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>{secondaryMetric.label}</Text>
                 <Text style={styles.metric}>{secondaryMetric.value}</Text>
+              </View>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>TIME</Text>
                 <Text style={styles.metric}>{timeText}</Text>
               </View>
-            </>
+            </View>
           ) : (
-            <>
-              <View style={styles.metricLabels}>
+            <View style={styles.metricsSingle}>
+              <View style={[styles.metricCard, styles.metricCardSingle]}>
                 <Text style={styles.metricLabel}>TIME</Text>
-              </View>
-              <View style={styles.metricsSingle}>
                 <Text style={styles.metricSingle}>{timeText}</Text>
               </View>
-            </>
+            </View>
           )}
         </View>
-
-        {selected ? (
-          <View style={styles.selectedBadge}>
-            <MaterialCommunityIcons
-              name="check"
-              size={16}
-              color={colors.primaryText}
-            />
-          </View>
-        ) : null}
       </View>
     </Pressable>
   );
@@ -187,7 +189,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: radius.lg + 4,
       borderWidth: 1,
       borderColor: colors.border,
-      padding: spacing.sm + 5,
+      padding: spacing.sm + 4,
       marginBottom: spacing.sm + 4,
       shadowColor: colors.text,
       shadowOpacity: 0.06,
@@ -210,11 +212,11 @@ function createStyles(colors: ThemeColors) {
     row: {
       flexDirection: 'row',
       gap: spacing.sm + 2,
-      alignItems: 'flex-start',
+      alignItems: 'center',
     },
     thumbnail: {
-      width: 96,
-      height: 96,
+      width: 88,
+      height: 88,
       borderRadius: radius.md + 4,
       backgroundColor: colors.surfaceAlt,
     },
@@ -238,18 +240,12 @@ function createStyles(colors: ThemeColors) {
     },
     date: {
       color: colors.textMuted,
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: '600',
       marginTop: 2,
-      marginBottom: 12,
-    },
-    metricLabels: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      gap: 8,
+      marginBottom: 8,
     },
     metricLabel: {
-      flex: 1,
       color: colors.textSubtle,
       fontSize: 10,
       fontWeight: '700',
@@ -257,36 +253,50 @@ function createStyles(colors: ThemeColors) {
     },
     metrics: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      gap: 8,
+      gap: 6,
     },
     metricsSingle: {
       flexDirection: 'row',
       justifyContent: 'flex-start',
     },
-    metric: {
+    metricCard: {
       flex: 1,
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 8,
+      paddingVertical: 7,
+      gap: 3,
+    },
+    metricCardSingle: {
+      minWidth: 94,
+      flex: 0,
+    },
+    metric: {
       color: colors.text,
       fontWeight: '800',
-      fontSize: 17,
+      fontSize: 14,
     },
     metricSingle: {
       color: colors.text,
       fontWeight: '800',
-      fontSize: 17,
+      fontSize: 14,
     },
-    selectedBadge: {
-      position: 'absolute',
-      right: 11,
-      top: 11,
-      width: 30,
-      height: 30,
-      borderRadius: 15,
-      backgroundColor: colors.primary,
+    selectionPill: {
+      marginLeft: 'auto',
+      width: 24,
+      height: 24,
+      borderRadius: 999,
+      backgroundColor: colors.surfaceAlt,
       borderWidth: 1,
-      borderColor: colors.primaryBorderOnLight,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    selectionPillActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primaryBorderOnLight,
     },
   });
 }

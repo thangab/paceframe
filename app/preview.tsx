@@ -393,6 +393,7 @@ export default function PreviewScreen() {
   const [activeLayer, setActiveLayer] = useState<LayerId | null>(null);
   const [activePanel, setActivePanel] = useState<PreviewPanelTab>('background');
   const [panelOpen, setPanelOpen] = useState(false);
+  const [helpPopoverOpen, setHelpPopoverOpen] = useState(false);
   const [isSquareFormat, setIsSquareFormat] = useState(false);
   const [resolvedLocationText, setResolvedLocationText] = useState('');
   const [draftReady, setDraftReady] = useState(false);
@@ -1136,10 +1137,10 @@ export default function PreviewScreen() {
   }, [headerVisible, selectedLayer, visibleLayers.meta]);
 
   useEffect(() => {
-    if (activePanel !== 'help' || !panelOpen) return;
+    if (!helpPopoverOpen) return;
     void refreshAppCacheUsage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePanel, panelOpen]);
+  }, [helpPopoverOpen]);
 
   useEffect(() => {
     if (hasSubjectFree) return;
@@ -1892,6 +1893,10 @@ export default function PreviewScreen() {
     void (media?.type === 'video' ? exportVideo() : exportAndShare());
   }
 
+  function toggleHelpPanel() {
+    setHelpPopoverOpen((prev) => !prev);
+  }
+
   return (
     <>
       <Stack.Screen
@@ -1941,19 +1946,21 @@ export default function PreviewScreen() {
                 />
               </Pressable>
               <Pressable
-                onPress={() => {
-                  if (busy) return;
-                  triggerExport();
-                }}
+                onPress={toggleHelpPanel}
                 hitSlop={8}
-                style={styles.headerExportButton}
+                style={[
+                  styles.headerFormatButton,
+                  helpPopoverOpen
+                    ? styles.headerHelpButtonActive
+                    : null,
+                ]}
                 accessibilityRole="button"
-                accessibilityLabel="Export"
+                accessibilityLabel="Help"
               >
                 <MaterialCommunityIcons
-                  name={busy ? 'dots-horizontal' : 'export-variant'}
-                  size={20}
-                  color={colors.primaryText}
+                  name="help-circle-outline"
+                  size={18}
+                  color={colors.panelText}
                 />
               </Pressable>
             </View>
@@ -1967,6 +1974,7 @@ export default function PreviewScreen() {
           panelOpen={panelOpen}
           onCanvasTouch={() => {
             if (panelOpen) setPanelOpen(false);
+            if (helpPopoverOpen) setHelpPopoverOpen(false);
             setOutlinedLayer(null);
           }}
           canvasDisplayWidth={canvasDisplayWidth}
@@ -2101,6 +2109,13 @@ export default function PreviewScreen() {
             void clearAppCache();
           }}
           onOpenPaywall={() => router.push('/paywall')}
+          onQuickExport={() => {
+            if (busy) return;
+            triggerExport();
+          }}
+          quickExportBusy={busy}
+          helpPopoverOpen={helpPopoverOpen}
+          onCloseHelpPopover={() => setHelpPopoverOpen(false)}
         />
       </View>
     </>
@@ -2316,6 +2331,9 @@ function createStyles(colors: ThemeColors) {
     backgroundColor: colors.primary,
     borderWidth: 1,
     borderColor: colors.borderStrong,
+  },
+  headerHelpButtonActive: {
+    borderColor: colors.primaryBorderOnLight,
   },
   centered: {
     flex: 1,
