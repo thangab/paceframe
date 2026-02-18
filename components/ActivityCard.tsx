@@ -53,7 +53,7 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
 
         <View style={styles.content}>
           <View style={styles.titleRow}>
-            {renderActivityIcon(16, colors.primary)}
+            {renderActivityIcon(16, colors.primaryOnLight)}
             <Text style={styles.title} numberOfLines={1}>
               {activity.name}
             </Text>
@@ -191,7 +191,7 @@ function createStyles(colors: ThemeColors) {
       marginBottom: spacing.sm + 4,
     },
     selected: {
-      borderColor: colors.primary,
+      borderColor: colors.primaryBorderOnLight,
       shadowColor: colors.primary,
       shadowOpacity: 0.12,
       shadowRadius: 10,

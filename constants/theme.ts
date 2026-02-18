@@ -7,6 +7,8 @@ export type ThemeColors = {
   textMuted: string;
   textSubtle: string;
   primary: string;
+  primaryOnLight: string;
+  primaryBorderOnLight: string;
   primaryText: string;
   accent: string;
   border: string;
@@ -57,6 +59,8 @@ export const lightColors: ThemeColors = {
   textMuted: '#5C6675',
   textSubtle: '#8A94A5',
   primary: '#D4FF54',
+  primaryOnLight: '#6C8200',
+  primaryBorderOnLight: '#7A9100',
   primaryText: '#111500',
   accent: '#2563EB',
   border: '#D3DBE5',
@@ -107,6 +111,8 @@ export const darkColors: ThemeColors = {
   textMuted: '#A2AFC4',
   textSubtle: '#7C8AA1',
   primary: '#D4FF54',
+  primaryOnLight: '#D4FF54',
+  primaryBorderOnLight: '#D4FF54',
   primaryText: '#111500',
   accent: '#60A5FA',
   border: '#2E3A52',

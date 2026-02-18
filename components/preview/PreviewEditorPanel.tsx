@@ -1516,7 +1516,7 @@ function createStyles(colors: ThemeColors) {
     minWidth: 116,
   },
   chipSelected: {
-    borderColor: colors.primary,
+    borderColor: colors.primaryBorderOnLight,
     borderWidth: 2,
   },
   chipText: {
@@ -1566,7 +1566,7 @@ function createStyles(colors: ThemeColors) {
     overflow: 'hidden',
   },
   templateCardSelected: {
-    borderColor: colors.primary,
+    borderColor: colors.primaryBorderOnLight,
     borderWidth: 2,
   },
   previewFrame: {
@@ -1758,7 +1758,7 @@ function createStyles(colors: ThemeColors) {
     gap: 8,
   },
   effectCardSelected: {
-    borderColor: colors.primary,
+    borderColor: colors.primaryBorderOnLight,
     borderWidth: 2,
   },
   effectCardPressed: {
@@ -1853,7 +1853,7 @@ function createStyles(colors: ThemeColors) {
     overflow: 'hidden',
   },
   gradientPresetCardSelected: {
-    borderColor: colors.primary,
+    borderColor: colors.primaryBorderOnLight,
     borderWidth: 2,
   },
   gradientPresetFill: {
@@ -1873,7 +1873,7 @@ function createStyles(colors: ThemeColors) {
     backgroundColor: colors.surface,
   },
   sunsetGradientPresetCardSelected: {
-    borderColor: colors.primary,
+    borderColor: colors.primaryBorderOnLight,
     borderWidth: 2,
   },
   sunsetGradientPresetFill: {
@@ -1935,7 +1935,7 @@ function createStyles(colors: ThemeColors) {
     borderRadius: 10,
   },
   layerRowCardSelected: {
-    borderColor: colors.primary,
+    borderColor: colors.primaryBorderOnLight,
   },
   layerRowCardDragging: {
     opacity: 0.75,
@@ -1977,7 +1977,7 @@ function createStyles(colors: ThemeColors) {
   },
   behindToggleBtnActive: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    borderColor: colors.primaryBorderOnLight,
   },
   behindToggleText: {
     color: colors.text,
@@ -2057,11 +2057,11 @@ function createStyles(colors: ThemeColors) {
   },
   statsPrimaryBtnSelected: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    borderColor: colors.primaryBorderOnLight,
   },
   statsPillSelected: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    borderColor: colors.primaryBorderOnLight,
   },
   statsPillDisabled: {
     opacity: 0.45,
@@ -2093,7 +2093,7 @@ function createStyles(colors: ThemeColors) {
     minWidth: 78,
   },
   styleLayerButtonSelected: {
-    borderColor: colors.primary,
+    borderColor: colors.primaryBorderOnLight,
     backgroundColor: colors.primary,
   },
   styleLayerButtonDot: {
@@ -2364,7 +2364,7 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: 10,
   },
   themeModeChipSelected: {
-    borderColor: colors.primary,
+    borderColor: colors.primaryBorderOnLight,
     backgroundColor: colors.primary,
   },
   themeModeChipText: {
