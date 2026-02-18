@@ -1801,7 +1801,7 @@ function createStyles(colors: ThemeColors) {
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       paddingBottom: spacing.sm,
-      overflow: 'hidden',
+      overflow: 'visible',
       shadowColor: colors.glassShadow,
       shadowOpacity: 0.24,
       shadowRadius: 16,
