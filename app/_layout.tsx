@@ -5,16 +5,22 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '@/store/authStore';
 import { useAppBootstrap } from '@/hooks/useAppBootstrap';
-import { colors } from '@/constants/theme';
+import { ThemeColors } from '@/constants/theme';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { useThemeStore } from '@/store/themeStore';
 
 export default function RootLayout() {
   useAppBootstrap();
+  const colors = useThemeColors();
   const isHydrated = useAuthStore((s) => s.isHydrated);
+  const isThemeHydrated = useThemeStore((s) => s.isHydrated);
+  const styles = createStyles(colors);
+  const statusBarStyle = useThemeStore((s) => (s.mode === 'dark' ? 'light' : 'dark'));
 
-  if (!isHydrated) {
+  if (!isHydrated || !isThemeHydrated) {
     return (
       <View style={styles.loading}>
-        <StatusBar style="dark" />
+        <StatusBar style={statusBarStyle} />
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -22,11 +28,12 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="dark" />
+      <StatusBar style={statusBarStyle} />
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.text,
+          headerShadowVisible: false,
           headerBackButtonDisplayMode: 'minimal',
           contentStyle: { backgroundColor: colors.background },
         }}
@@ -41,11 +48,13 @@ export default function RootLayout() {
   );
 }
 
-const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    loading: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.background,
+    },
+  });
+}

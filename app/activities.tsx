@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { router, Stack } from 'expo-router';
 import {
   ActivityIndicator,
@@ -12,12 +12,18 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons, FontAwesome6 } from '@expo/vector-icons';
 import { ActivityCard } from '@/components/ActivityCard';
-import { spacing } from '@/constants/theme';
+import { spacing, type ThemeColors } from '@/constants/theme';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { fetchActivities, refreshTokensWithSupabase } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
+import { useThemeStore } from '@/store/themeStore';
 
 export default function ActivitiesScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const themeMode = useThemeStore((s) => s.mode);
+  const setThemeMode = useThemeStore((s) => s.setMode);
   const tokens = useAuthStore((s) => s.tokens);
   const login = useAuthStore((s) => s.login);
   const logout = useAuthStore((s) => s.logout);
@@ -93,10 +99,10 @@ export default function ActivitiesScreen() {
                 <MaterialCommunityIcons
                   name="heart-pulse"
                   size={18}
-                  color="#131313"
+                  color={colors.text}
                 />
               ) : (
-                <FontAwesome6 name="strava" size={18} color="#131313" />
+                <FontAwesome6 name="strava" size={18} color={colors.text} />
               )}
               <Text style={styles.navTitleText}>Activities</Text>
             </View>
@@ -111,7 +117,7 @@ export default function ActivitiesScreen() {
               <MaterialCommunityIcons
                 name="logout"
                 size={20}
-                color="#131313"
+                color={colors.text}
                 style={{ transform: [{ scaleX: -1 }] }}
               />
             </Pressable>
@@ -129,11 +135,29 @@ export default function ActivitiesScreen() {
                     <MaterialCommunityIcons
                       name="account-outline"
                       size={16}
-                      color="#A0A8B8"
+                      color={colors.textSubtle}
                     />
                   </View>
                 )}
               </View>
+              <Pressable
+                onPress={() => {
+                  void setThemeMode(themeMode === 'dark' ? 'light' : 'dark');
+                }}
+                style={styles.themeToggleBtn}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  themeMode === 'dark'
+                    ? 'Switch to light theme'
+                    : 'Switch to dark theme'
+                }
+              >
+                <MaterialCommunityIcons
+                  name={themeMode === 'dark' ? 'weather-sunny' : 'weather-night'}
+                  size={16}
+                  color={colors.text}
+                />
+              </Pressable>
             </View>
           ),
         }}
@@ -148,7 +172,7 @@ export default function ActivitiesScreen() {
 
         {loading && activities.length === 0 ? (
           <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#D4FF54" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : (
           <FlatList
@@ -185,7 +209,7 @@ export default function ActivitiesScreen() {
               <MaterialCommunityIcons
                 name="star-four-points-outline"
                 size={18}
-                color="#111500"
+                color={colors.primaryText}
               />
             </View>
           </Pressable>
@@ -195,13 +219,14 @@ export default function ActivitiesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: spacing.md,
-    paddingHorizontal: spacing.md,
-    backgroundColor: '#06080D',
-  },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      paddingTop: spacing.md,
+      paddingHorizontal: spacing.md,
+      backgroundColor: colors.background,
+    },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -214,8 +239,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#2A2E38',
-    backgroundColor: '#161B25',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   headerAvatar: {
     width: '100%',
@@ -236,11 +261,24 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#2A2E38',
-    backgroundColor: '#161B25',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   navAvatarContainer: {
     marginLeft: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  themeToggleBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   navAvatar: {
     width: '100%',
@@ -258,14 +296,13 @@ const styles = StyleSheet.create({
   },
   navTitleText: {
     fontSize: 17,
-    fontWeight: '600',
-    color: '#131313',
+    fontWeight: '700',
+    color: colors.text,
   },
   title: {
-    fontSize: 30 / 1.5,
-    fontWeight: '500',
-    color: '#D2D8E6',
-    letterSpacing: 0.8,
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.text,
     textAlign: 'left',
     flex: 1,
   },
@@ -275,10 +312,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   countBadge: {
-    color: '#C9D0DE',
+    color: colors.textMuted,
     fontWeight: '800',
     fontSize: 13,
-    backgroundColor: '#2A2E38',
+    backgroundColor: colors.surfaceStrong,
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -293,12 +330,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   error: {
-    color: '#F87171',
+    color: colors.danger,
     marginBottom: spacing.sm,
   },
   empty: {
     marginTop: spacing.lg,
-    color: '#8A93A5',
+    color: colors.textMuted,
     textAlign: 'center',
   },
   listContent: {
@@ -311,25 +348,26 @@ const styles = StyleSheet.create({
     bottom: spacing.md,
   },
   generateBtn: {
-    borderRadius: 20,
-    backgroundColor: '#D4FF54',
-    height: 74,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    height: 62,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.25)',
+    borderColor: colors.borderStrong,
   },
   generateBtnDisabled: {
     opacity: 0.5,
   },
   generateBtnText: {
-    color: '#111500',
-    fontSize: 38 / 2,
-    fontWeight: '900',
+    color: colors.primaryText,
+    fontSize: 18,
+    fontWeight: '800',
   },
-  generateBtnContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-});
+    generateBtnContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+  });
+}

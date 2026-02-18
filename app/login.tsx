@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { FontAwesome6 } from '@expo/vector-icons';
+import { FontAwesome6, MaterialCommunityIcons } from '@expo/vector-icons';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { colors, spacing } from '@/constants/theme';
+import { spacing, type ThemeColors } from '@/constants/theme';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { importActivitiesFromHealthKit } from '@/lib/healthkit';
 import {
   exchangeCodeWithSupabase,
@@ -18,6 +18,8 @@ import { useAuthStore } from '@/store/authStore';
 WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const clientId = process.env.EXPO_PUBLIC_STRAVA_CLIENT_ID?.trim();
   const login = useAuthStore((s) => s.login);
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +133,11 @@ export default function LoginScreen() {
     <View style={styles.container}>
       <View style={styles.card}>
         <View style={styles.brandMark}>
-          <MaterialCommunityIcons name="run-fast" size={26} color="#111500" />
+          <MaterialCommunityIcons
+            name="run-fast"
+            size={26}
+            color={colors.primaryText}
+          />
         </View>
         <Text style={styles.title}>PaceFrame</Text>
         <Text style={styles.subtitle}>
@@ -143,7 +149,7 @@ export default function LoginScreen() {
             <MaterialCommunityIcons
               name="alert-circle-outline"
               size={16}
-              color="#FCA5A5"
+              color={colors.danger}
             />
             <Text style={styles.errorText}>{error}</Text>
           </View>
@@ -158,7 +164,13 @@ export default function LoginScreen() {
                   ? 'Continue (Mock Mode)'
                   : 'Connect Strava'
             }
-            iconElement={<FontAwesome6 name="strava" size={16} color="#111500" />}
+            iconElement={
+              <FontAwesome6
+                name="strava"
+                size={16}
+                color={colors.primaryText}
+              />
+            }
             onPress={handleLogin}
             disabled={isBusy}
           />
@@ -177,7 +189,7 @@ export default function LoginScreen() {
                 <MaterialCommunityIcons
                   name="flask-outline"
                   size={18}
-                  color="#111500"
+                  color={colors.primaryText}
                 />
               </View>
               <View style={styles.demoCopy}>
@@ -226,119 +238,121 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: spacing.lg,
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-  },
-  card: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  brandMark: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: colors.text,
-  },
-  subtitle: {
-    color: colors.textMuted,
-    fontSize: 16,
-    lineHeight: 22,
-    marginTop: -4,
-  },
-  actions: {
-    gap: spacing.sm,
-  },
-  demoCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  demoCardPressed: {
-    opacity: 0.88,
-  },
-  demoCardDisabled: {
-    opacity: 0.6,
-  },
-  demoIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  demoCopy: {
-    flex: 1,
-  },
-  demoTitle: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  demoSubtitle: {
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 1,
-  },
-  errorBanner: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(220,38,38,0.35)',
-    backgroundColor: 'rgba(127,29,29,0.16)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    flexDirection: 'row',
-    gap: spacing.xs,
-    alignItems: 'center',
-  },
-  errorText: {
-    color: '#FCA5A5',
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  healthHelpWrap: {
-    gap: spacing.xs,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.sm,
-    backgroundColor: colors.surfaceAlt,
-  },
-  healthHelpText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
-    flex: 1,
-  },
-  footerHint: {
-    color: colors.textMuted,
-    textAlign: 'center',
-    fontSize: 12,
-    marginTop: spacing.md,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: spacing.lg,
+      justifyContent: 'center',
+      backgroundColor: colors.background,
+    },
+    card: {
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      padding: spacing.lg,
+      gap: spacing.md,
+    },
+    brandMark: {
+      width: 48,
+      height: 48,
+      borderRadius: 14,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    title: {
+      fontSize: 30,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    subtitle: {
+      color: colors.textMuted,
+      fontSize: 16,
+      lineHeight: 22,
+      marginTop: -4,
+    },
+    actions: {
+      gap: spacing.sm,
+    },
+    demoCard: {
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.sm,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    demoCardPressed: {
+      opacity: 0.88,
+    },
+    demoCardDisabled: {
+      opacity: 0.6,
+    },
+    demoIconWrap: {
+      width: 34,
+      height: 34,
+      borderRadius: 9,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    demoCopy: {
+      flex: 1,
+    },
+    demoTitle: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    demoSubtitle: {
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 16,
+      marginTop: 1,
+    },
+    errorBanner: {
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.dangerBorder,
+      backgroundColor: colors.dangerSurface,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.sm,
+      flexDirection: 'row',
+      gap: spacing.xs,
+      alignItems: 'center',
+    },
+    errorText: {
+      color: colors.dangerText,
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    healthHelpWrap: {
+      gap: spacing.xs,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.sm,
+      backgroundColor: colors.surfaceAlt,
+    },
+    healthHelpText: {
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 18,
+      flex: 1,
+    },
+    footerHint: {
+      color: colors.textMuted,
+      textAlign: 'center',
+      fontSize: 12,
+      marginTop: spacing.md,
+    },
+  });
+}

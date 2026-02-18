@@ -20,7 +20,8 @@ import {
   PrimaryStatLayerContent,
   StatsLayerContent,
 } from '@/components/StatsLayerContent';
-import { colors, radius } from '@/constants/theme';
+import { radius } from '@/constants/theme';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { CHECKER_SIZE } from '@/lib/previewConfig';
 import type {
   BackgroundGradient,
@@ -54,8 +55,8 @@ type VisualEffectPreset = {
   description?: string;
   backgroundBlurRadius?: number;
   backgroundRadialFocus?: boolean;
-  backgroundFilter?: Array<Record<string, number | string>>;
-  subjectFilter?: Array<Record<string, number | string>>;
+  backgroundFilter?: Record<string, number | string>[];
+  subjectFilter?: Record<string, number | string>[];
   backgroundOverlayColor: string;
   backgroundOverlayOpacity: number;
   subjectOverlayColor: string;
@@ -236,6 +237,7 @@ export function PreviewEditorCanvas({
   onDragGuideChange,
   onRotationGuideChange,
 }: Props) {
+  const colors = useThemeColors();
   const [subjectRadialCenter, setSubjectRadialCenter] = useState<{
     x: number;
     y: number;
@@ -511,6 +513,7 @@ export function PreviewEditorCanvas({
           ref={exportRef}
           style={[
             styles.storyCanvas,
+            { borderColor: colors.border },
             { width: canvasDisplayWidth, height: canvasDisplayHeight },
             (isCapturingOverlay || isExportingPng) && styles.storyCanvasSquare,
             (isCapturingOverlay || isExportingPng) &&
@@ -1024,7 +1027,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#0B0B0B',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'transparent',
   },
   storyCanvasSquare: {
     borderRadius: 0,

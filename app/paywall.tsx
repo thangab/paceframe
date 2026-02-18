@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { colors, spacing } from '@/constants/theme';
+import { radius, spacing, type ThemeColors } from '@/constants/theme';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { getCurrentOffering, purchasePremiumPackage, restorePurchases, customerInfoIsPremium } from '@/lib/revenuecat';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 
 export default function PaywallScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const isPremium = useSubscriptionStore((s) => s.isPremium);
   const [loading, setLoading] = useState(false);
   const [offeringTitle, setOfferingTitle] = useState('Premium');
@@ -22,7 +25,8 @@ export default function PaywallScreen() {
         setOfferingTitle(offering?.serverDescription || 'Premium');
         const pack = offering?.availablePackages[0] ?? null;
         setPkg(pack);
-        setPackageLabel(pack?.storeProduct?.priceString || 'Unlock');
+        const product = (pack as any)?.product ?? (pack as any)?.storeProduct;
+        setPackageLabel(product?.priceString || 'Unlock');
       } catch {
         setMessage('RevenueCat is not configured. Add API keys to .env for live purchases.');
       } finally {
@@ -72,7 +76,13 @@ export default function PaywallScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>PaceFrame {offeringTitle}</Text>
+      <View style={styles.hero}>
+        <Text style={styles.title}>PaceFrame {offeringTitle}</Text>
+        <Text style={styles.subtitle}>
+          Unlock all creative templates and export without watermark.
+        </Text>
+      </View>
+
       <Text style={styles.bullet}>- All premium templates</Text>
       <Text style={styles.bullet}>- No watermark on exports</Text>
       <Text style={styles.bullet}>- Future premium packs</Text>
@@ -99,27 +109,41 @@ export default function PaywallScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: spacing.lg,
-    gap: spacing.md,
-    backgroundColor: colors.background,
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: spacing.lg,
+      gap: spacing.md,
+      backgroundColor: colors.background,
+    },
+  hero: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    gap: 6,
   },
   title: {
     color: colors.text,
     fontWeight: '800',
-    fontSize: 28,
+    fontSize: 30,
+  },
+  subtitle: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
   },
   bullet: {
-    color: colors.text,
-    fontSize: 16,
+    color: colors.textMuted,
+    fontSize: 15,
   },
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: radius.md,
     padding: spacing.md,
   },
   freeTitle: {
@@ -135,7 +159,8 @@ const styles = StyleSheet.create({
   freeLine: {
     color: colors.textMuted,
   },
-  message: {
-    color: colors.textMuted,
-  },
-});
+    message: {
+      color: colors.textMuted,
+    },
+  });
+}

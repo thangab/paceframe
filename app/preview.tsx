@@ -18,7 +18,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { colors } from '@/constants/theme';
+import { type ThemeColors } from '@/constants/theme';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { PreviewEditorCanvas } from '@/components/preview/PreviewEditorCanvas';
 import {
   PreviewEditorPanel,
@@ -340,6 +341,8 @@ function getDefaultVisibleLayersForLayout(
 }
 
 export default function PreviewScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const activity = useActivityStore((s) => s.selectedActivity());
   const isPremium = useSubscriptionStore((s) => s.isPremium);
@@ -980,6 +983,7 @@ export default function PreviewScreen() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activity?.id, activityDraftKey, activityPhotoUri]);
 
   useEffect(() => {
@@ -1134,6 +1138,7 @@ export default function PreviewScreen() {
   useEffect(() => {
     if (activePanel !== 'help' || !panelOpen) return;
     void refreshAppCacheUsage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activePanel, panelOpen]);
 
   useEffect(() => {
@@ -1909,7 +1914,7 @@ export default function PreviewScreen() {
                 <MaterialCommunityIcons
                   name="restore"
                   size={18}
-                  color="#F3F4F6"
+                  color={colors.panelText}
                 />
               </Pressable>
               <Pressable
@@ -1932,7 +1937,7 @@ export default function PreviewScreen() {
                 <MaterialCommunityIcons
                   name={isSquareFormat ? 'crop-square' : 'cellphone'}
                   size={18}
-                  color="#F3F4F6"
+                  color={colors.panelText}
                 />
               </Pressable>
               <Pressable
@@ -1948,7 +1953,7 @@ export default function PreviewScreen() {
                 <MaterialCommunityIcons
                   name={busy ? 'dots-horizontal' : 'export-variant'}
                   size={20}
-                  color="#0E0F12"
+                  color={colors.primaryText}
                 />
               </Pressable>
             </View>
@@ -2282,11 +2287,12 @@ function hslToHex(hue: number, saturation: number, lightness: number): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0E0F12',
-  },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.panelSurfaceAlt,
+    },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2296,16 +2302,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: '#232833',
+    backgroundColor: colors.panelSurface,
     borderWidth: 1,
-    borderColor: '#2F3644',
+    borderColor: colors.panelBorder,
   },
   headerFormatButtonDisabled: {
     opacity: 0.5,
   },
   headerExportButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
   },
   centered: {
     flex: 1,
@@ -2314,7 +2324,8 @@ const styles = StyleSheet.create({
     gap: 16,
     backgroundColor: colors.background,
   },
-  note: {
-    color: '#A0A8B8',
-  },
-});
+    note: {
+      color: colors.panelTextMuted,
+    },
+  });
+}

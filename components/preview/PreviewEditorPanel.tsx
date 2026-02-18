@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Image,
@@ -15,9 +15,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { StatsLayerContent } from '@/components/StatsLayerContent';
-import { colors, spacing } from '@/constants/theme';
+import { spacing, type ThemeColors } from '@/constants/theme';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import type { DistanceUnit } from '@/lib/format';
 import { FONT_PRESETS, TEMPLATES } from '@/lib/previewConfig';
+import { useThemeStore, type AppThemeMode } from '@/store/themeStore';
 import type {
   BackgroundGradient,
   FieldId,
@@ -184,6 +186,10 @@ export function PreviewEditorPanel({
   onClearAppCache,
   onOpenPaywall,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const themeMode = useThemeStore((s) => s.mode);
+  const setThemeMode = useThemeStore((s) => s.setMode);
   const [selectedStyleLayer, setSelectedStyleLayer] = useState<
     'meta' | 'stats' | 'route' | 'primary'
   >('meta');
@@ -458,7 +464,7 @@ export function PreviewEditorPanel({
                       <MaterialCommunityIcons
                         name="image-sync-outline"
                         size={18}
-                        color="#E5E7EB"
+                        color={colors.text}
                       />
                     </Pressable>
                   ) : null}
@@ -475,7 +481,7 @@ export function PreviewEditorPanel({
                     <MaterialCommunityIcons
                       name="crown-outline"
                       size={14}
-                      color="#9CA3AF"
+                      color={colors.textMuted}
                       style={styles.premiumBtnIcon}
                     />
                     <Text style={styles.premiumBtnText}>Premium</Text>
@@ -630,7 +636,7 @@ export function PreviewEditorPanel({
                         <MaterialCommunityIcons
                           name={switchValue ? 'eye' : 'eye-off'}
                           size={20}
-                          color={switchValue ? '#E5E7EB' : '#7B8495'}
+                          color={switchValue ? colors.text : colors.textSubtle}
                         />
                       </Pressable>
                       <Pressable
@@ -674,7 +680,7 @@ export function PreviewEditorPanel({
                           <MaterialCommunityIcons
                             name="trash-can-outline"
                             size={16}
-                            color="#DC2626"
+                            color={colors.danger}
                           />
                         </Pressable>
                       ) : null}
@@ -687,7 +693,7 @@ export function PreviewEditorPanel({
                         <MaterialCommunityIcons
                           name="drag-horizontal-variant"
                           size={20}
-                          color="#94A3B8"
+                          color={colors.textSubtle}
                         />
                       </Pressable>
                     </View>
@@ -725,7 +731,7 @@ export function PreviewEditorPanel({
                             selected && styles.templateCardSelected,
                           ]}
                         >
-                          <LayoutLayoutPreview template={item} />
+                          <LayoutLayoutPreview template={item} styles={styles} />
                           {isLocked ? (
                             <Text style={styles.templatePremiumBadge}>
                               Premium
@@ -771,7 +777,7 @@ export function PreviewEditorPanel({
                           <MaterialCommunityIcons
                             name="check"
                             size={14}
-                            color={selected ? '#111500' : '#9CA3AF'}
+                            color={selected ? colors.primaryText : colors.textSubtle}
                           />
                           <Text
                             numberOfLines={1}
@@ -799,7 +805,7 @@ export function PreviewEditorPanel({
                             <MaterialCommunityIcons
                               name={isPrimary ? 'star' : 'star-outline'}
                               size={13}
-                              color={isPrimary ? '#111500' : '#9CA3AF'}
+                              color={isPrimary ? colors.primaryText : colors.textSubtle}
                             />
                           </Pressable>
                         ) : null}
@@ -830,7 +836,7 @@ export function PreviewEditorPanel({
                         <MaterialCommunityIcons
                           name="check"
                           size={14}
-                          color={selected ? '#111500' : '#9CA3AF'}
+                          color={selected ? colors.primaryText : colors.textSubtle}
                         />
                         <Text
                           style={[
@@ -992,7 +998,7 @@ export function PreviewEditorPanel({
                     <MaterialCommunityIcons
                       name="palette-outline"
                       size={14}
-                      color="#E5E7EB"
+                      color={colors.text}
                     />
                     <Text style={styles.openPickerButtonText}>Color Picker</Text>
                   </Pressable>
@@ -1079,6 +1085,39 @@ export function PreviewEditorPanel({
               contentContainerStyle={styles.helpContent}
             >
               <View style={styles.controls}>
+                <Text style={styles.sectionTitle}>Settings</Text>
+                <View style={styles.themeModeRow}>
+                  {(
+                    [
+                      { id: 'light', label: 'Light' },
+                      { id: 'dark', label: 'Dark' },
+                    ] as { id: AppThemeMode; label: string }[]
+                  ).map((item) => {
+                    const selected = item.id === themeMode;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => {
+                          void setThemeMode(item.id);
+                        }}
+                        style={[
+                          styles.themeModeChip,
+                          selected && styles.themeModeChipSelected,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.themeModeChipText,
+                            selected && styles.themeModeChipTextSelected,
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
                 <Text style={styles.note}>
                   Pinch/rotate/drag blocks. Center and rotation guides appear
                   during move. Tap stats to switch template. Tap route to switch
@@ -1156,7 +1195,7 @@ export function PreviewEditorPanel({
                 ]}
                 hitSlop={8}
               >
-                <MaterialCommunityIcons name="close" size={18} color="#30343B" />
+                <MaterialCommunityIcons name="close" size={18} color={colors.textMuted} />
               </Pressable>
             </View>
 
@@ -1273,10 +1312,10 @@ export function PreviewEditorPanel({
                     size={14}
                     color={
                       tab.disabled
-                        ? '#6B7280'
+                        ? colors.textSubtle
                         : selected
-                          ? '#111827'
-                          : '#E5E7EB'
+                          ? colors.primaryText
+                          : colors.textMuted
                     }
                   />
                   <Text
@@ -1307,24 +1346,11 @@ export function PreviewEditorPanel({
           <MaterialCommunityIcons
             name="help-circle-outline"
             size={20}
-            color={activePanel === 'help' ? '#111827' : '#E5E7EB'}
+            color={activePanel === 'help' ? colors.primaryText : colors.textMuted}
           />
         </Pressable>
       </View>
     </View>
-  );
-}
-
-function isSameGradient(
-  a: BackgroundGradient | null | undefined,
-  b: BackgroundGradient,
-) {
-  if (!a) return false;
-  return (
-    a.direction === b.direction &&
-    a.colors[0] === b.colors[0] &&
-    a.colors[1] === b.colors[1] &&
-    a.colors[2] === b.colors[2]
   );
 }
 
@@ -1335,7 +1361,13 @@ function isSameSunsetPrimaryGradient(
   return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 }
 
-function LayoutLayoutPreview({ template }: { template: StatsLayout }) {
+function LayoutLayoutPreview({
+  template,
+  styles,
+}: {
+  template: StatsLayout;
+  styles: ReturnType<typeof createStyles>;
+}) {
   const rawWidth = template.width;
   const rawHeight = getLayoutPreviewHeight(template.layout);
   const scale = Math.min(92 / rawWidth, 52 / rawHeight);
@@ -1463,18 +1495,19 @@ function hsvToHex(h: number, s: number, v: number) {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-const styles = StyleSheet.create({
-  sectionTitle: {
-    color: '#F3F4F6',
-    fontWeight: '400',
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    sectionTitle: {
+    color: colors.text,
+    fontWeight: '700',
     fontSize: 14,
   },
   chipRow: {
     gap: spacing.sm,
   },
   chip: {
-    backgroundColor: '#232833',
-    borderColor: '#2F3644',
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.border,
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 12,
@@ -1482,15 +1515,15 @@ const styles = StyleSheet.create({
     minWidth: 116,
   },
   chipSelected: {
-    borderColor: '#D9F04A',
+    borderColor: colors.primary,
     borderWidth: 2,
   },
   chipText: {
-    color: '#F3F4F6',
-    fontWeight: '400',
+    color: colors.text,
+    fontWeight: '600',
   },
   chipSub: {
-    color: '#D9F04A',
+    color: colors.primaryText,
     fontSize: 12,
     marginTop: 2,
     textAlign: 'center',
@@ -1500,8 +1533,8 @@ const styles = StyleSheet.create({
     width: 108,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2F3644',
-    backgroundColor: '#232833',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     padding: 0,
     overflow: 'hidden',
     position: 'relative',
@@ -1510,9 +1543,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   templateCardName: {
-    color: '#E5E7EB',
+    color: colors.text,
     fontSize: 11,
-    fontWeight: '400',
+    fontWeight: '600',
     textAlign: 'center',
     paddingHorizontal: 6,
     paddingTop: 6,
@@ -1522,32 +1555,33 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 4,
     right: 4,
-    color: '#D9F04A',
+    color: colors.primaryText,
     fontSize: 10,
-    fontWeight: '400',
-    backgroundColor: 'rgba(17,24,39,0.78)',
+    fontWeight: '700',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 2,
     overflow: 'hidden',
   },
   templateCardSelected: {
-    borderColor: '#D9F04A',
+    borderColor: colors.primary,
     borderWidth: 2,
   },
   previewFrame: {
     height: 54,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 0,
     borderColor: 'transparent',
-    backgroundColor: 'transparent',
-    padding: 1,
+    backgroundColor: '#C9D2DE',
+    padding: 2,
     overflow: 'hidden',
   },
   previewSurface: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#B7C2D0',
   },
   previewScaledWrap: {
     alignItems: 'center',
@@ -1572,8 +1606,8 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#333A47',
-    backgroundColor: '#202632',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     padding: 10,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1586,28 +1620,28 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 8,
-    backgroundColor: '#2A3140',
+    backgroundColor: colors.surfaceAlt,
   },
   activityPhotoCopy: {
     flex: 1,
   },
   activityPhotoTitle: {
-    color: '#F3F4F6',
+    color: colors.text,
     fontSize: 14,
-    fontWeight: '400',
+    fontWeight: '600',
   },
   activityPhotoSubtitle: {
-    color: '#9CA3AF',
+    color: colors.textMuted,
     fontSize: 12,
-    fontWeight: '400',
+    fontWeight: '500',
     marginTop: 2,
   },
   premiumBtn: {
     minWidth: 92,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2F3644',
-    backgroundColor: '#242935',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 10,
@@ -1624,18 +1658,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   premiumBtnText: {
-    color: '#9CA3AF',
+    color: colors.textMuted,
     fontSize: 12,
-    fontWeight: '400',
+    fontWeight: '600',
   },
   panelShell: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 24,
-    backgroundColor: 'rgba(23, 26, 32, 0.82)',
+    backgroundColor: colors.panelSurfaceOverlay,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(39, 43, 53, 0.9)',
+    borderTopColor: colors.border,
     paddingBottom: spacing.sm,
   },
   panelBody: {
@@ -1665,7 +1699,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#242935',
+    backgroundColor: colors.surfaceAlt,
   },
   panelTabContent: {
     flexDirection: 'column',
@@ -1674,22 +1708,22 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   panelTabSelected: {
-    backgroundColor: '#D9F04A',
+    backgroundColor: colors.primary,
   },
   panelTabDisabled: {
     opacity: 0.5,
   },
   panelTabText: {
-    color: '#E5E7EB',
-    fontWeight: '400',
+    color: colors.textMuted,
+    fontWeight: '600',
     fontSize: 12,
   },
   panelTabTextSelected: {
-    color: '#111827',
-    fontWeight: '400',
+    color: colors.primaryText,
+    fontWeight: '700',
   },
   panelTabTextDisabled: {
-    color: '#6B7280',
+    color: colors.textSubtle,
   },
   helpFab: {
     width: 42,
@@ -1700,12 +1734,12 @@ const styles = StyleSheet.create({
     marginTop: -6,
   },
   helpFabIdle: {
-    backgroundColor: '#242935',
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
-    borderColor: '#2F3644',
+    borderColor: colors.border,
   },
   helpFabSelected: {
-    backgroundColor: '#D9F04A',
+    backgroundColor: colors.primary,
   },
   effectsList: {
     flexDirection: 'row',
@@ -1716,8 +1750,8 @@ const styles = StyleSheet.create({
     width: 116,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2F3644',
-    backgroundColor: '#202632',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     paddingHorizontal: 8,
     paddingVertical: 8,
     gap: 8,
@@ -1736,8 +1770,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#3A4356',
-    backgroundColor: '#1B2130',
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceStrong,
   },
   effectPreviewBg: {
     ...StyleSheet.absoluteFillObject,
@@ -1789,7 +1823,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.8)',
   },
   effectTitle: {
-    color: '#E5E7EB',
+    color: colors.text,
     fontSize: 12,
     fontWeight: '600',
     lineHeight: 15,
@@ -1814,7 +1848,7 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2F3644',
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   gradientPresetCardSelected: {
@@ -1833,9 +1867,9 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2F3644',
+    borderColor: colors.border,
     overflow: 'hidden',
-    backgroundColor: '#1F2430',
+    backgroundColor: colors.surface,
   },
   sunsetGradientPresetCardSelected: {
     borderColor: colors.primary,
@@ -1849,12 +1883,12 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   orderHint: {
-    color: '#A0A8B8',
+    color: colors.textMuted,
     fontSize: 11,
     marginTop: -2,
   },
   orderLegend: {
-    color: '#A0A8B8',
+    color: colors.textMuted,
     fontSize: 10,
     marginTop: -1,
     marginBottom: 2,
@@ -1893,14 +1927,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     borderWidth: 1,
-    borderColor: '#2F3644',
-    backgroundColor: '#202632',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     paddingHorizontal: 6,
     paddingVertical: 4,
     borderRadius: 10,
   },
   layerRowCardSelected: {
-    borderColor: '#D9F04A',
+    borderColor: colors.primary,
   },
   layerRowCardDragging: {
     opacity: 0.75,
@@ -1910,8 +1944,8 @@ const styles = StyleSheet.create({
     height: 30,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#2F3644',
-    backgroundColor: '#242935',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1926,7 +1960,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   orderPositionText: {
-    color: '#A0A8B8',
+    color: colors.textMuted,
     fontSize: 11,
   },
   behindToggleBtn: {
@@ -1934,8 +1968,8 @@ const styles = StyleSheet.create({
     height: 34,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2F3644',
-    backgroundColor: '#242935',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 8,
@@ -1945,20 +1979,20 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   behindToggleText: {
-    color: '#DDE6F5',
+    color: colors.text,
     fontSize: 12,
-    fontWeight: '400',
+    fontWeight: '600',
   },
   behindToggleTextActive: {
-    color: '#111500',
+    color: colors.primaryText,
   },
   layerHandleBtn: {
     width: 46,
     height: 36,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#2F3644',
-    backgroundColor: '#242935',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1968,9 +2002,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#7F1D1D',
+    borderColor: colors.dangerBorder,
     borderRadius: 8,
-    backgroundColor: '#2A1F24',
+    backgroundColor: colors.dangerSurface,
   },
   statsPillsWrap: {
     flexDirection: 'row',
@@ -1978,9 +2012,9 @@ const styles = StyleSheet.create({
     gap: 8,
     rowGap: 8,
     borderWidth: 1,
-    borderColor: '#2F3644',
+    borderColor: colors.border,
     borderRadius: 12,
-    backgroundColor: '#202632',
+    backgroundColor: colors.surface,
     padding: 8,
   },
   statsPill: {
@@ -1989,8 +2023,8 @@ const styles = StyleSheet.create({
     flexBasis: '31%',
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#3A4356',
-    backgroundColor: '#2A3140',
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceAlt,
     paddingVertical: 8,
     paddingHorizontal: 10,
     flexDirection: 'row',
@@ -2015,8 +2049,8 @@ const styles = StyleSheet.create({
     width: 34,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#3A4356',
-    backgroundColor: '#2A3140',
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2032,12 +2066,12 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   statsPillText: {
-    color: '#D1D5DB',
-    fontWeight: '400',
+    color: colors.text,
+    fontWeight: '600',
     fontSize: 13,
   },
   statsPillTextSelected: {
-    color: '#111500',
+    color: colors.primaryText,
   },
   styleLayerButtonsRow: {
     flexDirection: 'row',
@@ -2050,8 +2084,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     borderWidth: 1,
-    borderColor: '#2E3442',
-    backgroundColor: '#252B38',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -2066,15 +2100,15 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: colors.surface,
   },
   styleLayerButtonText: {
-    color: '#D6DAE3',
+    color: colors.text,
     fontSize: 12,
     fontWeight: '600',
   },
   styleLayerButtonTextSelected: {
-    color: '#111500',
+    color: colors.primaryText,
   },
   stylePickerPopover: {
     position: 'absolute',
@@ -2085,13 +2119,13 @@ const styles = StyleSheet.create({
   },
   stylePickerCard: {
     borderWidth: 1,
-    borderColor: '#E5E7EC',
+    borderColor: colors.border,
     borderRadius: 24,
-    backgroundColor: '#F7F6F8',
+    backgroundColor: colors.surface,
     paddingHorizontal: 14,
     paddingVertical: 14,
     gap: 12,
-    shadowColor: '#000000',
+    shadowColor: colors.text,
     shadowOpacity: 0.18,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
@@ -2107,12 +2141,12 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   stylePickerTitle: {
-    color: '#111827',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
   stylePickerSubtitle: {
-    color: '#6B7280',
+    color: colors.textMuted,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -2121,8 +2155,8 @@ const styles = StyleSheet.create({
     height: 30,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#D9DCE3',
-    backgroundColor: '#ECEEF2',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2130,14 +2164,14 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
   stylePickerHint: {
-    color: '#A0A8B8',
+    color: colors.textMuted,
     fontSize: 11,
   },
   colorGrid: {
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#DDE0E7',
+    borderColor: colors.border,
   },
   colorGridRow: {
     flexDirection: 'row',
@@ -2156,14 +2190,14 @@ const styles = StyleSheet.create({
     bottom: 2,
     left: 2,
     borderWidth: 2,
-    borderColor: '#111827',
+    borderColor: colors.text,
     borderRadius: 2,
   },
   colorGridCellPressed: {
     opacity: 0.8,
   },
   opacityTitle: {
-    color: '#5B6270',
+    color: colors.textMuted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.4,
@@ -2179,9 +2213,9 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#D8DCE3',
+    borderColor: colors.border,
     overflow: 'hidden',
-    backgroundColor: '#ECEFF3',
+    backgroundColor: colors.surfaceAlt,
   },
   opacitySliderTint: {
     ...StyleSheet.absoluteFillObject,
@@ -2198,20 +2232,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   opacityCheckerCellDark: {
-    backgroundColor: '#C9CDD4',
+    backgroundColor: colors.borderStrong,
   },
   opacityCheckerCellLight: {
-    backgroundColor: '#E7EAEE',
+    backgroundColor: colors.surface,
   },
   opacityValueBadge: {
     width: 52,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#D8DCE3',
-    backgroundColor: '#FFFFFF',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     paddingVertical: 6,
     textAlign: 'right',
-    color: '#111827',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
     paddingRight: 8,
@@ -2223,16 +2257,16 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 999,
     borderWidth: 3,
-    borderColor: '#FFFFFF',
-    backgroundColor: '#111827',
-    shadowColor: '#000000',
+    borderColor: colors.surface,
+    backgroundColor: colors.text,
+    shadowColor: colors.text,
     shadowOpacity: 0.2,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
   opacityHelpText: {
-    color: '#6B7280',
+    color: colors.textMuted,
     fontSize: 12,
     fontWeight: '500',
     marginTop: -2,
@@ -2248,7 +2282,7 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#2F3644',
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   stylePickerPreviewSwatchChecker: {
@@ -2258,7 +2292,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   stylePickerMetaText: {
-    color: '#5B6270',
+    color: colors.textMuted,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -2280,8 +2314,8 @@ const styles = StyleSheet.create({
     height: 34,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#3A4356',
-    backgroundColor: '#252B38',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2292,7 +2326,7 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
   openPickerButtonText: {
-    color: '#E5E7EB',
+    color: colors.text,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -2301,22 +2335,49 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#2F3644',
+    borderColor: colors.border,
   },
   colorSwatchSelected: {
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: colors.surface,
   },
   controlLabel: {
-    color: '#F3F4F6',
-    fontWeight: '400',
+    color: colors.text,
+    fontWeight: '600',
   },
   note: {
-    color: '#A0A8B8',
+    color: colors.textMuted,
   },
-  unitChip: {
+  themeModeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  themeModeChip: {
     flex: 1,
-    minWidth: 0,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
   },
-});
+  themeModeChipSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  themeModeChipText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  themeModeChipTextSelected: {
+    color: colors.primaryText,
+  },
+    unitChip: {
+      flex: 1,
+      minWidth: 0,
+      alignItems: 'center',
+    },
+  });
+}
