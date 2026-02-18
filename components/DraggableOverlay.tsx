@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -5,6 +6,8 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import type { ThemeColors } from '@/constants/theme';
 
 type Props = {
   text: string;
@@ -30,6 +33,8 @@ export function DraggableOverlay({
   containerStyle,
   textStyle,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const tx = useSharedValue(initialX);
   const ty = useSharedValue(initialY);
   const scale = useSharedValue(1);
@@ -90,25 +95,27 @@ export function DraggableOverlay({
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    backgroundColor: 'rgba(17,24,39,0.66)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
-  },
-  selected: {
-    borderColor: '#fff',
-    borderWidth: 2,
-  },
-  text: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    overlay: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      backgroundColor: colors.overlayChipBg,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: colors.overlayChipBorder,
+    },
+    selected: {
+      borderColor: colors.overlayChipSelectedBorder,
+      borderWidth: 2,
+    },
+    text: {
+      color: colors.overlayChipText,
+      fontWeight: '700',
+      fontSize: 16,
+    },
+  });
+}

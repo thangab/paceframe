@@ -192,7 +192,7 @@ function createStyles(colors: ThemeColors) {
     },
     selected: {
       borderColor: colors.primary,
-      shadowColor: '#A3B518',
+      shadowColor: colors.primary,
       shadowOpacity: 0.12,
       shadowRadius: 10,
       shadowOffset: { width: 0, height: 6 },

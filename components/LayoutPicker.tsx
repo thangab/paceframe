@@ -70,19 +70,19 @@ function createStyles(colors: ThemeColors) {
       padding: spacing.sm,
       justifyContent: 'space-between',
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.3)',
+      borderColor: colors.layoutCardBorderOnImage,
     },
     selected: {
       borderColor: colors.accent,
       borderWidth: 2,
     },
     name: {
-      color: '#fff',
+      color: colors.layoutCardTextOnImage,
       fontWeight: '700',
       fontSize: 15,
     },
     lock: {
-      color: '#fff',
+      color: colors.layoutCardTextOnImage,
       fontSize: 12,
       opacity: 0.9,
     },

@@ -7,6 +7,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
+import { useThemeColors } from '@/hooks/useThemeColors';
 
 type Props = {
   initialX: number;
@@ -72,6 +73,7 @@ export function DraggableBlock({
   onTransformEnd,
   rotationSnapThresholdDeg = 2,
 }: Props) {
+  const colors = useThemeColors();
   const tx = useSharedValue(initialX);
   const ty = useSharedValue(initialY);
   const scale = useSharedValue(initialScale);
@@ -357,6 +359,7 @@ export function DraggableBlock({
 
   useEffect(() => {
     runOnUI(clampInsideCanvas)();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasWidth, canvasHeight]);
 
   useEffect(() => {
@@ -365,6 +368,7 @@ export function DraggableBlock({
     scale.value = initialScale;
     dynamicRotationDeg.value = 0;
     runOnUI(clampInsideCanvas)();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialScale, initialX, initialY, rotationDeg]);
 
   return (
@@ -391,6 +395,7 @@ export function DraggableBlock({
             pointerEvents="none"
             style={[
               styles.selectionOutline,
+              { borderColor: colors.selectionOutline },
               typeof outlineRadius === 'number'
                 ? { borderRadius: outlineRadius }
                 : null,
@@ -406,6 +411,6 @@ const styles = StyleSheet.create({
   selectionOutline: {
     ...StyleSheet.absoluteFillObject,
     borderWidth: 2,
-    borderColor: '#22D3EE',
+    borderColor: 'transparent',
   },
 });

@@ -938,14 +938,15 @@ export function PreviewEditorPanel({
                       style={[
                         styles.stylePickerPreviewSwatchTint,
                         {
-                          backgroundColor: selectedLayerStyle?.color ?? '#FFFFFF',
+                          backgroundColor:
+                            selectedLayerStyle?.color ?? colors.solidWhite,
                           opacity: selectedLayerStyle?.opacity ?? 1,
                         },
                       ]}
                     />
                   </View>
                   <Text style={styles.stylePickerMetaText}>
-                    {(selectedLayerStyle?.color ?? '#FFFFFF').toUpperCase()} •{' '}
+                    {(selectedLayerStyle?.color ?? colors.solidWhite).toUpperCase()} •{' '}
                     {Math.round((selectedLayerStyle?.opacity ?? 1) * 100)}%
                   </Text>
                 </View>
@@ -1259,7 +1260,7 @@ export function PreviewEditorPanel({
                   <LinearGradient
                     colors={[
                       'rgba(255,255,255,0)',
-                      selectedLayerStyle?.color ?? '#FFFFFF',
+                      selectedLayerStyle?.color ?? colors.solidWhite,
                     ]}
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
@@ -1573,7 +1574,7 @@ function createStyles(colors: ThemeColors) {
     borderRadius: 10,
     borderWidth: 0,
     borderColor: 'transparent',
-    backgroundColor: '#C9D2DE',
+    backgroundColor: colors.layoutPreviewFrameBg,
     padding: 2,
     overflow: 'hidden',
   },
@@ -1581,7 +1582,7 @@ function createStyles(colors: ThemeColors) {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#B7C2D0',
+    backgroundColor: colors.layoutPreviewSurfaceBg,
   },
   previewScaledWrap: {
     alignItems: 'center',

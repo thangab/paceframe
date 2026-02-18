@@ -3,6 +3,7 @@ import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { Canvas, Path, Skia } from '@shopify/react-native-skia';
 import { generateMapSnapshot } from '@/lib/nativeMapSnapshot';
 import { decodePolyline } from '@/lib/polyline';
+import { useThemeColors } from '@/hooks/useThemeColors';
 
 type RouteMode = 'map' | 'trace';
 type RouteMapVariant = 'standard' | 'dark' | 'satellite';
@@ -25,8 +26,11 @@ export function RouteLayer({
   mapVariant = 'standard',
   width = 250,
   height = 150,
-  traceColor = '#D4FF54',
+  traceColor,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const resolvedTraceColor = traceColor ?? colors.primary;
   const [mapLoadFailed, setMapLoadFailed] = useState(false);
   const [iosMapUri, setIosMapUri] = useState<string | null>(null);
   const iosSnapshotKeyRef = useRef<string | null>(null);
@@ -89,7 +93,7 @@ export function RouteLayer({
           : 'mapbox/streets-v12';
     const sampled = sampleForStaticMap(latLngs, 50);
     const encodedPolyline = encodeURIComponent(encodePolyline(sampled));
-    const overlayColor = traceColor.replace('#', '').toLowerCase();
+    const overlayColor = resolvedTraceColor.replace('#', '').toLowerCase();
     const overlay = `path-4+${overlayColor}-0.95(${encodedPolyline})`;
     const pixelRatioSuffix = '@2x';
 
@@ -100,7 +104,7 @@ export function RouteLayer({
       `${Math.round(width)}x${Math.round(height)}${pixelRatioSuffix}` +
       `?access_token=${encodeURIComponent(MAPBOX_TOKEN)}`
     );
-  }, [polyline, latLngs, viewport, width, height, mapVariant, traceColor]);
+  }, [polyline, latLngs, viewport, width, height, mapVariant, resolvedTraceColor]);
 
   useEffect(() => {
     setMapLoadFailed(false);
@@ -124,7 +128,7 @@ export function RouteLayer({
       polyline,
       width,
       height,
-      strokeColorHex: traceColor,
+      strokeColorHex: resolvedTraceColor,
       mapVariant,
     })
       .then((uri) => {
@@ -144,7 +148,7 @@ export function RouteLayer({
     return () => {
       cancelled = true;
     };
-  }, [polyline, width, height, iosMapUri, mapVariant, traceColor]);
+  }, [polyline, width, height, iosMapUri, mapVariant, resolvedTraceColor]);
 
   if (!routePath) {
     return (
@@ -188,7 +192,7 @@ export function RouteLayer({
         path={routePath.path}
         style="stroke"
         strokeWidth={TRACE_STROKE_WIDTH}
-        color={traceColor}
+        color={resolvedTraceColor}
         strokeJoin="round"
         strokeCap="round"
       />
@@ -303,28 +307,30 @@ function encodePolyline(points: { lat: number; lng: number }[]) {
   return result;
 }
 
-const styles = StyleSheet.create({
-  mapWrap: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: 'transparent',
-  },
-  mapImage: {
-    width: '100%',
-    height: '100%',
-  },
-  empty: {
-    borderRadius: 0,
-    borderWidth: 0,
-    borderColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-    paddingHorizontal: 12,
-  },
-  emptyText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-});
+function createStyles(colors: { mapEmptyText: string }) {
+  return StyleSheet.create({
+    mapWrap: {
+      borderRadius: 12,
+      overflow: 'hidden',
+      backgroundColor: 'transparent',
+    },
+    mapImage: {
+      width: '100%',
+      height: '100%',
+    },
+    empty: {
+      borderRadius: 0,
+      borderWidth: 0,
+      borderColor: 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
+      paddingHorizontal: 12,
+    },
+    emptyText: {
+      color: colors.mapEmptyText,
+      fontSize: 12,
+      textAlign: 'center',
+    },
+  });
+}

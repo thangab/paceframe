@@ -22,6 +22,30 @@ export type ThemeColors = {
   panelBorder: string;
   panelText: string;
   panelTextMuted: string;
+  onDanger: string;
+  onImageText: string;
+  onImageTextMuted: string;
+  onImageShadow: string;
+  onImageShadowStrong: string;
+  onImageDivider: string;
+  watermarkOnImage: string;
+  previewCanvasBase: string;
+  previewCheckerDark: string;
+  previewCheckerLight: string;
+  previewGuide: string;
+  previewGuideText: string;
+  selectionOutline: string;
+  overlayChipBg: string;
+  overlayChipBorder: string;
+  overlayChipSelectedBorder: string;
+  overlayChipText: string;
+  mapEmptyText: string;
+  layoutCardTextOnImage: string;
+  layoutCardBorderOnImage: string;
+  layoutPreviewFrameBg: string;
+  layoutPreviewSurfaceBg: string;
+  solidBlack: string;
+  solidWhite: string;
 };
 
 export const lightColors: ThemeColors = {
@@ -48,6 +72,30 @@ export const lightColors: ThemeColors = {
   panelBorder: '#2F3644',
   panelText: '#E5E7EB',
   panelTextMuted: '#9CA3AF',
+  onDanger: '#FFFFFF',
+  onImageText: '#FFFFFF',
+  onImageTextMuted: 'rgba(235,235,242,0.9)',
+  onImageShadow: 'rgba(0,0,0,0.35)',
+  onImageShadowStrong: 'rgba(0,0,0,0.4)',
+  onImageDivider: 'rgba(255,255,255,0.25)',
+  watermarkOnImage: 'rgba(255,255,255,0.84)',
+  previewCanvasBase: '#0B0B0B',
+  previewCheckerDark: '#060606',
+  previewCheckerLight: '#111111',
+  previewGuide: 'rgba(34,211,238,0.95)',
+  previewGuideText: '#00131A',
+  selectionOutline: '#22D3EE',
+  overlayChipBg: 'rgba(17,24,39,0.66)',
+  overlayChipBorder: 'rgba(255,255,255,0.35)',
+  overlayChipSelectedBorder: '#FFFFFF',
+  overlayChipText: '#FFFFFF',
+  mapEmptyText: 'rgba(255,255,255,0.8)',
+  layoutCardTextOnImage: '#FFFFFF',
+  layoutCardBorderOnImage: 'rgba(255,255,255,0.3)',
+  layoutPreviewFrameBg: '#AEBBCC',
+  layoutPreviewSurfaceBg: '#9CAABD',
+  solidBlack: '#000000',
+  solidWhite: '#FFFFFF',
 };
 
 export const darkColors: ThemeColors = {
@@ -74,6 +122,30 @@ export const darkColors: ThemeColors = {
   panelBorder: '#2F3A50',
   panelText: '#E5E7EB',
   panelTextMuted: '#9CA3AF',
+  onDanger: '#FFFFFF',
+  onImageText: '#FFFFFF',
+  onImageTextMuted: 'rgba(235,235,242,0.9)',
+  onImageShadow: 'rgba(0,0,0,0.35)',
+  onImageShadowStrong: 'rgba(0,0,0,0.4)',
+  onImageDivider: 'rgba(255,255,255,0.25)',
+  watermarkOnImage: 'rgba(255,255,255,0.84)',
+  previewCanvasBase: '#0B0B0B',
+  previewCheckerDark: '#060606',
+  previewCheckerLight: '#111111',
+  previewGuide: 'rgba(34,211,238,0.95)',
+  previewGuideText: '#00131A',
+  selectionOutline: '#22D3EE',
+  overlayChipBg: 'rgba(17,24,39,0.66)',
+  overlayChipBorder: 'rgba(255,255,255,0.35)',
+  overlayChipSelectedBorder: '#FFFFFF',
+  overlayChipText: '#FFFFFF',
+  mapEmptyText: 'rgba(255,255,255,0.8)',
+  layoutCardTextOnImage: '#FFFFFF',
+  layoutCardBorderOnImage: 'rgba(255,255,255,0.3)',
+  layoutPreviewFrameBg: '#2A3344',
+  layoutPreviewSurfaceBg: '#202A3D',
+  solidBlack: '#000000',
+  solidWhite: '#FFFFFF',
 };
 
 // Backward compatibility for files not yet migrated to dynamic theming.

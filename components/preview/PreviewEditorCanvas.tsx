@@ -20,7 +20,7 @@ import {
   PrimaryStatLayerContent,
   StatsLayerContent,
 } from '@/components/StatsLayerContent';
-import { radius } from '@/constants/theme';
+import { radius, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { CHECKER_SIZE } from '@/lib/previewConfig';
 import type {
@@ -238,6 +238,7 @@ export function PreviewEditorCanvas({
   onRotationGuideChange,
 }: Props) {
   const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [subjectRadialCenter, setSubjectRadialCenter] = useState<{
     x: number;
     y: number;
@@ -1002,8 +1003,9 @@ export function PreviewEditorCanvas({
   );
 }
 
-const styles = StyleSheet.create({
-  stageWrap: {
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    stageWrap: {
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 0,
@@ -1022,13 +1024,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: radius.lg,
   },
-  storyCanvas: {
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    backgroundColor: '#0B0B0B',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
+    storyCanvas: {
+      borderRadius: radius.lg,
+      overflow: 'hidden',
+      backgroundColor: colors.previewCanvasBase,
+      borderWidth: 1,
+      borderColor: 'transparent',
+    },
   storyCanvasSquare: {
     borderRadius: 0,
   },
@@ -1068,47 +1070,47 @@ const styles = StyleSheet.create({
     width: CHECKER_SIZE,
     height: CHECKER_SIZE,
   },
-  checkerTileDark: {
-    backgroundColor: '#060606',
-  },
-  checkerTileLight: {
-    backgroundColor: '#111111',
-  },
-  centerGuideVertical: {
+    checkerTileDark: {
+      backgroundColor: colors.previewCheckerDark,
+    },
+    checkerTileLight: {
+      backgroundColor: colors.previewCheckerLight,
+    },
+    centerGuideVertical: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     left: '50%',
     width: 1,
     marginLeft: -0.5,
-    backgroundColor: 'rgba(34,211,238,0.95)',
+    backgroundColor: colors.previewGuide,
     zIndex: 999,
     elevation: 999,
   },
-  centerGuideHorizontal: {
+    centerGuideHorizontal: {
     position: 'absolute',
     left: 0,
     right: 0,
     top: '50%',
     height: 1,
     marginTop: -0.5,
-    backgroundColor: 'rgba(34,211,238,0.95)',
+    backgroundColor: colors.previewGuide,
     zIndex: 999,
     elevation: 999,
   },
-  rotationGuideBadge: {
+    rotationGuideBadge: {
     position: 'absolute',
     top: 12,
     alignSelf: 'center',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: 'rgba(34,211,238,0.95)',
+    backgroundColor: colors.previewGuide,
     zIndex: 1000,
     elevation: 1000,
   },
-  rotationGuideBadgeText: {
-    color: '#00131A',
+    rotationGuideBadgeText: {
+      color: colors.previewGuideText,
     fontWeight: '800',
     fontSize: 12,
   },
@@ -1132,13 +1134,13 @@ const styles = StyleSheet.create({
   subjectFilterOverlay: {
     ...StyleSheet.absoluteFillObject,
   },
-  trueBlackWhiteBlendLayer: {
+    trueBlackWhiteBlendLayer: {
     position: 'absolute',
     width: '100%',
     height: '100%',
     zIndex: 6,
     elevation: 6,
-    backgroundColor: '#000000',
+    backgroundColor: colors.solidBlack,
     mixBlendMode: 'saturation',
   },
   canvasTapCatcher: {
@@ -1173,35 +1175,35 @@ const styles = StyleSheet.create({
     width: 280,
     paddingTop: 4,
   },
-  metaSubtitle: {
-    color: '#FFFFFF',
+    metaSubtitle: {
+      color: colors.onImageText,
     fontSize: 12,
     marginTop: 2,
-    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowColor: colors.onImageShadow,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-  metaSubtitleSunset: {
-    color: 'rgba(235,235,242,0.9)',
+    metaSubtitleSunset: {
+      color: colors.onImageTextMuted,
     fontSize: 13,
     letterSpacing: 0.2,
     marginTop: 6,
   },
-  metaLocation: {
-    color: '#FFFFFF',
+    metaLocation: {
+      color: colors.onImageText,
     fontSize: 12,
     marginTop: 2,
-    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowColor: colors.onImageShadow,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-  metaTitle: {
+    metaTitle: {
     width: '100%',
-    color: '#FFFFFF',
+    color: colors.onImageText,
     fontSize: 18,
     fontWeight: '800',
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowColor: colors.onImageShadowStrong,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
@@ -1210,10 +1212,10 @@ const styles = StyleSheet.create({
     letterSpacing: 2.2,
     marginBottom: 6,
   },
-  metaDividerSunset: {
+    metaDividerSunset: {
     width: '82%',
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: colors.onImageDivider,
     marginTop: 2,
   },
   routeBlock: {
@@ -1232,14 +1234,15 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  watermark: {
+    watermark: {
     position: 'absolute',
     right: 14,
     bottom: 16,
-    color: 'rgba(255,255,255,0.84)',
+    color: colors.watermarkOnImage,
     fontWeight: '800',
     letterSpacing: 1,
     zIndex: 5000,
     elevation: 5000,
-  },
-});
+    },
+  });
+}

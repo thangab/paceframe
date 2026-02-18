@@ -35,7 +35,7 @@ export function PrimaryButton({
     variant === 'primary'
       ? colors.primaryText
       : variant === 'danger'
-        ? '#FFFFFF'
+        ? colors.onDanger
         : colors.text;
 
   return (
