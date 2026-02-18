@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { radius, spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -16,6 +18,11 @@ export default function PaywallScreen() {
   const [packageLabel, setPackageLabel] = useState('Unlock');
   const [pkg, setPkg] = useState<any>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const features = [
+    'All premium templates',
+    'No watermark on exports',
+    'Future premium packs included',
+  ];
 
   useEffect(() => {
     async function loadOffering() {
@@ -76,16 +83,41 @@ export default function PaywallScreen() {
 
   return (
     <View style={styles.container}>
+      <LinearGradient
+        colors={[colors.background, colors.surfaceAlt]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.backdrop}
+      />
       <View style={styles.hero}>
+        <View style={styles.heroBadge}>
+          <MaterialCommunityIcons
+            name="crown-outline"
+            size={14}
+            color={colors.primaryText}
+          />
+          <Text style={styles.heroBadgeText}>Premium</Text>
+        </View>
         <Text style={styles.title}>PaceFrame {offeringTitle}</Text>
         <Text style={styles.subtitle}>
           Unlock all creative templates and export without watermark.
         </Text>
       </View>
 
-      <Text style={styles.bullet}>- All premium templates</Text>
-      <Text style={styles.bullet}>- No watermark on exports</Text>
-      <Text style={styles.bullet}>- Future premium packs</Text>
+      <View style={styles.features}>
+        {features.map((item) => (
+          <View key={item} style={styles.featureRow}>
+            <View style={styles.featureIcon}>
+              <MaterialCommunityIcons
+                name="check"
+                size={14}
+                color={colors.primaryText}
+              />
+            </View>
+            <Text style={styles.bullet}>{item}</Text>
+          </View>
+        ))}
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.freeTitle}>Free Tier</Text>
@@ -117,48 +149,91 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.md,
       backgroundColor: colors.background,
     },
-  hero: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    gap: 6,
-  },
-  title: {
-    color: colors.text,
-    fontWeight: '800',
-    fontSize: 30,
-  },
-  subtitle: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  bullet: {
-    color: colors.textMuted,
-    fontSize: 15,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  freeTitle: {
-    color: colors.text,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  premiumTitle: {
-    color: colors.success,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  freeLine: {
-    color: colors.textMuted,
-  },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    hero: {
+      borderRadius: radius.lg + 2,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      padding: spacing.md,
+      gap: 6,
+      shadowColor: colors.text,
+      shadowOpacity: 0.1,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 4,
+    },
+    heroBadge: {
+      alignSelf: 'flex-start',
+      borderRadius: 999,
+      backgroundColor: colors.primary,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginBottom: 4,
+    },
+    heroBadgeText: {
+      color: colors.primaryText,
+      fontWeight: '800',
+      fontSize: 12,
+    },
+    title: {
+      color: colors.text,
+      fontWeight: '900',
+      fontSize: 30,
+    },
+    subtitle: {
+      color: colors.textMuted,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    features: {
+      gap: 8,
+      marginTop: 2,
+    },
+    featureRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    featureIcon: {
+      width: 20,
+      height: 20,
+      borderRadius: 999,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    bullet: {
+      color: colors.textMuted,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.md + 2,
+      padding: spacing.md,
+    },
+    freeTitle: {
+      color: colors.text,
+      fontWeight: '800',
+      marginBottom: 4,
+    },
+    premiumTitle: {
+      color: colors.success,
+      fontWeight: '900',
+      marginBottom: 4,
+    },
+    freeLine: {
+      color: colors.textMuted,
+      fontWeight: '600',
+    },
     message: {
       color: colors.textMuted,
     },

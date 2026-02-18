@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { StatsLayerContent } from '@/components/StatsLayerContent';
-import { spacing, type ThemeColors } from '@/constants/theme';
+import { layout, spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import type { DistanceUnit } from '@/lib/format';
 import { FONT_PRESETS, TEMPLATES } from '@/lib/previewConfig';
@@ -429,6 +429,40 @@ export function PreviewEditorPanel({
 
   return (
     <View style={styles.panelShell}>
+      {panelOpen ? (
+        <>
+          <LinearGradient
+            pointerEvents="none"
+            colors={[colors.glassSurfaceStart, colors.glassSurfaceEnd]}
+            start={{ x: 0.1, y: 0 }}
+            end={{ x: 0.9, y: 1 }}
+            style={styles.panelGlassBg}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={[
+              colors.glassHighlight,
+              'rgba(255,255,255,0.28)',
+              'rgba(255,255,255,0.05)',
+            ]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={styles.panelGlassSheen}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={[
+              'rgba(8,11,18,0.06)',
+              'rgba(8,11,18,0.18)',
+              'rgba(8,11,18,0.28)',
+            ]}
+            start={{ x: 0.5, y: 0.3 }}
+            end={{ x: 0.5, y: 1 }}
+            style={styles.panelGlassDepth}
+          />
+          <View pointerEvents="none" style={styles.panelGlassHighlight} />
+        </>
+      ) : null}
       {panelOpen ? (
         <View style={styles.panelBody}>
           {activePanel === 'background' ? (
@@ -1294,6 +1328,20 @@ export function PreviewEditorPanel({
 
       <View style={styles.panelTabs}>
         <View style={styles.mainTabsRow}>
+          <LinearGradient
+            pointerEvents="none"
+            colors={[colors.glassSurfaceStart, colors.glassSurfaceEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.mainTabsGlassBg}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(255,255,255,0.42)', 'rgba(255,255,255,0.04)']}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.8, y: 1 }}
+            style={styles.mainTabsGlassSheen}
+          />
           {mainTabs.map((tab) => {
             const selected = activePanel === tab.id;
             return (
@@ -1315,7 +1363,7 @@ export function PreviewEditorPanel({
                       tab.disabled
                         ? colors.textSubtle
                         : selected
-                          ? colors.primaryText
+                          ? colors.text
                           : colors.textMuted
                     }
                   />
@@ -1344,10 +1392,17 @@ export function PreviewEditorPanel({
           accessibilityRole="button"
           accessibilityLabel="Help"
         >
+          <LinearGradient
+            pointerEvents="none"
+            colors={[colors.glassSurfaceStart, colors.glassSurfaceEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.helpFabGlassBg}
+          />
           <MaterialCommunityIcons
             name="help-circle-outline"
             size={20}
-            color={activePanel === 'help' ? colors.primaryText : colors.textMuted}
+            color={activePanel === 'help' ? colors.text : colors.textMuted}
           />
         </Pressable>
       </View>
@@ -1499,30 +1554,32 @@ function hsvToHex(h: number, s: number, v: number) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     sectionTitle: {
-    color: colors.text,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  chipRow: {
-    gap: spacing.sm,
-  },
-  chip: {
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    minWidth: 116,
-  },
-  chipSelected: {
-    borderColor: colors.primaryBorderOnLight,
-    borderWidth: 2,
-  },
-  chipText: {
-    color: colors.text,
-    fontWeight: '600',
-  },
+      color: colors.text,
+      fontWeight: '800',
+      fontSize: 14,
+      letterSpacing: 0.2,
+    },
+    chipRow: {
+      gap: spacing.sm,
+    },
+    chip: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      minWidth: 116,
+    },
+    chipSelected: {
+      borderColor: colors.primaryBorderOnLight,
+      borderWidth: 2,
+      backgroundColor: colors.surfaceAlt,
+    },
+    chipText: {
+      color: colors.text,
+      fontWeight: '700',
+    },
   chipSub: {
     color: colors.primaryText,
     fontSize: 12,
@@ -1530,16 +1587,21 @@ function createStyles(colors: ThemeColors) {
     textAlign: 'center',
     alignSelf: 'center',
   },
-  templateCard: {
-    width: 108,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    padding: 0,
-    overflow: 'hidden',
-    position: 'relative',
-  },
+    templateCard: {
+      width: 108,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      padding: 0,
+      overflow: 'hidden',
+      position: 'relative',
+      shadowColor: colors.text,
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
+    },
   templateItem: {
     alignItems: 'center',
   },
@@ -1663,22 +1725,50 @@ function createStyles(colors: ThemeColors) {
     fontSize: 12,
     fontWeight: '600',
   },
-  panelShell: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 24,
-    backgroundColor: colors.panelSurfaceOverlay,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingBottom: spacing.sm,
-  },
-  panelBody: {
-    minHeight: 188,
-    maxHeight: 230,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-  },
+    panelShell: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: layout.floatingBottomOffset,
+      backgroundColor: 'transparent',
+      borderTopWidth: 1,
+      borderTopColor: colors.glassStroke,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingBottom: spacing.sm,
+      overflow: 'hidden',
+      shadowColor: colors.glassShadow,
+      shadowOpacity: 0.24,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: -4 },
+      elevation: 8,
+    },
+    panelGlassBg: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    panelGlassSheen: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.56,
+    },
+    panelGlassDepth: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.24,
+    },
+    panelGlassHighlight: {
+      position: 'absolute',
+      left: 14,
+      right: 14,
+      top: 0,
+      height: 1,
+      backgroundColor: colors.glassHighlight,
+      opacity: 0.9,
+    },
+    panelBody: {
+      minHeight: 196,
+      maxHeight: 240,
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.sm,
+    },
   panelScroll: {
     flex: 1,
   },
@@ -1692,55 +1782,83 @@ function createStyles(colors: ThemeColors) {
   mainTabsRow: {
     flex: 1,
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.glassStroke,
+    overflow: 'hidden',
+    paddingHorizontal: 5,
+    paddingVertical: 5,
+    position: 'relative',
   },
-  panelTab: {
-    flex: 1,
-    borderRadius: 12,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceAlt,
+  mainTabsGlassBg: {
+    ...StyleSheet.absoluteFillObject,
   },
+  mainTabsGlassSheen: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.6,
+  },
+    panelTab: {
+      flex: 1,
+      borderRadius: 999,
+      paddingVertical: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: 'transparent',
+    },
   panelTabContent: {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 3,
   },
-  panelTabSelected: {
-    backgroundColor: colors.primary,
-  },
+    panelTabSelected: {
+      backgroundColor: colors.surface,
+      borderColor: colors.borderStrong,
+      shadowColor: colors.glassShadow,
+      shadowOpacity: 0.1,
+      shadowRadius: 7,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    },
   panelTabDisabled: {
     opacity: 0.5,
   },
   panelTabText: {
     color: colors.textMuted,
-    fontWeight: '600',
-    fontSize: 12,
+    fontWeight: '500',
+    fontSize: 11,
   },
   panelTabTextSelected: {
-    color: colors.primaryText,
-    fontWeight: '700',
+    color: colors.text,
+    fontWeight: '600',
   },
   panelTabTextDisabled: {
     color: colors.textSubtle,
   },
-  helpFab: {
-    width: 42,
-    height: 42,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -6,
-  },
-  helpFabIdle: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+    helpFab: {
+      width: 44,
+      height: 44,
+      borderRadius: 999,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: -6,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.glassStroke,
+      position: 'relative',
+    },
+    helpFabGlassBg: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    helpFabIdle: {
+      backgroundColor: 'transparent',
+    },
   helpFabSelected: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.surface,
+    borderColor: colors.borderStrong,
   },
   effectsList: {
     flexDirection: 'row',
@@ -1923,20 +2041,21 @@ function createStyles(colors: ThemeColors) {
   layerRowSpacer: {
     height: 6,
   },
-  layerRowCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  layerRowCardSelected: {
-    borderColor: colors.primaryBorderOnLight,
-  },
+    layerRowCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      borderRadius: 12,
+    },
+    layerRowCardSelected: {
+      borderColor: colors.primaryBorderOnLight,
+      borderWidth: 2,
+    },
   layerRowCardDragging: {
     opacity: 0.75,
   },
@@ -2007,32 +2126,32 @@ function createStyles(colors: ThemeColors) {
     borderRadius: 8,
     backgroundColor: colors.dangerSurface,
   },
-  statsPillsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    rowGap: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    padding: 8,
-  },
-  statsPill: {
-    minWidth: 98,
-    flexGrow: 1,
-    flexBasis: '31%',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surfaceAlt,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
+    statsPillsWrap: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      rowGap: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      backgroundColor: colors.surface,
+      padding: 8,
+    },
+    statsPill: {
+      minWidth: 98,
+      flexGrow: 1,
+      flexBasis: '31%',
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      backgroundColor: colors.surfaceAlt,
+      paddingVertical: 9,
+      paddingHorizontal: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
   statsPillMain: {
     flex: 1,
     minWidth: 0,
@@ -2118,20 +2237,20 @@ function createStyles(colors: ThemeColors) {
     bottom: 76,
     zIndex: 40,
   },
-  stylePickerCard: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 24,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    gap: 12,
-    shadowColor: colors.text,
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
-  },
+    stylePickerCard: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 24,
+      backgroundColor: colors.surface,
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+      gap: 12,
+      shadowColor: colors.text,
+      shadowOpacity: 0.22,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 12,
+    },
   stylePickerHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',

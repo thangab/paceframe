@@ -11,8 +11,9 @@ import {
   View,
 } from 'react-native';
 import { MaterialCommunityIcons, FontAwesome6 } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ActivityCard } from '@/components/ActivityCard';
-import { spacing, type ThemeColors } from '@/constants/theme';
+import { layout, spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { fetchActivities, refreshTokensWithSupabase } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
@@ -152,6 +153,20 @@ export default function ActivitiesScreen() {
                     : 'Switch to dark theme'
                 }
               >
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={[colors.glassSurfaceStart, colors.glassSurfaceEnd]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.themeToggleGlassBg}
+                />
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={['rgba(255,255,255,0.7)', 'rgba(255,255,255,0.08)']}
+                  start={{ x: 0.2, y: 0 }}
+                  end={{ x: 0.8, y: 1 }}
+                  style={styles.themeToggleGlassSheen}
+                />
                 <MaterialCommunityIcons
                   name={themeMode === 'dark' ? 'weather-sunny' : 'weather-night'}
                   size={16}
@@ -164,8 +179,10 @@ export default function ActivitiesScreen() {
       />
       <View style={styles.container}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>{welcomeTitle}</Text>
-          <View style={styles.headerAvatarSpacer} />
+          <View style={styles.headerCopy}>
+            <Text style={styles.title}>{welcomeTitle}</Text>
+            <Text style={styles.subtitle}>Pick one activity to start your design</Text>
+          </View>
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -227,143 +244,127 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.md,
       backgroundColor: colors.background,
     },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  headerAvatarWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 999,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  headerAvatar: {
-    width: '100%',
-    height: '100%',
-  },
-  headerAvatarFallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerAvatarSpacer: {
-    width: 36,
-    height: 36,
-  },
-  navAvatarWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 999,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  navAvatarContainer: {
-    marginLeft: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  themeToggleBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navAvatar: {
-    width: '100%',
-    height: '100%',
-  },
-  navAvatarFallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navTitleWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  navTitleText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.text,
-    textAlign: 'left',
-    flex: 1,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  countBadge: {
-    color: colors.textMuted,
-    fontWeight: '800',
-    fontSize: 13,
-    backgroundColor: colors.surfaceStrong,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  logoutBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  error: {
-    color: colors.danger,
-    marginBottom: spacing.sm,
-  },
-  empty: {
-    marginTop: spacing.lg,
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
-  listContent: {
-    paddingBottom: 120,
-  },
-  bottomBar: {
-    position: 'absolute',
-    left: spacing.md,
-    right: spacing.md,
-    bottom: spacing.md,
-  },
-  generateBtn: {
-    borderRadius: 18,
-    backgroundColor: colors.primary,
-    height: 62,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  generateBtnDisabled: {
-    opacity: 0.5,
-  },
-  generateBtnText: {
-    color: colors.primaryText,
-    fontSize: 18,
-    fontWeight: '800',
-  },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: spacing.md,
+    },
+    headerCopy: {
+      flex: 1,
+      gap: 2,
+    },
+    navAvatarWrap: {
+      width: 32,
+      height: 32,
+      borderRadius: 999,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    navAvatarContainer: {
+      marginLeft: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    themeToggleBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.glassStroke,
+      backgroundColor: 'transparent',
+      overflow: 'hidden',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    themeToggleGlassBg: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    themeToggleGlassSheen: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    navAvatar: {
+      width: '100%',
+      height: '100%',
+    },
+    navAvatarFallback: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    navTitleWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    navTitleText: {
+      fontSize: 17,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    title: {
+      fontSize: 30,
+      fontWeight: '800',
+      color: colors.text,
+      textAlign: 'left',
+      lineHeight: 34,
+    },
+    subtitle: {
+      color: colors.textMuted,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    logoutBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    error: {
+      color: colors.danger,
+      marginBottom: spacing.sm,
+    },
+    empty: {
+      marginTop: spacing.lg,
+      color: colors.textMuted,
+      textAlign: 'center',
+      fontWeight: '600',
+    },
+    listContent: {
+      paddingBottom: 124,
+    },
+    bottomBar: {
+      position: 'absolute',
+      left: spacing.md,
+      right: spacing.md,
+      bottom: layout.floatingBottomOffset,
+    },
+    generateBtn: {
+      borderRadius: 20,
+      backgroundColor: colors.primary,
+      height: 62,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: colors.text,
+      shadowOpacity: 0.14,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 6,
+    },
+    generateBtnDisabled: {
+      opacity: 0.5,
+    },
+    generateBtnText: {
+      color: colors.primaryText,
+      fontSize: 18,
+      fontWeight: '900',
+      letterSpacing: 0.2,
+    },
     generateBtnContent: {
       flexDirection: 'row',
       alignItems: 'center',

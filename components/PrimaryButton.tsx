@@ -90,14 +90,16 @@ export function PrimaryButton({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     button: {
-      borderRadius: radius.md,
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.md,
+      minHeight: 52,
+      borderRadius: radius.lg + 2,
+      paddingVertical: spacing.md - 2,
+      paddingHorizontal: spacing.md + 2,
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'row',
     },
     buttonCompact: {
+      minHeight: 44,
       paddingVertical: 8,
       paddingHorizontal: 6,
     },
@@ -106,11 +108,17 @@ function createStyles(colors: ThemeColors) {
     },
     primary: {
       backgroundColor: colors.primary,
+      borderWidth: 0,
+      shadowColor: colors.text,
+      shadowOpacity: 0.16,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 5,
     },
     secondary: {
-      backgroundColor: colors.surfaceAlt,
+      backgroundColor: colors.surface,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: colors.borderStrong,
     },
     secondaryPanel: {
       backgroundColor: colors.surfaceAlt,
@@ -118,16 +126,24 @@ function createStyles(colors: ThemeColors) {
     },
     danger: {
       backgroundColor: colors.danger,
+      borderWidth: 0,
+      shadowColor: colors.danger,
+      shadowOpacity: 0.18,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4,
     },
     pressed: {
-      opacity: 0.86,
+      opacity: 0.96,
+      transform: [{ scale: 0.985 }],
     },
     disabled: {
       opacity: 0.55,
     },
     label: {
-      fontWeight: '700',
+      fontWeight: '800',
       fontSize: 15,
+      letterSpacing: 0.2,
       textAlign: 'center',
     },
     labelCompact: {

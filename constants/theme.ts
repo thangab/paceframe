@@ -46,6 +46,11 @@ export type ThemeColors = {
   layoutCardBorderOnImage: string;
   layoutPreviewFrameBg: string;
   layoutPreviewSurfaceBg: string;
+  glassSurfaceStart: string;
+  glassSurfaceEnd: string;
+  glassStroke: string;
+  glassHighlight: string;
+  glassShadow: string;
   solidBlack: string;
   solidWhite: string;
 };
@@ -98,6 +103,11 @@ export const lightColors: ThemeColors = {
   layoutCardBorderOnImage: 'rgba(255,255,255,0.3)',
   layoutPreviewFrameBg: '#AEBBCC',
   layoutPreviewSurfaceBg: '#9CAABD',
+  glassSurfaceStart: 'rgba(255,255,255,0.78)',
+  glassSurfaceEnd: 'rgba(236,242,250,0.62)',
+  glassStroke: 'rgba(190,204,224,0.85)',
+  glassHighlight: 'rgba(255,255,255,0.82)',
+  glassShadow: 'rgba(15,23,42,0.22)',
   solidBlack: '#000000',
   solidWhite: '#FFFFFF',
 };
@@ -150,6 +160,11 @@ export const darkColors: ThemeColors = {
   layoutCardBorderOnImage: 'rgba(255,255,255,0.3)',
   layoutPreviewFrameBg: '#2A3344',
   layoutPreviewSurfaceBg: '#202A3D',
+  glassSurfaceStart: 'rgba(36,46,65,0.82)',
+  glassSurfaceEnd: 'rgba(19,27,44,0.62)',
+  glassStroke: 'rgba(121,136,161,0.35)',
+  glassHighlight: 'rgba(255,255,255,0.16)',
+  glassShadow: 'rgba(0,0,0,0.42)',
   solidBlack: '#000000',
   solidWhite: '#FFFFFF',
 };
@@ -169,4 +184,8 @@ export const radius = {
   sm: 8,
   md: 14,
   lg: 20,
+};
+
+export const layout = {
+  floatingBottomOffset: 34,
 };

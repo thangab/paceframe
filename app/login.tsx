@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -131,6 +132,14 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
+      <LinearGradient
+        colors={[colors.background, colors.surfaceAlt]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.backdrop}
+      />
+      <View style={styles.glowTop} />
+      <View style={styles.glowBottom} />
       <View style={styles.card}>
         <View style={styles.brandMark}>
           <MaterialCommunityIcons
@@ -246,25 +255,52 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'center',
       backgroundColor: colors.background,
     },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    glowTop: {
+      position: 'absolute',
+      top: -110,
+      right: -60,
+      width: 260,
+      height: 260,
+      borderRadius: 999,
+      backgroundColor: `${colors.primary}24`,
+    },
+    glowBottom: {
+      position: 'absolute',
+      left: -80,
+      bottom: -120,
+      width: 260,
+      height: 260,
+      borderRadius: 999,
+      backgroundColor: `${colors.accent}1F`,
+    },
     card: {
-      borderRadius: 18,
+      borderRadius: 24,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.surface,
-      padding: spacing.lg,
+      padding: spacing.lg + 2,
       gap: spacing.md,
+      shadowColor: colors.text,
+      shadowOpacity: 0.12,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 6,
     },
     brandMark: {
-      width: 48,
-      height: 48,
-      borderRadius: 14,
+      width: 54,
+      height: 54,
+      borderRadius: 18,
       backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
     },
     title: {
-      fontSize: 30,
-      fontWeight: '800',
+      fontSize: 34,
+      lineHeight: 38,
+      fontWeight: '900',
       color: colors.text,
     },
     subtitle: {
@@ -277,12 +313,12 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.sm,
     },
     demoCard: {
-      borderRadius: 12,
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: colors.border,
-      backgroundColor: colors.surfaceAlt,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.sm,
+      backgroundColor: colors.surface,
+      paddingHorizontal: spacing.sm + 2,
+      paddingVertical: spacing.sm + 1,
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
@@ -294,9 +330,9 @@ function createStyles(colors: ThemeColors) {
       opacity: 0.6,
     },
     demoIconWrap: {
-      width: 34,
-      height: 34,
-      borderRadius: 9,
+      width: 36,
+      height: 36,
+      borderRadius: 10,
       backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
@@ -306,8 +342,8 @@ function createStyles(colors: ThemeColors) {
     },
     demoTitle: {
       color: colors.text,
-      fontSize: 14,
-      fontWeight: '700',
+      fontSize: 15,
+      fontWeight: '800',
     },
     demoSubtitle: {
       color: colors.textMuted,
@@ -316,7 +352,7 @@ function createStyles(colors: ThemeColors) {
       marginTop: 1,
     },
     errorBanner: {
-      borderRadius: 10,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: colors.dangerBorder,
       backgroundColor: colors.dangerSurface,
@@ -336,11 +372,11 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.xs,
       flexDirection: 'row',
       alignItems: 'flex-start',
-      borderRadius: 12,
+      borderRadius: 14,
       borderWidth: 1,
       borderColor: colors.border,
       padding: spacing.sm,
-      backgroundColor: colors.surfaceAlt,
+      backgroundColor: colors.surface,
     },
     healthHelpText: {
       color: colors.textMuted,
