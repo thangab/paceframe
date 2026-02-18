@@ -1,5 +1,13 @@
-import { RefObject, useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { RefObject, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  Easing,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import type * as ImagePicker from 'expo-image-picker';
 import { ResizeMode, Video } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -239,6 +247,10 @@ export function PreviewEditorCanvas({
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const resizeWidth = useRef(new Animated.Value(canvasDisplayWidth)).current;
+  const resizeHeight = useRef(new Animated.Value(canvasDisplayHeight)).current;
+  const prevIsSquareRef = useRef(isSquareFormat);
+  const [lockCenteredStage, setLockCenteredStage] = useState(false);
   const [subjectRadialCenter, setSubjectRadialCenter] = useState<{
     x: number;
     y: number;
@@ -496,17 +508,53 @@ export function PreviewEditorCanvas({
     typeof activityPolyline === 'string' &&
     activityPolyline.trim().length > 0;
 
+  useEffect(() => {
+    const isSquareToPortrait = prevIsSquareRef.current && !isSquareFormat;
+    if (isSquareToPortrait) {
+      setLockCenteredStage(true);
+    }
+
+    Animated.parallel([
+      Animated.timing(resizeWidth, {
+        toValue: canvasDisplayWidth,
+        duration: 260,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(resizeHeight, {
+        toValue: canvasDisplayHeight,
+        duration: 260,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: false,
+      }),
+    ]).start(({ finished }) => {
+      if (finished && isSquareToPortrait) {
+        setLockCenteredStage(false);
+      }
+    });
+
+    prevIsSquareRef.current = isSquareFormat;
+  }, [
+    canvasDisplayHeight,
+    canvasDisplayWidth,
+    isSquareFormat,
+    resizeHeight,
+    resizeWidth,
+  ]);
+
   return (
     <View
       style={[
         styles.stageWrap,
-        isSquareFormat ? styles.stageWrapCentered : styles.stageWrapTop,
+        isSquareFormat || lockCenteredStage
+          ? styles.stageWrapCentered
+          : styles.stageWrapTop,
       ]}
     >
-      <View
+      <Animated.View
         style={[
           styles.canvasScaleWrap,
-          { width: canvasDisplayWidth, height: canvasDisplayHeight },
+          { width: resizeWidth, height: resizeHeight },
         ]}
       >
         <View
@@ -515,7 +563,6 @@ export function PreviewEditorCanvas({
           style={[
             styles.storyCanvas,
             { borderColor: colors.border },
-            { width: canvasDisplayWidth, height: canvasDisplayHeight },
             (isCapturingOverlay || isExportingPng) && styles.storyCanvasSquare,
             (isCapturingOverlay || isExportingPng) &&
               styles.storyCanvasNoBorder,
@@ -998,7 +1045,7 @@ export function PreviewEditorCanvas({
 
           {!isPremium ? <Text style={styles.watermark}>PACEFRAME</Text> : null}
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -1017,7 +1064,7 @@ function createStyles(colors: ThemeColors) {
   },
   stageWrapCentered: {
     justifyContent: 'center',
-    paddingTop: 0,
+    paddingTop: 2,
     paddingBottom: 120,
   },
   canvasScaleWrap: {
@@ -1025,6 +1072,8 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radius.lg,
   },
     storyCanvas: {
+      width: '100%',
+      height: '100%',
       borderRadius: radius.lg,
       overflow: 'hidden',
       backgroundColor: colors.previewCanvasBase,

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Easing,
   Image,
   LayoutChangeEvent,
   PanResponder,
@@ -264,6 +265,8 @@ export function PreviewEditorPanel({
   const isSunsetPrimaryStyleSelected =
     selectedStyleLayer === 'primary' && template.layout === 'sunset-hero';
   const [opacityTrackWidth, setOpacityTrackWidth] = useState(0);
+  const [renderPanelBody, setRenderPanelBody] = useState(panelOpen);
+  const panelBodyAnim = useRef(new Animated.Value(panelOpen ? 1 : 0)).current;
   const popoverAnim = useRef(new Animated.Value(0)).current;
   const gridHues = [200, 220, 250, 280, 330, 8, 22, 38, 48, 62, 75, 95];
   const grayscaleRow = gridHues.map((_, index) => {
@@ -344,6 +347,31 @@ export function PreviewEditorPanel({
       setSelectedStyleLayer('meta');
     }
   }, [selectedStyleLayer, supportsPrimaryLayer, visibleLayers.primary]);
+
+  useEffect(() => {
+    panelBodyAnim.stopAnimation();
+    if (panelOpen) {
+      setRenderPanelBody(true);
+      Animated.timing(panelBodyAnim, {
+        toValue: 1,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+
+    Animated.timing(panelBodyAnim, {
+      toValue: 0,
+      duration: 190,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setRenderPanelBody(false);
+      }
+    });
+  }, [panelBodyAnim, panelOpen]);
 
   useEffect(() => {
     if (!panelOpen || activePanel !== 'design') {
@@ -429,8 +457,24 @@ export function PreviewEditorPanel({
 
   return (
     <View style={styles.panelShell}>
-      {panelOpen ? (
-        <>
+      {renderPanelBody ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.panelBackdropLayer,
+            {
+              opacity: panelBodyAnim,
+              transform: [
+                {
+                  translateY: panelBodyAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [10, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           <LinearGradient
             pointerEvents="none"
             colors={[colors.glassSurfaceStart, colors.glassSurfaceEnd]}
@@ -461,10 +505,32 @@ export function PreviewEditorPanel({
             style={styles.panelGlassDepth}
           />
           <View pointerEvents="none" style={styles.panelGlassHighlight} />
-        </>
+        </Animated.View>
       ) : null}
-      {panelOpen ? (
-        <View style={styles.panelBody}>
+      {renderPanelBody ? (
+        <Animated.View
+          pointerEvents={panelOpen ? 'auto' : 'none'}
+          style={[
+            styles.panelBody,
+            {
+              opacity: panelBodyAnim,
+              transform: [
+                {
+                  translateY: panelBodyAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [12, 0],
+                  }),
+                },
+                {
+                  scale: panelBodyAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.985, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           {activePanel === 'background' ? (
             <ScrollView
               style={styles.panelScroll}
@@ -1186,7 +1252,7 @@ export function PreviewEditorPanel({
               </View>
             </ScrollView>
           ) : null}
-        </View>
+        </Animated.View>
       ) : null}
 
       {panelOpen && activePanel === 'design' && stylePickerOpen ? (
@@ -1731,8 +1797,7 @@ function createStyles(colors: ThemeColors) {
       right: 0,
       bottom: layout.floatingBottomOffset,
       backgroundColor: 'transparent',
-      borderTopWidth: 1,
-      borderTopColor: colors.glassStroke,
+      borderTopWidth: 0,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       paddingBottom: spacing.sm,
@@ -1744,6 +1809,9 @@ function createStyles(colors: ThemeColors) {
       elevation: 8,
     },
     panelGlassBg: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    panelBackdropLayer: {
       ...StyleSheet.absoluteFillObject,
     },
     panelGlassSheen: {
