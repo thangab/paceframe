@@ -151,6 +151,7 @@ export const PREVIEW_TEMPLATES: PreviewTemplateDefinition[] = [
     name: 'Polaroid',
     disableBackgroundRemoval: true,
     disableVideoBackground: true,
+    defaultFilterEffectId: 'cool-night',
     imagePickerCropSize: {
       width: 650,
       height: 735,

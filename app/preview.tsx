@@ -108,6 +108,7 @@ const DEFAULT_VISIBLE_LAYERS: Partial<Record<LayerId, boolean>> = {
   route: false,
 };
 const PREVIEW_DRAFT_KEY_PREFIX = 'paceframe.preview.draft.';
+const PREVIEW_TEMPLATE_MEDIA_KEY_PREFIX = 'paceframe.preview.template-media.';
 const BACKGROUND_GRADIENT_PRESETS: BackgroundGradient[] = [
   { colors: ['#0F172A', '#1D4ED8', '#38BDF8'], direction: 'vertical' },
   { colors: ['#111827', '#7C3AED', '#F97316'], direction: 'horizontal' },
@@ -289,6 +290,7 @@ type NormalPreviewSnapshot = {
   media: ImagePicker.ImagePickerAsset | null;
   backgroundGradient: BackgroundGradient | null;
   autoSubjectUri: string | null;
+  autoSubjectSourceUri: string | null;
   imageOverlays: ImageOverlay[];
   selectedLayoutId: string;
   routeMode: RouteMode;
@@ -306,6 +308,19 @@ type NormalPreviewSnapshot = {
   >;
   behindSubjectLayers: Partial<Record<LayerId, boolean>>;
   layerStyleMapByLayout: LayerStyleMapByLayout;
+};
+type TemplateMediaDraft = {
+  v: 2;
+  media: ImagePicker.ImagePickerAsset | null;
+  backgroundGradient: BackgroundGradient | null;
+  autoSubjectUri: string | null;
+  autoSubjectSourceUri: string | null;
+};
+
+type TemplateMediaHydrationState = {
+  key: string | null;
+  loading: boolean;
+  hasStoredDraft: boolean;
 };
 const DEFAULT_LAYER_STYLE_MAP: LayerStyleMap = {
   meta: { color: '#FFFFFF', opacity: 1 },
@@ -359,6 +374,79 @@ function normalizeLocalUri(path: string) {
     return path;
   }
   return `file://${path}`;
+}
+
+function sanitizeTemplateMediaAsset(
+  input: unknown,
+): ImagePicker.ImagePickerAsset | null {
+  if (typeof input !== 'object' || !input) return null;
+  const source = input as Record<string, unknown>;
+  const uri = typeof source.uri === 'string' ? source.uri.trim() : '';
+  if (!uri) return null;
+  return {
+    uri,
+    type: source.type === 'video' ? 'video' : 'image',
+    width: typeof source.width === 'number' ? source.width : 0,
+    height: typeof source.height === 'number' ? source.height : 0,
+    fileName:
+      typeof source.fileName === 'string' || source.fileName === null
+        ? source.fileName
+        : null,
+    fileSize: typeof source.fileSize === 'number' ? source.fileSize : undefined,
+    mimeType: typeof source.mimeType === 'string' ? source.mimeType : undefined,
+    duration:
+      typeof source.duration === 'number' ? source.duration : undefined,
+    assetId: typeof source.assetId === 'string' ? source.assetId : undefined,
+    base64:
+      typeof source.base64 === 'string' || source.base64 === null
+        ? source.base64
+        : null,
+    exif:
+      typeof source.exif === 'object' && source.exif !== null
+        ? (source.exif as Record<string, unknown>)
+        : null,
+  };
+}
+
+function sanitizeTemplateMediaDraft(input: unknown): TemplateMediaDraft | null {
+  if (typeof input !== 'object' || !input) return null;
+  const source = input as Record<string, unknown>;
+  const media = sanitizeTemplateMediaAsset(source.media);
+  const version = source.v === 2 ? 2 : 1;
+  const autoSubjectUri =
+    version === 2 && typeof source.autoSubjectUri === 'string'
+      ? source.autoSubjectUri.trim() || null
+      : null;
+  const autoSubjectSourceUri =
+    version === 2 && typeof source.autoSubjectSourceUri === 'string'
+      ? source.autoSubjectSourceUri.trim() || null
+      : null;
+  const gradientCandidate = source.backgroundGradient;
+  let backgroundGradient: BackgroundGradient | null = null;
+  if (typeof gradientCandidate === 'object' && gradientCandidate !== null) {
+    const candidateRecord = gradientCandidate as Record<string, unknown>;
+    const colorsCandidate = candidateRecord.colors;
+    if (
+      Array.isArray(colorsCandidate) &&
+      colorsCandidate.length === 3 &&
+      colorsCandidate.every((value) => typeof value === 'string')
+    ) {
+      backgroundGradient = {
+        colors: colorsCandidate as [string, string, string],
+        direction:
+          candidateRecord.direction === 'horizontal'
+            ? 'horizontal'
+            : 'vertical',
+      };
+    }
+  }
+  return {
+    v: 2,
+    media,
+    backgroundGradient,
+    autoSubjectUri,
+    autoSubjectSourceUri,
+  };
 }
 
 function resolveTemplateText(
@@ -479,6 +567,9 @@ export default function PreviewScreen() {
   const [backgroundGradient, setBackgroundGradient] =
     useState<BackgroundGradient | null>(null);
   const [autoSubjectUri, setAutoSubjectUri] = useState<string | null>(null);
+  const [autoSubjectSourceUri, setAutoSubjectSourceUri] = useState<
+    string | null
+  >(null);
   const [imageOverlays, setImageOverlays] = useState<ImageOverlay[]>([]);
   const modeParam = Array.isArray(searchParams.mode)
     ? searchParams.mode[0]
@@ -542,6 +633,12 @@ export default function PreviewScreen() {
     useState<FilterEffectId>('none');
   const [selectedBlurEffectId, setSelectedBlurEffectId] =
     useState<BlurEffectId>('none');
+  const [templateMediaHydration, setTemplateMediaHydration] =
+    useState<TemplateMediaHydrationState>({
+      key: null,
+      loading: false,
+      hasStoredDraft: false,
+    });
 
   useEffect(() => {
     if (!templateMode) return;
@@ -570,6 +667,7 @@ export default function PreviewScreen() {
   const templatePresetAppliedRef = useRef<string | null>(null);
   const normalSnapshotRef = useRef<NormalPreviewSnapshot | null>(null);
   const autoExtractAttemptRef = useRef<string | null>(null);
+  const backgroundExtractionRequestRef = useRef(0);
 
   const selectedTemplateDefinition = useMemo(
     () =>
@@ -1247,6 +1345,10 @@ export default function PreviewScreen() {
       activity ? `${PREVIEW_DRAFT_KEY_PREFIX}${String(activity.id)}` : null,
     [activity],
   );
+  const templateMediaDraftKey = useMemo(() => {
+    if (!templateMode || !activity || !selectedTemplateDefinition) return null;
+    return `${PREVIEW_TEMPLATE_MEDIA_KEY_PREFIX}${String(activity.id)}.${selectedTemplateDefinition.id}`;
+  }, [activity, selectedTemplateDefinition, templateMode]);
 
   function resetDraftStateToDefaults(options?: { keepLayoutId?: string }) {
     const templateIdToKeep = options?.keepLayoutId;
@@ -1262,6 +1364,7 @@ export default function PreviewScreen() {
     setMedia(null);
     setBackgroundGradient(null);
     setAutoSubjectUri(null);
+    setAutoSubjectSourceUri(null);
     setImageOverlays([]);
     setSelectedLayoutId(nextLayoutId);
     setSelectedFontId(FONT_PRESETS[0].id);
@@ -1295,6 +1398,9 @@ export default function PreviewScreen() {
     setMedia(draft.media ?? null);
     setBackgroundGradient(draft.backgroundGradient ?? null);
     setAutoSubjectUri(draft.autoSubjectUri ?? null);
+    setAutoSubjectSourceUri(
+      draft.autoSubjectUri && draft.media?.uri ? draft.media.uri : null,
+    );
     setImageOverlays(draft.imageOverlays ?? []);
     setSelectedLayoutId(draft.selectedLayoutId ?? LAYOUTS[0].id);
     setSelectedFontId(draft.selectedFontId ?? FONT_PRESETS[0].id);
@@ -1502,6 +1608,103 @@ export default function PreviewScreen() {
     templateMode,
   ]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateTemplateMediaDraft() {
+      if (!templateMode || !templateMediaDraftKey) {
+        setTemplateMediaHydration({
+          key: null,
+          loading: false,
+          hasStoredDraft: false,
+        });
+        return;
+      }
+
+      setTemplateMediaHydration({
+        key: templateMediaDraftKey,
+        loading: true,
+        hasStoredDraft: false,
+      });
+
+      let hasStoredDraft = false;
+      try {
+        const raw = await AsyncStorage.getItem(templateMediaDraftKey);
+        if (cancelled) return;
+        if (raw) {
+          const parsed = JSON.parse(raw) as unknown;
+          const draft = sanitizeTemplateMediaDraft(parsed);
+          if (draft) {
+            hasStoredDraft = true;
+            setMedia(draft.media);
+            setBackgroundGradient(draft.backgroundGradient);
+            const mediaUri = draft.media?.uri ?? null;
+            const subjectMatchesMedia =
+              Boolean(draft.autoSubjectUri) &&
+              Boolean(mediaUri) &&
+              Boolean(draft.autoSubjectSourceUri) &&
+              draft.autoSubjectSourceUri === mediaUri;
+            setAutoSubjectUri(
+              subjectMatchesMedia ? draft.autoSubjectUri : null,
+            );
+            setAutoSubjectSourceUri(subjectMatchesMedia ? mediaUri : null);
+          }
+        }
+      } catch {
+        hasStoredDraft = false;
+      } finally {
+        if (!cancelled) {
+          setTemplateMediaHydration({
+            key: templateMediaDraftKey,
+            loading: false,
+            hasStoredDraft,
+          });
+        }
+      }
+    }
+
+    void hydrateTemplateMediaDraft();
+    return () => {
+      cancelled = true;
+    };
+  }, [templateMediaDraftKey, templateMode]);
+
+  useEffect(() => {
+    if (!templateMode || !templateMediaDraftKey) return;
+    if (
+      templateMediaHydration.key !== templateMediaDraftKey ||
+      templateMediaHydration.loading
+    ) {
+      return;
+    }
+
+    const draft: TemplateMediaDraft = {
+      v: 2,
+      media,
+      backgroundGradient,
+      autoSubjectUri,
+      autoSubjectSourceUri,
+    };
+
+    const timeout = setTimeout(() => {
+      void AsyncStorage.setItem(
+        templateMediaDraftKey,
+        JSON.stringify(draft),
+      ).catch(() => {});
+    }, 180);
+
+    return () => clearTimeout(timeout);
+  }, [
+    autoSubjectUri,
+    autoSubjectSourceUri,
+    backgroundGradient,
+    media,
+    templateMediaDraftKey,
+    templateMediaHydration.key,
+    templateMediaHydration.loading,
+    templateMode,
+  ]);
+
   useFocusEffect(
     useCallback(() => {
       setActivePanel('background');
@@ -1551,6 +1754,7 @@ export default function PreviewScreen() {
           media,
           backgroundGradient,
           autoSubjectUri,
+          autoSubjectSourceUri,
           imageOverlays,
           selectedLayoutId,
           routeMode,
@@ -1576,6 +1780,7 @@ export default function PreviewScreen() {
     setMedia(snapshot.media);
     setBackgroundGradient(snapshot.backgroundGradient);
     setAutoSubjectUri(snapshot.autoSubjectUri);
+    setAutoSubjectSourceUri(snapshot.autoSubjectSourceUri);
     setImageOverlays(snapshot.imageOverlays);
     setSelectedLayoutId(snapshot.selectedLayoutId);
     setRouteMode(snapshot.routeMode);
@@ -1590,6 +1795,7 @@ export default function PreviewScreen() {
     setLayerStyleMapByLayout(snapshot.layerStyleMapByLayout);
   }, [
     autoSubjectUri,
+    autoSubjectSourceUri,
     backgroundGradient,
     behindSubjectLayers,
     headerVisible,
@@ -1612,6 +1818,16 @@ export default function PreviewScreen() {
   useEffect(() => {
     if (!templateMode || !selectedTemplateDefinition) {
       templatePresetAppliedRef.current = null;
+      return;
+    }
+    if (
+      !templateMediaDraftKey ||
+      templateMediaHydration.key !== templateMediaDraftKey ||
+      templateMediaHydration.loading
+    ) {
+      return;
+    }
+    if (templateMediaHydration.hasStoredDraft) {
       return;
     }
 
@@ -1645,10 +1861,15 @@ export default function PreviewScreen() {
     setMedia(null);
     setBackgroundGradient(null);
     setAutoSubjectUri(null);
+    setAutoSubjectSourceUri(null);
   }, [
     activity?.id,
     activityPhotoUri,
     selectedTemplateDefinition,
+    templateMediaDraftKey,
+    templateMediaHydration.hasStoredDraft,
+    templateMediaHydration.key,
+    templateMediaHydration.loading,
     templateMode,
   ]);
   /* eslint-enable react-hooks/exhaustive-deps */
@@ -1886,11 +2107,14 @@ export default function PreviewScreen() {
     asset: ImagePicker.ImagePickerAsset,
     options: ApplyImageBackgroundOptions = {},
   ) {
+    const requestId = backgroundExtractionRequestRef.current + 1;
+    backgroundExtractionRequestRef.current = requestId;
     const previousMedia = media;
     const previousAutoSubjectUri = autoSubjectUri;
     setMedia(asset);
     setBackgroundGradient(null);
     setAutoSubjectUri(null);
+    setAutoSubjectSourceUri(null);
     void cleanupMediaIfTemp(
       previousMedia?.uri === asset.uri ? null : previousMedia,
     );
@@ -1916,20 +2140,30 @@ export default function PreviewScreen() {
       }
       const cutoutUri = await removeBackgroundOnDevice(asset.uri);
       trackManagedTempUri(cutoutUri);
+      if (backgroundExtractionRequestRef.current !== requestId) {
+        await cleanupTempUriIfOwned(cutoutUri);
+        return;
+      }
       setAutoSubjectUri(cutoutUri);
+      setAutoSubjectSourceUri(asset.uri);
       if (!options.silent) {
         setMessage(
           options.successMessage ?? 'Subject extracted automatically.',
         );
       }
     } catch (err) {
+      if (backgroundExtractionRequestRef.current !== requestId) {
+        return;
+      }
       if (!options.silent) {
         const details = err instanceof Error ? ` (${err.message})` : '';
         const prefix = options.failurePrefix ?? 'Image loaded.';
         setMessage(`${prefix} Subject extraction unavailable${details}.`);
       }
     } finally {
-      setIsExtracting(false);
+      if (backgroundExtractionRequestRef.current === requestId) {
+        setIsExtracting(false);
+      }
     }
   }
 
@@ -2010,6 +2244,7 @@ export default function PreviewScreen() {
     setMedia(asset);
     setBackgroundGradient(null);
     setAutoSubjectUri(null);
+    setAutoSubjectSourceUri(null);
     void cleanupMediaIfTemp(
       previousMedia?.uri === asset.uri ? null : previousMedia,
     );
@@ -2450,6 +2685,7 @@ export default function PreviewScreen() {
     setMedia(null);
     setBackgroundGradient(null);
     setAutoSubjectUri(null);
+    setAutoSubjectSourceUri(null);
     void cleanupMediaIfTemp(previousMedia);
     void cleanupTempUriIfOwned(previousAutoSubjectUri);
     setMessage('Transparent background selected.');
@@ -2483,6 +2719,7 @@ export default function PreviewScreen() {
     const previousAutoSubjectUri = autoSubjectUri;
     setMedia(null);
     setAutoSubjectUri(null);
+    setAutoSubjectSourceUri(null);
     setBackgroundGradient(nextGradient);
     void cleanupMediaIfTemp(previousMedia);
     void cleanupTempUriIfOwned(previousAutoSubjectUri);
