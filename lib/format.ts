@@ -1,7 +1,9 @@
 export type DistanceUnit = 'km' | 'mi';
+export type ElevationUnit = 'm' | 'ft';
 
 const METERS_PER_KM = 1000;
 const METERS_PER_MILE = 1609.344;
+const FEET_PER_METER = 3.28084;
 
 export function formatDistanceMeters(distance: number, unit: DistanceUnit = 'km') {
   const divisor = unit === 'mi' ? METERS_PER_MILE : METERS_PER_KM;
@@ -39,6 +41,16 @@ export function formatPace(
   }
 
   return `${m}:${String(s).padStart(2, '0')} /${unit}`;
+}
+
+export function formatElevationMeters(
+  elevationMeters: number,
+  unit: ElevationUnit = 'm',
+) {
+  if (unit === 'ft') {
+    return `${Math.round(elevationMeters * FEET_PER_METER)} ft`;
+  }
+  return `${Math.round(elevationMeters)} m`;
 }
 
 export function formatDate(isoDate: string) {

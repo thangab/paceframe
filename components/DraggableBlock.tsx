@@ -35,6 +35,7 @@ type Props = {
     rotationDeg: number;
   }) => void;
   rotationSnapThresholdDeg?: number;
+  locked?: boolean;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -72,6 +73,7 @@ export function DraggableBlock({
   onRotationGuideChange,
   onTransformEnd,
   rotationSnapThresholdDeg = 2,
+  locked = false,
 }: Props) {
   const colors = useThemeColors();
   const tx = useSharedValue(initialX);
@@ -371,40 +373,44 @@ export function DraggableBlock({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialScale, initialX, initialY, rotationDeg]);
 
-  return (
-    <GestureDetector gesture={gesture}>
-      <Animated.View
-        onLayout={(event) => {
-          const measuredWidth = event.nativeEvent.layout.width;
-          const measuredHeight = event.nativeEvent.layout.height;
-          width.value = measuredWidth;
-          height.value = measuredHeight;
+  const content = (
+    <Animated.View
+      onLayout={(event) => {
+        const measuredWidth = event.nativeEvent.layout.width;
+        const measuredHeight = event.nativeEvent.layout.height;
+        width.value = measuredWidth;
+        height.value = measuredHeight;
 
-          if (canvasWidth && canvasHeight) {
-            const xBounds = getAxisBounds(canvasWidth, measuredWidth);
-            const yBounds = getAxisBounds(canvasHeight, measuredHeight);
-            tx.value = clamp(tx.value, xBounds.min, xBounds.max);
-            ty.value = clamp(ty.value, yBounds.min, yBounds.max);
-          }
-        }}
-        style={[{ position: 'absolute', left: 0, top: 0 }, style, animatedStyle]}
-      >
-        {children}
-        {selected ? (
-          <View
-            pointerEvents="none"
-            style={[
-              styles.selectionOutline,
-              { borderColor: colors.selectionOutline },
-              typeof outlineRadius === 'number'
-                ? { borderRadius: outlineRadius }
-                : null,
-            ]}
-          />
-        ) : null}
-      </Animated.View>
-    </GestureDetector>
+        if (canvasWidth && canvasHeight) {
+          const xBounds = getAxisBounds(canvasWidth, measuredWidth);
+          const yBounds = getAxisBounds(canvasHeight, measuredHeight);
+          tx.value = clamp(tx.value, xBounds.min, xBounds.max);
+          ty.value = clamp(ty.value, yBounds.min, yBounds.max);
+        }
+      }}
+      style={[{ position: 'absolute', left: 0, top: 0 }, style, animatedStyle]}
+    >
+      {children}
+      {selected ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.selectionOutline,
+            { borderColor: colors.selectionOutline },
+            typeof outlineRadius === 'number'
+              ? { borderRadius: outlineRadius }
+              : null,
+          ]}
+        />
+      ) : null}
+    </Animated.View>
   );
+
+  if (locked) {
+    return content;
+  }
+
+  return <GestureDetector gesture={gesture}>{content}</GestureDetector>;
 }
 
 const styles = StyleSheet.create({

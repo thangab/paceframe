@@ -20,7 +20,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { StatsLayerContent } from '@/components/StatsLayerContent';
 import { layout, spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import type { DistanceUnit } from '@/lib/format';
+import type { DistanceUnit, ElevationUnit } from '@/lib/format';
 import { FONT_PRESETS, TEMPLATES } from '@/lib/previewConfig';
 import { useThemeStore, type AppThemeMode } from '@/store/themeStore';
 import type {
@@ -81,6 +81,9 @@ type Props = {
   onRemoveLayer: (layer: LayerId) => void;
   template: StatsLayout;
   onSelectLayout: (t: StatsLayout) => void;
+  templateOptions?: { id: string; name: string; premium?: boolean }[];
+  selectedTemplateId?: string;
+  onSelectTemplate?: (templateId: string) => void;
   selectedFontId: string;
   onSelectFont: (fontId: string) => void;
   effectiveVisible: Record<FieldId, boolean>;
@@ -96,6 +99,8 @@ type Props = {
   onToggleHeaderField: (field: HeaderFieldId, value: boolean) => void;
   distanceUnit: DistanceUnit;
   onSetDistanceUnit: (unit: DistanceUnit) => void;
+  elevationUnit: ElevationUnit;
+  onSetElevationUnit: (unit: ElevationUnit) => void;
   layerStyleMap: Record<
     'meta' | 'stats' | 'route' | 'primary',
     { color: string; opacity: number }
@@ -127,6 +132,8 @@ type Props = {
   quickExportBusy?: boolean;
   helpPopoverOpen?: boolean;
   onCloseHelpPopover?: () => void;
+  quickTemplateMode?: boolean;
+  allowVideoBackground?: boolean;
 };
 
 export function PreviewEditorPanel({
@@ -159,6 +166,9 @@ export function PreviewEditorPanel({
   onRemoveLayer,
   template,
   onSelectLayout,
+  templateOptions = [],
+  selectedTemplateId,
+  onSelectTemplate,
   selectedFontId,
   onSelectFont,
   effectiveVisible,
@@ -174,6 +184,8 @@ export function PreviewEditorPanel({
   onToggleHeaderField,
   distanceUnit,
   onSetDistanceUnit,
+  elevationUnit,
+  onSetElevationUnit,
   layerStyleMap,
   onSetLayerStyleColor,
   onSetLayerStyleOpacity,
@@ -196,6 +208,8 @@ export function PreviewEditorPanel({
   quickExportBusy = false,
   helpPopoverOpen = false,
   onCloseHelpPopover,
+  quickTemplateMode = false,
+  allowVideoBackground = true,
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -410,7 +424,7 @@ export function PreviewEditorPanel({
     }).start();
   }, [helpPopoverAnim, helpPopoverOpen]);
 
-  const mainTabs = [
+  const defaultTabs = [
     { id: 'background', label: 'Background', icon: 'image-area-close' },
     { id: 'content', label: 'Content', icon: 'layers-outline' },
     { id: 'design', label: 'Design', icon: 'palette-outline' },
@@ -420,12 +434,17 @@ export function PreviewEditorPanel({
       icon: 'image-filter-center-focus',
       disabled: !effectsEnabled,
     },
-  ] as {
+  ] as const;
+  const quickTemplateTabs = [
+    { id: 'background', label: 'Background', icon: 'image-area-close' },
+    { id: 'design', label: 'Templates', icon: 'view-grid-outline' },
+  ] as const;
+  const mainTabs: {
     id: PreviewPanelTab;
     label: string;
     icon: keyof typeof MaterialCommunityIcons.glyphMap;
     disabled?: boolean;
-  }[];
+  }[] = quickTemplateMode ? [...quickTemplateTabs] : [...defaultTabs];
   const [orderedLayerEntries, setOrderedLayerEntries] = useState(layerEntries);
   const [draggingLayerId, setDraggingLayerId] = useState<LayerId | null>(null);
 
@@ -622,30 +641,34 @@ export function PreviewEditorPanel({
                       disabled={busy || isExtracting}
                     />
                   </View>
-                  <View style={styles.backgroundActionCell}>
-                    <PrimaryButton
-                      label="Video"
-                      icon="video-outline"
-                      onPress={onPickVideo}
-                      variant="secondary"
-                      colorScheme="panel"
-                      iconPosition="top"
-                      compact
-                      disabled={busy || isSquareFormat}
-                    />
-                  </View>
-                  <View style={styles.backgroundActionCell}>
-                    <PrimaryButton
-                      label="Gradient"
-                      icon="gradient-horizontal"
-                      onPress={onGenerateGradient}
-                      variant="secondary"
-                      colorScheme="panel"
-                      iconPosition="top"
-                      compact
-                      disabled={busy}
-                    />
-                  </View>
+                  {allowVideoBackground ? (
+                    <View style={styles.backgroundActionCell}>
+                      <PrimaryButton
+                        label="Video"
+                        icon="video-outline"
+                        onPress={onPickVideo}
+                        variant="secondary"
+                        colorScheme="panel"
+                        iconPosition="top"
+                        compact
+                        disabled={busy || isSquareFormat}
+                      />
+                    </View>
+                  ) : null}
+                  {!quickTemplateMode ? (
+                    <View style={styles.backgroundActionCell}>
+                      <PrimaryButton
+                        label="Gradient"
+                        icon="gradient-horizontal"
+                        onPress={onGenerateGradient}
+                        variant="secondary"
+                        colorScheme="panel"
+                        iconPosition="top"
+                        compact
+                        disabled={busy}
+                      />
+                    </View>
+                  ) : null}
                   <View style={styles.backgroundActionCell}>
                     <PrimaryButton
                       label="Transparent"
@@ -831,43 +854,86 @@ export function PreviewEditorPanel({
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.controls}>
-                <Text style={styles.sectionTitle}>Layouts</Text>
+                <Text style={styles.sectionTitle}>
+                  {quickTemplateMode ? 'Templates' : 'Layouts'}
+                </Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.chipRow}
                 >
-                  {TEMPLATES.map((item) => {
-                    const isLocked = item.premium && !isPremium;
-                    const selected = item.id === template.id;
-                    return (
-                      <Pressable
-                        key={item.id}
-                        style={styles.templateItem}
-                        onPress={() => onSelectLayout(item)}
-                        accessibilityLabel={item.name}
-                      >
-                        <View
-                          style={[
-                            styles.templateCard,
-                            selected && styles.templateCardSelected,
-                          ]}
-                        >
-                          <LayoutLayoutPreview template={item} styles={styles} />
-                          {isLocked ? (
-                            <Text style={styles.templatePremiumBadge}>
-                              Premium
-                            </Text>
-                          ) : null}
-                        </View>
-                        <Text style={styles.templateCardName}>{item.name}</Text>
-                      </Pressable>
-                    );
-                  })}
+                  {quickTemplateMode
+                    ? templateOptions.map((item) => {
+                        const isLocked = item.premium && !isPremium;
+                        const selected = item.id === selectedTemplateId;
+                        return (
+                          <Pressable
+                            key={item.id}
+                            style={styles.templateItem}
+                            onPress={() => onSelectTemplate?.(item.id)}
+                            accessibilityLabel={item.name}
+                          >
+                            <View
+                              style={[
+                                styles.templateCard,
+                                selected && styles.templateCardSelected,
+                              ]}
+                            >
+                              <View style={styles.templateModeIconWrap}>
+                                <MaterialCommunityIcons
+                                  name="view-grid-outline"
+                                  size={20}
+                                  color={colors.text}
+                                />
+                              </View>
+                              {isLocked ? (
+                                <Text style={styles.templatePremiumBadge}>
+                                  Premium
+                                </Text>
+                              ) : null}
+                            </View>
+                            <Text style={styles.templateCardName}>{item.name}</Text>
+                          </Pressable>
+                        );
+                      })
+                    : TEMPLATES.map((item) => {
+                        const isLocked = item.premium && !isPremium;
+                        const selected = item.id === template.id;
+                        return (
+                          <Pressable
+                            key={item.id}
+                            style={styles.templateItem}
+                            onPress={() => onSelectLayout(item)}
+                            accessibilityLabel={item.name}
+                          >
+                            <View
+                              style={[
+                                styles.templateCard,
+                                selected && styles.templateCardSelected,
+                              ]}
+                            >
+                              <LayoutLayoutPreview template={item} styles={styles} />
+                              {isLocked ? (
+                                <Text style={styles.templatePremiumBadge}>
+                                  Premium
+                                </Text>
+                              ) : null}
+                            </View>
+                            <Text style={styles.templateCardName}>{item.name}</Text>
+                          </Pressable>
+                        );
+                      })}
                 </ScrollView>
+                {quickTemplateMode ? (
+                  <Text style={styles.stylePickerHint}>
+                    Template mode: only template + background image are editable.
+                  </Text>
+                ) : null}
 
-                <Text style={styles.sectionTitle}>Stats Infos</Text>
-                <View style={styles.statsPillsWrap}>
+                {!quickTemplateMode ? (
+                  <>
+                    <Text style={styles.sectionTitle}>Stats Infos</Text>
+                    <View style={styles.statsPillsWrap}>
                   {(
                     [
                       ['distance', 'Distance'],
@@ -934,10 +1000,10 @@ export function PreviewEditorPanel({
                       </View>
                     );
                   })}
-                </View>
+                    </View>
 
-                <Text style={styles.sectionTitle}>Header infos</Text>
-                <View style={styles.statsPillsWrap}>
+                    <Text style={styles.sectionTitle}>Header infos</Text>
+                    <View style={styles.statsPillsWrap}>
                   {(
                     [
                       ['title', 'Title'],
@@ -971,10 +1037,10 @@ export function PreviewEditorPanel({
                       </Pressable>
                     );
                   })}
-                </View>
+                    </View>
 
-                <Text style={styles.sectionTitle}>Font</Text>
-                <ScrollView
+                    <Text style={styles.sectionTitle}>Font</Text>
+                    <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.chipRow}
@@ -993,12 +1059,12 @@ export function PreviewEditorPanel({
                           {item.name}
                         </Text>
                       </Pressable>
-                    );
-                  })}
-                </ScrollView>
+                      );
+                    })}
+                    </ScrollView>
 
-                <Text style={styles.sectionTitle}>Colors</Text>
-                <View style={styles.styleLayerButtonsRow}>
+                    <Text style={styles.sectionTitle}>Colors</Text>
+                    <View style={styles.styleLayerButtonsRow}>
                   {styleLayerButtons.map((item) => {
                     const selected = item.id === selectedStyleLayer;
                     return (
@@ -1030,11 +1096,11 @@ export function PreviewEditorPanel({
                       </Pressable>
                     );
                   })}
-                </View>
-                <Text style={styles.stylePickerHint}>
+                    </View>
+                    <Text style={styles.stylePickerHint}>
                   Choose a layer, then pick a default color or open the picker.
-                </Text>
-                <View style={styles.stylePickerMetaRow}>
+                    </Text>
+                    <View style={styles.stylePickerMetaRow}>
                   <View style={styles.stylePickerPreviewSwatch}>
                     <View style={styles.stylePickerPreviewSwatchChecker}>
                       {Array.from({ length: 2 }).map((_, row) => (
@@ -1071,8 +1137,8 @@ export function PreviewEditorPanel({
                     {(selectedLayerStyle?.color ?? colors.solidWhite).toUpperCase()} •{' '}
                     {Math.round((selectedLayerStyle?.opacity ?? 1) * 100)}%
                   </Text>
-                </View>
-                {isSunsetPrimaryStyleSelected ? (
+                    </View>
+                    {isSunsetPrimaryStyleSelected ? (
                   <>
                     <Text style={styles.sectionTitle}>Primary Gradient</Text>
                     <Text style={styles.stylePickerHint}>
@@ -1109,8 +1175,8 @@ export function PreviewEditorPanel({
                       })}
                     </ScrollView>
                   </>
-                ) : null}
-                <View style={styles.quickColorRow}>
+                    ) : null}
+                    <View style={styles.quickColorRow}>
                   <Pressable
                     onPress={() => setStylePickerOpen(true)}
                     style={({ pressed }) => [
@@ -1143,34 +1209,12 @@ export function PreviewEditorPanel({
                           onSetLayerStyleColor(selectedStyleLayer, color)
                         }
                       />
-                    ))}
+                      ))}
                   </ScrollView>
-                </View>
+                    </View>
 
-                <Text style={styles.sectionTitle}>Unit</Text>
-                <View style={styles.mediaPickRow}>
-                  {(
-                    [
-                      { id: 'km', label: 'Kilometers' },
-                      { id: 'mi', label: 'Miles' },
-                    ] as { id: DistanceUnit; label: string }[]
-                  ).map((item) => {
-                    const selected = item.id === distanceUnit;
-                    return (
-                      <Pressable
-                        key={item.id}
-                        style={[
-                          styles.chip,
-                          selected && styles.chipSelected,
-                          styles.unitChip,
-                        ]}
-                        onPress={() => onSetDistanceUnit(item.id)}
-                      >
-                        <Text style={styles.chipText}>{item.label}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                  </>
+                ) : null}
               </View>
             </ScrollView>
           ) : null}
@@ -1236,6 +1280,54 @@ export function PreviewEditorPanel({
                         >
                           {item.label}
                         </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={styles.sectionTitle}>Distance Unit</Text>
+                <View style={styles.mediaPickRow}>
+                  {(
+                    [
+                      { id: 'km', label: 'Kilometers' },
+                      { id: 'mi', label: 'Miles' },
+                    ] as { id: DistanceUnit; label: string }[]
+                  ).map((item) => {
+                    const selected = item.id === distanceUnit;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        style={[
+                          styles.chip,
+                          selected && styles.chipSelected,
+                          styles.unitChip,
+                        ]}
+                        onPress={() => onSetDistanceUnit(item.id)}
+                      >
+                        <Text style={styles.chipText}>{item.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={styles.sectionTitle}>Elevation Unit</Text>
+                <View style={styles.mediaPickRow}>
+                  {(
+                    [
+                      { id: 'm', label: 'Meters' },
+                      { id: 'ft', label: 'Feet' },
+                    ] as { id: ElevationUnit; label: string }[]
+                  ).map((item) => {
+                    const selected = item.id === elevationUnit;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        style={[
+                          styles.chip,
+                          selected && styles.chipSelected,
+                          styles.unitChip,
+                        ]}
+                        onPress={() => onSetElevationUnit(item.id)}
+                      >
+                        <Text style={styles.chipText}>{item.label}</Text>
                       </Pressable>
                     );
                   })}
@@ -1451,9 +1543,9 @@ export function PreviewEditorPanel({
             <View style={[styles.stylePickerCard, styles.helpPopoverCard]}>
               <View style={styles.stylePickerHeaderRow}>
                 <View style={styles.stylePickerTitleWrap}>
-                  <Text style={styles.stylePickerTitle}>Help</Text>
+                  <Text style={styles.stylePickerTitle}>Settings</Text>
                   <Text style={styles.stylePickerSubtitle}>
-                    Quick settings and tips
+                    Quick settings
                   </Text>
                 </View>
                 <Pressable
@@ -1502,6 +1594,54 @@ export function PreviewEditorPanel({
                       >
                         {item.label}
                       </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.sectionTitle}>Distance Unit</Text>
+              <View style={styles.mediaPickRow}>
+                {(
+                  [
+                    { id: 'km', label: 'Kilometers' },
+                    { id: 'mi', label: 'Miles' },
+                  ] as { id: DistanceUnit; label: string }[]
+                ).map((item) => {
+                  const selected = item.id === distanceUnit;
+                  return (
+                    <Pressable
+                      key={item.id}
+                      style={[
+                        styles.chip,
+                        selected && styles.chipSelected,
+                        styles.unitChip,
+                      ]}
+                      onPress={() => onSetDistanceUnit(item.id)}
+                    >
+                      <Text style={styles.chipText}>{item.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.sectionTitle}>Elevation Unit</Text>
+              <View style={styles.mediaPickRow}>
+                {(
+                  [
+                    { id: 'm', label: 'Meters' },
+                    { id: 'ft', label: 'Feet' },
+                  ] as { id: ElevationUnit; label: string }[]
+                ).map((item) => {
+                  const selected = item.id === elevationUnit;
+                  return (
+                    <Pressable
+                      key={item.id}
+                      style={[
+                        styles.chip,
+                        selected && styles.chipSelected,
+                        styles.unitChip,
+                      ]}
+                      onPress={() => onSetElevationUnit(item.id)}
+                    >
+                      <Text style={styles.chipText}>{item.label}</Text>
                     </Pressable>
                   );
                 })}
@@ -1819,6 +1959,13 @@ function createStyles(colors: ThemeColors) {
       shadowRadius: 8,
       shadowOffset: { width: 0, height: 4 },
       elevation: 2,
+    },
+    templateModeIconWrap: {
+      width: '100%',
+      height: 72,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceAlt,
     },
   templateItem: {
     alignItems: 'center',
@@ -2183,8 +2330,8 @@ function createStyles(colors: ThemeColors) {
   },
   backgroundActionsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'stretch',
+    gap: spacing.sm,
   },
   gradientPresetRow: {
     gap: 8,
@@ -2226,7 +2373,7 @@ function createStyles(colors: ThemeColors) {
     flex: 1,
   },
   backgroundActionCell: {
-    width: '23%',
+    flex: 1,
     minWidth: 0,
   },
   orderHint: {

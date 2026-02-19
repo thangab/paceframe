@@ -1,5 +1,5 @@
 import type * as ImagePicker from 'expo-image-picker';
-import type { DistanceUnit } from '@/lib/format';
+import type { DistanceUnit, ElevationUnit } from '@/lib/format';
 import type {
   BackgroundGradient,
   FieldId,
@@ -55,6 +55,7 @@ export type PreviewDraft = {
   selectedLayoutId: string;
   selectedFontId: string;
   distanceUnit: DistanceUnit;
+  elevationUnit: ElevationUnit;
   routeMode: RouteMode;
   routeMapVariant: RouteMapVariant;
   primaryField: FieldId;
@@ -84,6 +85,7 @@ type SanitizeOptions = {
     selectedLayoutId: string;
     selectedFontId: string;
     distanceUnit: DistanceUnit;
+    elevationUnit: ElevationUnit;
     routeMode: RouteMode;
     routeMapVariant: RouteMapVariant;
     primaryField: FieldId;
@@ -398,6 +400,8 @@ export function sanitizePreviewDraft(
     : options.defaults.selectedFontId;
   const distanceUnit: DistanceUnit =
     input.distanceUnit === 'mi' ? 'mi' : options.defaults.distanceUnit;
+  const elevationUnit: ElevationUnit =
+    input.elevationUnit === 'ft' ? 'ft' : options.defaults.elevationUnit;
   const routeMode: RouteMode =
     input.routeMode === 'trace' || input.routeMode === 'map'
       ? input.routeMode
@@ -457,6 +461,7 @@ export function sanitizePreviewDraft(
     selectedLayoutId: sanitizedLayoutId,
     selectedFontId: sanitizedFontId,
     distanceUnit,
+    elevationUnit,
     routeMode,
     routeMapVariant,
     primaryField,

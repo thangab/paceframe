@@ -253,6 +253,23 @@ export default function ActivitiesScreen() {
         <View style={styles.bottomBar}>
           <Pressable
             style={[
+              styles.templatesBtn,
+              !selectedActivityId ? styles.generateBtnDisabled : null,
+            ]}
+            onPress={() => router.push('/preview?mode=templates')}
+            disabled={!selectedActivityId}
+          >
+            <View style={styles.generateBtnContent}>
+              <MaterialCommunityIcons
+                name="view-grid-outline"
+                size={17}
+                color={colors.text}
+              />
+              <Text style={styles.templatesBtnText}>Choose Template</Text>
+            </View>
+          </Pressable>
+          <Pressable
+            style={[
               styles.generateBtn,
               !selectedActivityId ? styles.generateBtnDisabled : null,
             ]}
@@ -460,6 +477,16 @@ function createStyles(colors: ThemeColors) {
       left: spacing.md,
       right: spacing.md,
       bottom: layout.floatingBottomOffset,
+      gap: 10,
+    },
+    templatesBtn: {
+      borderRadius: 18,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      height: 52,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     generateBtn: {
       borderRadius: 20,
@@ -480,6 +507,12 @@ function createStyles(colors: ThemeColors) {
       color: colors.primaryText,
       fontSize: 18,
       fontWeight: '900',
+      letterSpacing: 0.2,
+    },
+    templatesBtnText: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '700',
       letterSpacing: 0.2,
     },
     generateBtnContent: {

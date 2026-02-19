@@ -9,7 +9,12 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { router, Stack, useFocusEffect } from 'expo-router';
+import {
+  router,
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+} from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
@@ -31,8 +36,13 @@ import {
   MAX_VIDEO_DURATION_SECONDS,
   STORY_HEIGHT,
   STORY_WIDTH,
-  TEMPLATES,
 } from '@/lib/previewConfig';
+import { PREVIEW_LAYOUTS as LAYOUTS } from '@/lib/previewLayouts';
+import {
+  DEFAULT_PREVIEW_TEMPLATE_ID,
+  getPreviewTemplateById,
+  PREVIEW_TEMPLATES,
+} from '@/lib/previewTemplates';
 import {
   BASE_LAYER_ORDER,
   sanitizePreviewDraft,
@@ -42,7 +52,9 @@ import { removeBackgroundOnDevice } from '@/lib/backgroundRemoval';
 import { composeVideoWithOverlay } from '@/lib/nativeVideoComposer';
 import {
   DistanceUnit,
+  ElevationUnit,
   formatDistanceMeters,
+  formatElevationMeters,
   formatDuration,
   formatPace,
 } from '@/lib/format';
@@ -53,6 +65,7 @@ import {
   FieldId,
   ImageOverlay,
   LayerId,
+  PreviewTemplateRenderableTextElement,
   RouteMapVariant,
   RouteMode,
   StatsLayout,
@@ -271,9 +284,29 @@ type StyleLayerSettings = {
   opacity: number;
 };
 type LayerStyleMap = Record<StyleLayerId, StyleLayerSettings>;
-type LayerStyleMapByLayout = Partial<
-  Record<StatsLayoutKind, LayerStyleMap>
->;
+type LayerStyleMapByLayout = Partial<Record<StatsLayoutKind, LayerStyleMap>>;
+type NormalPreviewSnapshot = {
+  media: ImagePicker.ImagePickerAsset | null;
+  backgroundGradient: BackgroundGradient | null;
+  autoSubjectUri: string | null;
+  imageOverlays: ImageOverlay[];
+  selectedLayoutId: string;
+  routeMode: RouteMode;
+  routeMapVariant: RouteMapVariant;
+  visible: Record<FieldId, boolean>;
+  headerVisible: typeof DEFAULT_HEADER_VISIBLE;
+  primaryField: FieldId;
+  visibleLayers: Partial<Record<LayerId, boolean>>;
+  layerOrder: LayerId[];
+  layerTransforms: Partial<
+    Record<
+      LayerId,
+      { x: number; y: number; scale: number; rotationDeg: number }
+    >
+  >;
+  behindSubjectLayers: Partial<Record<LayerId, boolean>>;
+  layerStyleMapByLayout: LayerStyleMapByLayout;
+};
 const DEFAULT_LAYER_STYLE_MAP: LayerStyleMap = {
   meta: { color: '#FFFFFF', opacity: 1 },
   stats: { color: '#FFFFFF', opacity: 1 },
@@ -311,6 +344,7 @@ type ApplyImageBackgroundOptions = {
   silent?: boolean;
   successMessage?: string;
   failurePrefix?: string;
+  skipBackgroundRemoval?: boolean;
 };
 
 function normalizeLocalUri(path: string) {
@@ -327,6 +361,86 @@ function normalizeLocalUri(path: string) {
   return `file://${path}`;
 }
 
+function resolveTemplateText(
+  value: string,
+  vars: {
+    activityName: string;
+    locationText: string;
+    dateIso: string;
+    dateText: string;
+    distanceText: string;
+    durationText: string;
+    paceText: string;
+    elevText: string;
+    caloriesText: string;
+    avgHeartRateText: string;
+  },
+  options?: {
+    formatDate?: string;
+  },
+) {
+  const resolvedDate =
+    options?.formatDate && vars.dateIso
+      ? formatDateWithPattern(vars.dateIso, options.formatDate) ?? vars.dateText
+      : vars.dateText;
+  return value
+    .replaceAll('{activityName}', vars.activityName)
+    .replaceAll('{location}', vars.locationText)
+    .replaceAll('{date}', resolvedDate)
+    .replaceAll('{distance}', vars.distanceText)
+    .replaceAll('{time}', vars.durationText)
+    .replaceAll('{pace}', vars.paceText)
+    .replaceAll('{elev}', vars.elevText)
+    .replaceAll('{calories}', vars.caloriesText)
+    .replaceAll('{avgHr}', vars.avgHeartRateText);
+}
+
+function tokenizeTemplateText(
+  text: string,
+  accentStyle?: {
+    fontFamily?: string;
+    fontSize?: number;
+    fontWeight?: '400' | '500' | '600' | '700' | '800' | '900';
+    letterSpacing?: number;
+    color?: string;
+  },
+): { text: string; accent?: boolean }[] {
+  const tokenRegex = /\[\[(.*?)\]\]/g;
+  const tokens: { text: string; accent?: boolean }[] = [];
+  let lastIndex = 0;
+  let match = tokenRegex.exec(text);
+  while (match) {
+    const start = match.index;
+    const end = tokenRegex.lastIndex;
+    if (start > lastIndex) {
+      tokens.push({ text: text.slice(lastIndex, start) });
+    }
+    tokens.push({ text: match[1], accent: true, ...(accentStyle ?? {}) });
+    lastIndex = end;
+    match = tokenRegex.exec(text);
+  }
+  if (lastIndex < text.length) {
+    tokens.push({ text: text.slice(lastIndex) });
+  }
+  return tokens.length ? tokens : [{ text }];
+}
+
+function formatDateWithPattern(isoDate: string, pattern: string) {
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const day = `${date.getDate()}`.padStart(2, '0');
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const year = `${date.getFullYear()}`;
+  const yearShort = year.slice(-2);
+
+  return pattern
+    .replaceAll('dd', day)
+    .replaceAll('mm', month)
+    .replaceAll('YYYY', year)
+    .replaceAll('YY', yearShort);
+}
+
 function isAppOwnedCacheFile(uri: string) {
   if (!uri.startsWith('file://')) return false;
   const cacheDir = FileSystem.cacheDirectory;
@@ -341,6 +455,10 @@ function getDefaultVisibleLayersForLayout(
 }
 
 export default function PreviewScreen() {
+  const searchParams = useLocalSearchParams<{
+    mode?: string | string[];
+    templateId?: string | string[];
+  }>();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -362,9 +480,26 @@ export default function PreviewScreen() {
     useState<BackgroundGradient | null>(null);
   const [autoSubjectUri, setAutoSubjectUri] = useState<string | null>(null);
   const [imageOverlays, setImageOverlays] = useState<ImageOverlay[]>([]);
-  const [selectedLayoutId, setSelectedLayoutId] = useState(TEMPLATES[0].id);
+  const modeParam = Array.isArray(searchParams.mode)
+    ? searchParams.mode[0]
+    : searchParams.mode;
+  const templateMode = modeParam === 'templates';
+  const selectedTemplateParam = Array.isArray(searchParams.templateId)
+    ? searchParams.templateId[0]
+    : searchParams.templateId;
+  const initialLayoutId = LAYOUTS.some(
+    (item) => item.id === selectedTemplateParam,
+  )
+    ? selectedTemplateParam!
+    : LAYOUTS[0].id;
+  const [selectedLayoutId, setSelectedLayoutId] = useState(initialLayoutId);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(
+    getPreviewTemplateById(selectedTemplateParam)?.id ??
+      DEFAULT_PREVIEW_TEMPLATE_ID,
+  );
   const [selectedFontId, setSelectedFontId] = useState(FONT_PRESETS[0].id);
   const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>('km');
+  const [elevationUnit, setElevationUnit] = useState<ElevationUnit>('m');
   const [routeMode, setRouteMode] = useState<RouteMode>('trace');
   const [routeMapVariant, setRouteMapVariant] =
     useState<RouteMapVariant>('standard');
@@ -408,13 +543,49 @@ export default function PreviewScreen() {
   const [selectedBlurEffectId, setSelectedBlurEffectId] =
     useState<BlurEffectId>('none');
 
+  useEffect(() => {
+    if (!templateMode) return;
+    setPanelOpen(false);
+    setActivePanel('background');
+  }, [templateMode]);
+
+  useEffect(() => {
+    if (!selectedTemplateParam) return;
+    if (templateMode) {
+      const nextTemplate = getPreviewTemplateById(selectedTemplateParam);
+      if (!nextTemplate) return;
+      if (nextTemplate.premium && !isPremium) {
+        router.push('/paywall');
+        return;
+      }
+      setSelectedTemplateId(nextTemplate.id);
+      return;
+    }
+    if (!LAYOUTS.some((item) => item.id === selectedTemplateParam)) return;
+    setSelectedLayoutId(selectedTemplateParam);
+  }, [isPremium, selectedTemplateParam, templateMode]);
+
   const exportRef = useRef<View>(null);
   const managedTempUrisRef = useRef<Set<string>>(new Set());
+  const templatePresetAppliedRef = useRef<string | null>(null);
+  const normalSnapshotRef = useRef<NormalPreviewSnapshot | null>(null);
+  const autoExtractAttemptRef = useRef<string | null>(null);
 
-  const template = useMemo(
+  const selectedTemplateDefinition = useMemo(
     () =>
-      TEMPLATES.find((item) => item.id === selectedLayoutId) ?? TEMPLATES[0],
-    [selectedLayoutId],
+      getPreviewTemplateById(selectedTemplateId) ??
+      PREVIEW_TEMPLATES[0] ??
+      null,
+    [selectedTemplateId],
+  );
+  const activeLayoutId =
+    templateMode && selectedTemplateDefinition ? 'hero' : selectedLayoutId;
+  const templateDisablesVideoBackground = Boolean(
+    templateMode && selectedTemplateDefinition?.disableVideoBackground,
+  );
+  const template = useMemo(
+    () => LAYOUTS.find((item) => item.id === activeLayoutId) ?? LAYOUTS[0],
+    [activeLayoutId],
   );
   const layerStyleMap = useMemo(
     () =>
@@ -426,17 +597,29 @@ export default function PreviewScreen() {
     media?.uri && (media.type === 'image' || media.type === 'video'),
   );
   const hasSubjectFree = Boolean(autoSubjectUri);
+  const activeFilterEffectId: FilterEffectId = templateMode
+    ? selectedTemplateDefinition?.defaultFilterEffectId &&
+      isFilterEffectId(selectedTemplateDefinition.defaultFilterEffectId)
+      ? selectedTemplateDefinition.defaultFilterEffectId
+      : 'none'
+    : selectedFilterEffectId;
+  const activeBlurEffectId: BlurEffectId = templateMode
+    ? selectedTemplateDefinition?.defaultBlurEffectId &&
+      isBlurEffectId(selectedTemplateDefinition.defaultBlurEffectId)
+      ? selectedTemplateDefinition.defaultBlurEffectId
+      : 'none'
+    : selectedBlurEffectId;
   const selectedFilterEffect = useMemo(
     () =>
-      VISUAL_EFFECT_PRESETS.find((item) => item.id === selectedFilterEffectId) ??
+      VISUAL_EFFECT_PRESETS.find((item) => item.id === activeFilterEffectId) ??
       VISUAL_EFFECT_PRESETS[0],
-    [selectedFilterEffectId],
+    [activeFilterEffectId],
   );
   const selectedBlurEffect = useMemo(
     () =>
-      VISUAL_EFFECT_PRESETS.find((item) => item.id === selectedBlurEffectId) ??
+      VISUAL_EFFECT_PRESETS.find((item) => item.id === activeBlurEffectId) ??
       VISUAL_EFFECT_PRESETS[0],
-    [selectedBlurEffectId],
+    [activeBlurEffectId],
   );
   const supportsPrimaryLayer = useMemo(
     () =>
@@ -461,7 +644,10 @@ export default function PreviewScreen() {
     activity?.moving_time ?? 0,
     distanceUnit,
   );
-  const elevText = `${Math.round(activity?.total_elevation_gain ?? 0)} m`;
+  const elevText = formatElevationMeters(
+    activity?.total_elevation_gain ?? 0,
+    elevationUnit,
+  );
   const cadenceText = formatCadence(activity);
   const hasCadence = Boolean(
     activity?.average_cadence && activity.average_cadence > 0,
@@ -502,6 +688,254 @@ export default function PreviewScreen() {
     if (city) return city;
     return resolvedLocationText;
   }, [activity, resolvedLocationText]);
+  const templateFixedTextElements = useMemo<
+    PreviewTemplateRenderableTextElement[]
+  >(() => {
+    if (!templateMode || !selectedTemplateDefinition) return [];
+    const templateDataAvailability: Record<FieldId, boolean> = {
+      distance: (activity?.distance ?? 0) > 0,
+      time: (activity?.moving_time ?? 0) > 0,
+      pace: (activity?.distance ?? 0) > 0 && (activity?.moving_time ?? 0) > 0,
+      elev:
+        typeof activity?.total_elevation_gain === 'number' &&
+        !Number.isNaN(activity.total_elevation_gain),
+      cadence: hasCadence,
+      calories: hasCalories,
+      avgHr: hasAvgHeartRate,
+    };
+    const vars = {
+      activityName: activity?.name?.trim() ?? '',
+      locationText,
+      dateIso: activity?.start_date ?? '',
+      dateText,
+      distanceText,
+      durationText,
+      paceText,
+      elevText,
+      caloriesText,
+      avgHeartRateText,
+    };
+    return (selectedTemplateDefinition.fixedTextElements ?? [])
+      .filter((item) =>
+        (item.requiredDataFields ?? []).every(
+          (fieldId) => templateDataAvailability[fieldId],
+        ),
+      )
+      .map((item) => {
+        const resolvedText = resolveTemplateText(item.text, vars, {
+          formatDate: item.formatDate,
+        });
+        const displayText = item.uppercase
+          ? resolvedText.toUpperCase()
+          : resolvedText;
+        return {
+          ...item,
+          tokens: tokenizeTemplateText(displayText, {
+            fontFamily: item.accentFontFamily,
+            fontSize: item.accentFontSize,
+            fontWeight: item.accentFontWeight,
+            letterSpacing: item.accentLetterSpacing,
+            color: item.accentColor,
+          }),
+        };
+      });
+  }, [
+    activity?.distance,
+    activity?.moving_time,
+    activity?.start_date,
+    activity?.total_elevation_gain,
+    activity?.name,
+    avgHeartRateText,
+    caloriesText,
+    dateText,
+    distanceText,
+    durationText,
+    elevText,
+    locationText,
+    paceText,
+    selectedTemplateDefinition,
+    templateMode,
+    hasCadence,
+    hasCalories,
+    hasAvgHeartRate,
+  ]);
+  const templateHiddenVisibleConfig: Record<FieldId, boolean> = {
+    distance: false,
+    time: false,
+    pace: false,
+    elev: false,
+    cadence: false,
+    calories: false,
+    avgHr: false,
+  };
+  const templateHiddenHeaderConfig = {
+    title: false,
+    date: false,
+    location: false,
+  };
+  const templateImageOverlays = useMemo<ImageOverlay[]>(() => {
+    if (!templateMode || !selectedTemplateDefinition) return [];
+    const mapped = (selectedTemplateDefinition.fixedImageElements ?? []).map(
+      (item): ImageOverlay | null => {
+        const hasLocalAsset = typeof item.asset === 'number';
+        const resolvedUri =
+          item.uri === '@activityPhoto'
+            ? (activityPhotoUri ?? '')
+            : (item.uri ?? '');
+        if (!hasLocalAsset && !resolvedUri) return null;
+        return {
+          id: `template-${item.id}`,
+          uri: resolvedUri,
+          ...(hasLocalAsset ? { asset: item.asset } : {}),
+          name: item.name,
+          opacity: item.opacity ?? 1,
+          rotationDeg: item.rotationDeg ?? 0,
+          width: item.width,
+          height: item.height,
+        };
+      },
+    );
+    return mapped.filter((item): item is ImageOverlay => item !== null);
+  }, [activityPhotoUri, selectedTemplateDefinition, templateMode]);
+  const templateImageLayerIds = useMemo<LayerId[]>(
+    () => templateImageOverlays.map((item) => `image:${item.id}` as LayerId),
+    [templateImageOverlays],
+  );
+  const templateBackgroundMediaFrame = useMemo(() => {
+    if (!templateMode || !selectedTemplateDefinition?.backgroundMediaFrame) {
+      return null;
+    }
+    return selectedTemplateDefinition.backgroundMediaFrame;
+  }, [selectedTemplateDefinition, templateMode]);
+  const templateBehindSubjectLayers = useMemo<
+    Partial<Record<LayerId, boolean>>
+  >(() => {
+    if (!templateMode || !selectedTemplateDefinition) return {};
+    return (selectedTemplateDefinition.fixedImageElements ?? []).reduce(
+      (acc, item) => {
+        if (!item.isBehind) return acc;
+        const resolvedUri =
+          item.uri === '@activityPhoto'
+            ? (activityPhotoUri ?? '')
+            : (item.uri ?? '');
+        const hasLocalAsset = typeof item.asset === 'number';
+        if (!hasLocalAsset && !resolvedUri) return acc;
+        const layerId: LayerId = `image:template-${item.id}`;
+        return { ...acc, [layerId]: true };
+      },
+      {} as Partial<Record<LayerId, boolean>>,
+    );
+  }, [activityPhotoUri, selectedTemplateDefinition, templateMode]);
+  const templateLayerTransforms = useMemo<
+    Partial<
+      Record<
+        LayerId,
+        { x: number; y: number; scale: number; rotationDeg: number }
+      >
+    >
+  >(() => {
+    if (!templateMode || !selectedTemplateDefinition) return {};
+    const mapped = (selectedTemplateDefinition.fixedImageElements ?? [])
+      .map((item) => {
+        const hasLocalAsset = typeof item.asset === 'number';
+        const resolvedUri =
+          item.uri === '@activityPhoto'
+            ? (activityPhotoUri ?? '')
+            : (item.uri ?? '');
+        if (!hasLocalAsset && !resolvedUri) return null;
+        return {
+          id: `image:template-${item.id}` as LayerId,
+          x: item.x,
+          y: item.y,
+          rotationDeg: item.rotationDeg ?? 0,
+        };
+      })
+      .filter(
+        (
+          item,
+        ): item is { id: LayerId; x: number; y: number; rotationDeg: number } =>
+          Boolean(item),
+      );
+    const imageLayerTransforms = mapped.reduce(
+      (acc, item) => ({
+        ...acc,
+        [item.id]: {
+          x: item.x,
+          y: item.y,
+          scale: 1,
+          rotationDeg: item.rotationDeg,
+        },
+      }),
+      {} as Partial<
+        Record<
+          LayerId,
+          { x: number; y: number; scale: number; rotationDeg: number }
+        >
+      >,
+    );
+    if (!selectedTemplateDefinition.routeTransform) {
+      return imageLayerTransforms;
+    }
+    return {
+      ...imageLayerTransforms,
+      route: {
+        x: selectedTemplateDefinition.routeTransform.x,
+        y: selectedTemplateDefinition.routeTransform.y,
+        scale: selectedTemplateDefinition.routeTransform.scale ?? 1,
+        rotationDeg: selectedTemplateDefinition.routeTransform.rotationDeg ?? 0,
+      },
+    };
+  }, [selectedTemplateDefinition, templateMode, activityPhotoUri]);
+  const templateVisibleLayers = useMemo<
+    Partial<Record<LayerId, boolean>>
+  >(() => {
+    if (!templateMode || !selectedTemplateDefinition) {
+      return DEFAULT_VISIBLE_LAYERS;
+    }
+    return {
+      meta: false,
+      stats: false,
+      primary: false,
+      route: selectedTemplateDefinition.showRoute ?? false,
+      ...Object.fromEntries(templateImageLayerIds.map((id) => [id, true])),
+    };
+  }, [selectedTemplateDefinition, templateImageLayerIds, templateMode]);
+  const templateLayerStyleMap = useMemo(() => {
+    const base = getDefaultLayerStyleMapForLayout(template.layout);
+    if (!templateMode || !selectedTemplateDefinition) return base;
+    return {
+      ...base,
+      ...(selectedTemplateDefinition.layerStyleOverrides ?? {}),
+    };
+  }, [selectedTemplateDefinition, template.layout, templateMode]);
+  const activeVisible = templateMode ? templateHiddenVisibleConfig : visible;
+  const activeHeaderVisible = templateMode
+    ? templateHiddenHeaderConfig
+    : headerVisible;
+  const activePrimaryField = templateMode ? 'distance' : primaryField;
+  const activeImageOverlays = templateMode
+    ? templateImageOverlays
+    : imageOverlays;
+  const activeVisibleLayers = templateMode
+    ? templateVisibleLayers
+    : visibleLayers;
+  const activeLayerTransforms = templateMode
+    ? templateLayerTransforms
+    : layerTransforms;
+  const activeLayerOrder = useMemo(
+    () =>
+      templateMode
+        ? [...BASE_LAYER_ORDER, ...templateImageLayerIds]
+        : layerOrder,
+    [layerOrder, templateImageLayerIds, templateMode],
+  );
+  const activeBehindSubjectLayers = useMemo<Partial<Record<LayerId, boolean>>>(
+    () => (templateMode ? templateBehindSubjectLayers : behindSubjectLayers),
+    [behindSubjectLayers, templateBehindSubjectLayers, templateMode],
+  );
+  const activeLayerStyleMap = templateMode
+    ? templateLayerStyleMap
+    : layerStyleMap;
   const activityPolyline = useMemo(() => {
     const raw = activity?.map?.summary_polyline;
     if (typeof raw !== 'string') return null;
@@ -512,6 +946,14 @@ export default function PreviewScreen() {
     return normalized;
   }, [activity?.map?.summary_polyline]);
   const hasRouteLayer = Boolean(activityPolyline);
+  const activeRouteMode: RouteMode = templateMode
+    ? selectedTemplateDefinition?.showRoute && hasRouteLayer
+      ? 'trace'
+      : 'off'
+    : routeMode;
+  const activeRouteMapVariant: RouteMapVariant = templateMode
+    ? 'standard'
+    : routeMapVariant;
   const supportsFullStatsPreview = useMemo(() => {
     const t = (activity?.type || '').toLowerCase();
     return (
@@ -550,7 +992,7 @@ export default function PreviewScreen() {
       'avgHr',
     ];
     const picked = orderedFields.filter(
-      (field) => Boolean(visible[field]) && statsFieldAvailability[field],
+      (field) => Boolean(activeVisible[field]) && statsFieldAvailability[field],
     );
     const allowed = new Set(picked.slice(0, maxSelectableMetrics));
 
@@ -567,7 +1009,7 @@ export default function PreviewScreen() {
     maxSelectableMetrics,
     statsFieldAvailability,
     supportsFullStatsPreview,
-    visible,
+    activeVisible,
   ]);
   const metricTextByField = useMemo<Record<FieldId, string>>(
     () => ({
@@ -592,10 +1034,10 @@ export default function PreviewScreen() {
   const primaryFieldEffective = useMemo<FieldId>(() => {
     if (!supportsPrimaryLayer) return 'distance';
     if (
-      effectiveVisible[primaryField] &&
-      statsFieldAvailability[primaryField]
+      effectiveVisible[activePrimaryField] &&
+      statsFieldAvailability[activePrimaryField]
     ) {
-      return primaryField;
+      return activePrimaryField;
     }
     const fallback = (
       [
@@ -611,7 +1053,7 @@ export default function PreviewScreen() {
     return fallback ?? 'distance';
   }, [
     effectiveVisible,
-    primaryField,
+    activePrimaryField,
     statsFieldAvailability,
     supportsPrimaryLayer,
   ]);
@@ -649,13 +1091,13 @@ export default function PreviewScreen() {
     [template, visibleStatsCount],
   );
   const layerZ = useMemo(() => {
-    return layerOrder.reduce(
+    return activeLayerOrder.reduce(
       (acc, id, index) => ({ ...acc, [id]: index + 1 }),
       {} as Partial<Record<LayerId, number>>,
     );
-  }, [layerOrder]);
+  }, [activeLayerOrder]);
   const baseLayerZ = (id: LayerId) =>
-    behindSubjectLayers[id] ? 2 : (layerZ[id] ?? 1) * 10 + 10;
+    activeBehindSubjectLayers[id] ? 2 : (layerZ[id] ?? 1) * 10 + 10;
   const layerEntries = useMemo(() => {
     const labelMap = new Map<LayerId, string>([
       ['meta', 'Header'],
@@ -663,10 +1105,10 @@ export default function PreviewScreen() {
       ['primary', 'Primary'],
       ['route', 'Route'],
     ]);
-    imageOverlays.forEach((item) => {
+    activeImageOverlays.forEach((item) => {
       labelMap.set(`image:${item.id}`, item.name);
     });
-    return layerOrder
+    return activeLayerOrder
       .slice()
       .reverse()
       .filter((id) => (hasRouteLayer ? true : id !== 'route'))
@@ -674,13 +1116,13 @@ export default function PreviewScreen() {
       .map((id) => ({
         id,
         label: labelMap.get(id) ?? id,
-        isBehind: Boolean(behindSubjectLayers[id]),
+        isBehind: Boolean(activeBehindSubjectLayers[id]),
       }));
   }, [
-    behindSubjectLayers,
+    activeBehindSubjectLayers,
+    activeImageOverlays,
+    activeLayerOrder,
     hasRouteLayer,
-    imageOverlays,
-    layerOrder,
     supportsPrimaryLayer,
   ]);
   const canvasDisplaySize = useMemo(() => {
@@ -809,15 +1251,14 @@ export default function PreviewScreen() {
   function resetDraftStateToDefaults(options?: { keepLayoutId?: string }) {
     const templateIdToKeep = options?.keepLayoutId;
     const hasLayoutToKeep = Boolean(
-      templateIdToKeep &&
-      TEMPLATES.some((item) => item.id === templateIdToKeep),
+      templateIdToKeep && LAYOUTS.some((item) => item.id === templateIdToKeep),
     );
     const nextLayoutId = hasLayoutToKeep
       ? (templateIdToKeep as string)
-      : TEMPLATES[0].id;
+      : LAYOUTS[0].id;
     const nextLayoutLayout =
-      TEMPLATES.find((item) => item.id === nextLayoutId)?.layout ??
-      TEMPLATES[0].layout;
+      LAYOUTS.find((item) => item.id === nextLayoutId)?.layout ??
+      LAYOUTS[0].layout;
     setMedia(null);
     setBackgroundGradient(null);
     setAutoSubjectUri(null);
@@ -825,6 +1266,7 @@ export default function PreviewScreen() {
     setSelectedLayoutId(nextLayoutId);
     setSelectedFontId(FONT_PRESETS[0].id);
     setDistanceUnit('km');
+    setElevationUnit('m');
     setRouteMode('trace');
     setRouteMapVariant('standard');
     setPrimaryField('distance');
@@ -836,8 +1278,7 @@ export default function PreviewScreen() {
     setLayerTransforms({});
     setIsSquareFormat(false);
     setLayerStyleMapByLayout({
-      [nextLayoutLayout]:
-        getDefaultLayerStyleMapForLayout(nextLayoutLayout),
+      [nextLayoutLayout]: getDefaultLayerStyleMapForLayout(nextLayoutLayout),
     });
     setSunsetPrimaryGradient(DEFAULT_SUNSET_PRIMARY_GRADIENT);
     setSelectedFilterEffectId('none');
@@ -849,15 +1290,16 @@ export default function PreviewScreen() {
 
   function applyDraft(draft: PreviewDraft) {
     const selectedLayoutLayout =
-      TEMPLATES.find((item) => item.id === (draft.selectedLayoutId ?? ''))
-        ?.layout ?? TEMPLATES[0].layout;
+      LAYOUTS.find((item) => item.id === (draft.selectedLayoutId ?? ''))
+        ?.layout ?? LAYOUTS[0].layout;
     setMedia(draft.media ?? null);
     setBackgroundGradient(draft.backgroundGradient ?? null);
     setAutoSubjectUri(draft.autoSubjectUri ?? null);
     setImageOverlays(draft.imageOverlays ?? []);
-    setSelectedLayoutId(draft.selectedLayoutId ?? TEMPLATES[0].id);
+    setSelectedLayoutId(draft.selectedLayoutId ?? LAYOUTS[0].id);
     setSelectedFontId(draft.selectedFontId ?? FONT_PRESETS[0].id);
     setDistanceUnit(draft.distanceUnit ?? 'km');
+    setElevationUnit(draft.elevationUnit ?? 'm');
     setRouteMode(draft.routeMode ?? 'trace');
     setRouteMapVariant(draft.routeMapVariant ?? 'standard');
     setPrimaryField(draft.primaryField ?? 'distance');
@@ -884,9 +1326,8 @@ export default function PreviewScreen() {
       });
     } else {
       setLayerStyleMapByLayout({
-        [selectedLayoutLayout]: getDefaultLayerStyleMapForLayout(
-          selectedLayoutLayout,
-        ),
+        [selectedLayoutLayout]:
+          getDefaultLayerStyleMapForLayout(selectedLayoutLayout),
       });
     }
     setSunsetPrimaryGradient(
@@ -896,13 +1337,13 @@ export default function PreviewScreen() {
     const nextFilterId = isFilterEffectId(
       draft.selectedFilterEffectId ?? legacySelectedEffect,
     )
-      ? (draft.selectedFilterEffectId ??
-          legacySelectedEffect) as FilterEffectId
+      ? ((draft.selectedFilterEffectId ??
+          legacySelectedEffect) as FilterEffectId)
       : 'none';
     const nextBlurId = isBlurEffectId(
       draft.selectedBlurEffectId ?? legacySelectedEffect,
     )
-      ? (draft.selectedBlurEffectId ?? legacySelectedEffect) as BlurEffectId
+      ? ((draft.selectedBlurEffectId ?? legacySelectedEffect) as BlurEffectId)
       : 'none';
     setSelectedFilterEffectId(nextFilterId);
     setSelectedBlurEffectId(nextBlurId);
@@ -934,12 +1375,13 @@ export default function PreviewScreen() {
         if (raw) {
           const parsed = JSON.parse(raw) as unknown;
           const draft = sanitizePreviewDraft(parsed, {
-            templateIds: TEMPLATES.map((item) => item.id),
+            templateIds: LAYOUTS.map((item) => item.id),
             fontIds: FONT_PRESETS.map((item) => item.id),
             defaults: {
-              selectedLayoutId: TEMPLATES[0].id,
+              selectedLayoutId: LAYOUTS[0].id,
               selectedFontId: FONT_PRESETS[0].id,
               distanceUnit: 'km',
+              elevationUnit: 'm',
               routeMode: 'trace',
               routeMapVariant: 'standard',
               primaryField: 'distance',
@@ -988,7 +1430,9 @@ export default function PreviewScreen() {
   }, [activity?.id, activityDraftKey, activityPhotoUri]);
 
   useEffect(() => {
-    if (!draftReady || !activityDraftKey || isHydratingDraft) return;
+    if (!draftReady || !activityDraftKey || isHydratingDraft || templateMode) {
+      return;
+    }
 
     const draft: PreviewDraft = {
       v: 1,
@@ -999,6 +1443,7 @@ export default function PreviewScreen() {
       selectedLayoutId,
       selectedFontId,
       distanceUnit,
+      elevationUnit,
       routeMode,
       routeMapVariant,
       primaryField,
@@ -1033,6 +1478,7 @@ export default function PreviewScreen() {
     backgroundGradient,
     behindSubjectLayers,
     distanceUnit,
+    elevationUnit,
     draftReady,
     headerVisible,
     imageOverlays,
@@ -1053,6 +1499,7 @@ export default function PreviewScreen() {
     selectedFilterEffectId,
     selectedBlurEffectId,
     isHydratingDraft,
+    templateMode,
   ]);
 
   useFocusEffect(
@@ -1096,6 +1543,161 @@ export default function PreviewScreen() {
       setOutlinedLayer('stats');
     }
   }, [selectedLayer, supportsPrimaryLayer]);
+
+  useEffect(() => {
+    if (templateMode) {
+      if (!normalSnapshotRef.current) {
+        normalSnapshotRef.current = {
+          media,
+          backgroundGradient,
+          autoSubjectUri,
+          imageOverlays,
+          selectedLayoutId,
+          routeMode,
+          routeMapVariant,
+          visible,
+          headerVisible,
+          primaryField,
+          visibleLayers,
+          layerOrder,
+          layerTransforms,
+          behindSubjectLayers,
+          layerStyleMapByLayout,
+        };
+      }
+      return;
+    }
+
+    if (!normalSnapshotRef.current) return;
+    const snapshot = normalSnapshotRef.current;
+    normalSnapshotRef.current = null;
+    templatePresetAppliedRef.current = null;
+
+    setMedia(snapshot.media);
+    setBackgroundGradient(snapshot.backgroundGradient);
+    setAutoSubjectUri(snapshot.autoSubjectUri);
+    setImageOverlays(snapshot.imageOverlays);
+    setSelectedLayoutId(snapshot.selectedLayoutId);
+    setRouteMode(snapshot.routeMode);
+    setRouteMapVariant(snapshot.routeMapVariant);
+    setVisible(snapshot.visible);
+    setHeaderVisible(snapshot.headerVisible);
+    setPrimaryField(snapshot.primaryField);
+    setVisibleLayers(snapshot.visibleLayers);
+    setLayerOrder(snapshot.layerOrder);
+    setLayerTransforms(snapshot.layerTransforms);
+    setBehindSubjectLayers(snapshot.behindSubjectLayers);
+    setLayerStyleMapByLayout(snapshot.layerStyleMapByLayout);
+  }, [
+    autoSubjectUri,
+    backgroundGradient,
+    behindSubjectLayers,
+    headerVisible,
+    imageOverlays,
+    layerOrder,
+    layerStyleMapByLayout,
+    layerTransforms,
+    media,
+    primaryField,
+    routeMapVariant,
+    routeMode,
+    selectedLayoutId,
+    templateMode,
+    visible,
+    visibleLayers,
+  ]);
+
+  // Template presets can depend on activity photo, including subject extraction.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+    if (!templateMode || !selectedTemplateDefinition) {
+      templatePresetAppliedRef.current = null;
+      return;
+    }
+
+    const templateKey = `${activity?.id ?? 'none'}:${selectedTemplateDefinition.id}:${
+      activityPhotoUri ?? 'no-photo'
+    }`;
+    if (templatePresetAppliedRef.current === templateKey) {
+      return;
+    }
+    templatePresetAppliedRef.current = templateKey;
+
+    if (
+      selectedTemplateDefinition.defaultBackground === 'activity-photo' &&
+      activityPhotoUri
+    ) {
+      const asset: ImagePicker.ImagePickerAsset = {
+        uri: activityPhotoUri,
+        width: STORY_WIDTH,
+        height: STORY_HEIGHT,
+        type: 'image',
+      };
+      void applyImageBackground(asset, {
+        silent: true,
+        skipBackgroundRemoval: Boolean(
+          selectedTemplateDefinition.disableBackgroundRemoval,
+        ),
+      });
+      return;
+    }
+
+    setMedia(null);
+    setBackgroundGradient(null);
+    setAutoSubjectUri(null);
+  }, [
+    activity?.id,
+    activityPhotoUri,
+    selectedTemplateDefinition,
+    templateMode,
+  ]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+
+  // Guarded one-shot auto-heal effect. We intentionally avoid depending on
+  // applyImageBackground to prevent re-trigger loops.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+    if (templateMode) {
+      autoExtractAttemptRef.current = null;
+      return;
+    }
+    if (!draftReady || isHydratingDraft || isExtracting) return;
+    if (!activity?.id || !activityPhotoUri || autoSubjectUri) return;
+
+    const mediaMatchesActivityPhoto =
+      media?.type === 'image' && media.uri === activityPhotoUri;
+    const shouldApplyActivityPhotoByDefault = !media && !backgroundGradient;
+    if (!mediaMatchesActivityPhoto && !shouldApplyActivityPhotoByDefault)
+      return;
+
+    const attemptKey = `${activity.id}:${activityPhotoUri}:${
+      mediaMatchesActivityPhoto ? 'current-media' : 'empty-background'
+    }`;
+    if (autoExtractAttemptRef.current === attemptKey) return;
+    autoExtractAttemptRef.current = attemptKey;
+
+    const asset: ImagePicker.ImagePickerAsset =
+      mediaMatchesActivityPhoto && media
+        ? media
+        : {
+            uri: activityPhotoUri,
+            width: STORY_WIDTH,
+            height: STORY_HEIGHT,
+            type: 'image',
+          };
+    void applyImageBackground(asset, { silent: true });
+  }, [
+    activity?.id,
+    activityPhotoUri,
+    autoSubjectUri,
+    backgroundGradient,
+    draftReady,
+    isExtracting,
+    isHydratingDraft,
+    media,
+    templateMode,
+  ]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   useEffect(() => {
     let cancelled = false;
@@ -1294,6 +1896,19 @@ export default function PreviewScreen() {
     );
     void cleanupTempUriIfOwned(previousAutoSubjectUri);
 
+    const shouldSkipBackgroundRemoval =
+      options.skipBackgroundRemoval ??
+      (templateMode &&
+        Boolean(
+          getPreviewTemplateById(selectedTemplateId)?.disableBackgroundRemoval,
+        ));
+    if (shouldSkipBackgroundRemoval) {
+      if (!options.silent) {
+        setMessage(options.successMessage ?? 'Image loaded.');
+      }
+      return;
+    }
+
     try {
       setIsExtracting(true);
       if (!options.silent) {
@@ -1322,11 +1937,21 @@ export default function PreviewScreen() {
     const allowed = await ensureMediaPermission();
     if (!allowed) return;
     try {
+      const cropWidth =
+        templateMode && selectedTemplateDefinition?.imagePickerCropSize?.width
+          ? Math.max(1, Math.round(selectedTemplateDefinition.imagePickerCropSize.width))
+          : 1080;
+      const cropHeight =
+        templateMode && selectedTemplateDefinition?.imagePickerCropSize?.height
+          ? Math.max(1, Math.round(selectedTemplateDefinition.imagePickerCropSize.height))
+          : isSquareFormat
+            ? 1080
+            : 1920;
       const cropResult = await ImageCropPicker.openPicker({
         mediaType: 'photo',
         cropping: true,
-        width: 1080,
-        height: isSquareFormat ? 1080 : 1920,
+        width: cropWidth,
+        height: cropHeight,
         compressImageQuality: 1,
         forceJpg: true,
       });
@@ -1355,6 +1980,10 @@ export default function PreviewScreen() {
   }
 
   async function pickVideoMedia() {
+    if (templateDisablesVideoBackground) {
+      setMessage('Video background is disabled for this template.');
+      return;
+    }
     if (isSquareFormat) {
       setMessage('Video background is unavailable in square mode.');
       return;
@@ -1536,11 +2165,36 @@ export default function PreviewScreen() {
     }
   }
 
+  function selectTemplate(templateId: string) {
+    const nextTemplate = getPreviewTemplateById(templateId);
+    if (!nextTemplate) return;
+    if (nextTemplate.premium && !isPremium) {
+      router.push('/paywall');
+      return;
+    }
+    setSelectedTemplateId(nextTemplate.id);
+  }
+
   function cycleStatsLayout() {
-    const currentIndex = TEMPLATES.findIndex((item) => item.id === template.id);
+    const currentIndex = LAYOUTS.findIndex((item) => item.id === template.id);
     const nextIndex =
-      currentIndex >= 0 ? (currentIndex + 1) % TEMPLATES.length : 0;
-    selectLayout(TEMPLATES[nextIndex]);
+      currentIndex >= 0 ? (currentIndex + 1) % LAYOUTS.length : 0;
+    selectLayout(LAYOUTS[nextIndex]);
+  }
+
+  function changeTemplate(direction: 'next' | 'prev') {
+    if (!templateMode || PREVIEW_TEMPLATES.length <= 1 || busy) return;
+    const currentIndex = PREVIEW_TEMPLATES.findIndex(
+      (item) => item.id === selectedTemplateId,
+    );
+    const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+    const nextIndex =
+      direction === 'next'
+        ? (safeIndex + 1) % PREVIEW_TEMPLATES.length
+        : (safeIndex - 1 + PREVIEW_TEMPLATES.length) % PREVIEW_TEMPLATES.length;
+    const nextTemplate = PREVIEW_TEMPLATES[nextIndex];
+    if (!nextTemplate) return;
+    selectTemplate(nextTemplate.id);
   }
 
   function cycleRouteMode() {
@@ -1901,64 +2555,117 @@ export default function PreviewScreen() {
     <>
       <Stack.Screen
         options={{
+          headerTitle: () => (
+            <View style={styles.headerTitleRow}>
+              <Text style={styles.headerTitleText}>
+                {templateMode
+                  ? (selectedTemplateDefinition?.name ?? 'Templates')
+                  : 'Preview'}
+              </Text>
+              {templateMode ? (
+                <View style={styles.headerTemplateNav}>
+                  <Pressable
+                    onPress={() => changeTemplate('prev')}
+                    hitSlop={8}
+                    style={[
+                      styles.headerFormatButton,
+                      (busy || PREVIEW_TEMPLATES.length <= 1) &&
+                        styles.headerFormatButtonDisabled,
+                    ]}
+                    disabled={busy || PREVIEW_TEMPLATES.length <= 1}
+                    accessibilityRole="button"
+                    accessibilityLabel="Template précédent"
+                  >
+                    <MaterialCommunityIcons
+                      name="chevron-left"
+                      size={18}
+                      color={colors.panelText}
+                    />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => changeTemplate('next')}
+                    hitSlop={8}
+                    style={[
+                      styles.headerFormatButton,
+                      (busy || PREVIEW_TEMPLATES.length <= 1) &&
+                        styles.headerFormatButtonDisabled,
+                    ]}
+                    disabled={busy || PREVIEW_TEMPLATES.length <= 1}
+                    accessibilityRole="button"
+                    accessibilityLabel="Template suivant"
+                  >
+                    <MaterialCommunityIcons
+                      name="chevron-right"
+                      size={18}
+                      color={colors.panelText}
+                    />
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          ),
           headerRight: () => (
             <View style={styles.headerActions}>
-              <Pressable
-                onPress={() => {
-                  confirmResetToDefault();
-                }}
-                hitSlop={8}
-                style={[
-                  styles.headerFormatButton,
-                  busy ? styles.headerFormatButtonDisabled : null,
-                ]}
-                disabled={busy}
-                accessibilityRole="button"
-                accessibilityLabel="Reset to default"
-              >
-                <MaterialCommunityIcons
-                  name="restore"
-                  size={18}
-                  color={colors.panelText}
-                />
-              </Pressable>
-              <Pressable
-                onPress={toggleSquareFormat}
-                hitSlop={8}
-                style={[
-                  styles.headerFormatButton,
-                  (!isSquareFormat && media?.type === 'video') || busy
-                    ? styles.headerFormatButtonDisabled
-                    : null,
-                ]}
-                disabled={busy || (!isSquareFormat && media?.type === 'video')}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  isSquareFormat
-                    ? 'Square format (1:1)'
-                    : 'Portrait format (9:16)'
-                }
-              >
-                <MaterialCommunityIcons
-                  name={isSquareFormat ? 'crop-square' : 'cellphone'}
-                  size={18}
-                  color={colors.panelText}
-                />
-              </Pressable>
+              {!templateMode ? (
+                <Pressable
+                  onPress={() => {
+                    confirmResetToDefault();
+                  }}
+                  hitSlop={8}
+                  style={[
+                    styles.headerFormatButton,
+                    busy ? styles.headerFormatButtonDisabled : null,
+                  ]}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Reset to default"
+                >
+                  <MaterialCommunityIcons
+                    name="restore"
+                    size={18}
+                    color={colors.panelText}
+                  />
+                </Pressable>
+              ) : null}
+              {!templateMode ? (
+                <Pressable
+                  onPress={toggleSquareFormat}
+                  hitSlop={8}
+                  style={[
+                    styles.headerFormatButton,
+                    (!isSquareFormat && media?.type === 'video') || busy
+                      ? styles.headerFormatButtonDisabled
+                      : null,
+                  ]}
+                  disabled={
+                    busy || (!isSquareFormat && media?.type === 'video')
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    isSquareFormat
+                      ? 'Square format (1:1)'
+                      : 'Portrait format (9:16)'
+                  }
+                >
+                  <MaterialCommunityIcons
+                    name={isSquareFormat ? 'crop-square' : 'cellphone'}
+                    size={18}
+                    color={colors.panelText}
+                  />
+                </Pressable>
+              ) : null}
               <Pressable
                 onPress={toggleHelpPanel}
                 hitSlop={8}
                 style={[
                   styles.headerFormatButton,
-                  helpPopoverOpen
-                    ? styles.headerHelpButtonActive
-                    : null,
+                  helpPopoverOpen ? styles.headerHelpButtonActive : null,
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel="Help"
+                accessibilityLabel="Settings"
               >
                 <MaterialCommunityIcons
-                  name="help-circle-outline"
+                  name="cog-outline"
                   size={18}
                   color={colors.panelText}
                 />
@@ -1988,7 +2695,7 @@ export default function PreviewScreen() {
           media={media}
           backgroundGradient={backgroundGradient}
           autoSubjectUri={autoSubjectUri}
-          visibleLayers={visibleLayers}
+          visibleLayers={activeVisibleLayers}
           selectedLayer={outlinedLayer}
           activeLayer={activeLayer}
           setActiveLayer={setActiveLayer}
@@ -1997,12 +2704,12 @@ export default function PreviewScreen() {
           activityName={activity.name}
           dateText={dateText}
           locationText={locationText}
-          headerVisible={headerVisible}
+          headerVisible={activeHeaderVisible}
           template={template}
           fontPreset={fontPreset}
           effectiveVisible={statsVisibleForLayer}
           supportsPrimaryLayer={supportsPrimaryLayer}
-          primaryVisible={Boolean(visibleLayers.primary)}
+          primaryVisible={Boolean(activeVisibleLayers.primary)}
           primaryField={primaryFieldEffective}
           primaryValueText={metricTextByField[primaryFieldEffective]}
           distanceText={distanceText}
@@ -2012,20 +2719,20 @@ export default function PreviewScreen() {
           cadenceText={cadenceText}
           caloriesText={caloriesText}
           avgHeartRateText={avgHeartRateText}
-          layerStyleSettings={layerStyleMap}
+          layerStyleSettings={activeLayerStyleMap}
           sunsetPrimaryGradient={sunsetPrimaryGradient}
           selectedFilterEffect={selectedFilterEffect}
           selectedBlurEffect={selectedBlurEffect}
-          selectedFilterEffectId={selectedFilterEffectId}
-          selectedBlurEffectId={selectedBlurEffectId}
+          selectedFilterEffectId={activeFilterEffectId}
+          selectedBlurEffectId={activeBlurEffectId}
           centeredStatsXDisplay={centeredStatsXDisplay}
           dynamicStatsWidthDisplay={dynamicStatsWidthDisplay}
           canvasScaleX={canvasScaleX}
           canvasScaleY={canvasScaleY}
           cycleStatsLayout={cycleStatsLayout}
-          routeMode={routeMode}
-          routeMapVariant={routeMapVariant}
-          layerTransforms={layerTransforms}
+          routeMode={activeRouteMode}
+          routeMapVariant={activeRouteMapVariant}
+          layerTransforms={activeLayerTransforms}
           onLayerTransformChange={onLayerTransformChange}
           routeInitialXDisplay={routeInitialXDisplay}
           routeInitialYDisplay={routeInitialYDisplay}
@@ -2033,9 +2740,12 @@ export default function PreviewScreen() {
           routeLayerHeightDisplay={routeLayerHeightDisplay}
           activityPolyline={activityPolyline}
           cycleRouteMode={cycleRouteMode}
-          imageOverlays={imageOverlays}
+          imageOverlays={activeImageOverlays}
           imageOverlayMaxInitial={IMAGE_OVERLAY_MAX_INITIAL}
           isPremium={isPremium}
+          quickTemplateMode={templateMode}
+          templateFixedTextElements={templateFixedTextElements}
+          templateBackgroundMediaFrame={templateBackgroundMediaFrame}
           onDragGuideChange={setCenterGuides}
           onRotationGuideChange={setShowRotationGuide}
         />
@@ -2060,8 +2770,8 @@ export default function PreviewScreen() {
           onCreateSticker={createStickerOverlay}
           isSquareFormat={isSquareFormat}
           layerEntries={layerEntries}
-          routeMode={routeMode}
-          visibleLayers={visibleLayers}
+          routeMode={activeRouteMode}
+          visibleLayers={activeVisibleLayers}
           selectedLayer={selectedLayer}
           setSelectedLayer={selectLayer}
           onToggleLayer={toggleLayer}
@@ -2070,30 +2780,39 @@ export default function PreviewScreen() {
           onRemoveLayer={removeLayer}
           template={template}
           onSelectLayout={selectLayout}
+          templateOptions={PREVIEW_TEMPLATES.map((item) => ({
+            id: item.id,
+            name: item.name,
+            premium: item.premium,
+          }))}
+          selectedTemplateId={selectedTemplateId}
+          onSelectTemplate={selectTemplate}
           selectedFontId={selectedFontId}
           onSelectFont={setSelectedFontId}
           effectiveVisible={effectiveVisible}
           supportsFullStatsPreview={supportsFullStatsPreview}
           statsFieldAvailability={statsFieldAvailability}
           supportsPrimaryLayer={supportsPrimaryLayer}
-          primaryField={primaryField}
+          primaryField={activePrimaryField}
           onSetPrimaryField={setPrimaryMetric}
           maxOptionalMetrics={maxSelectableMetrics}
           selectedOptionalMetrics={selectedVisibleMetrics}
           onToggleField={toggleField}
-          headerVisible={headerVisible}
+          headerVisible={activeHeaderVisible}
           onToggleHeaderField={toggleHeaderField}
           distanceUnit={distanceUnit}
           onSetDistanceUnit={setDistanceUnit}
-          layerStyleMap={layerStyleMap}
+          elevationUnit={elevationUnit}
+          onSetElevationUnit={setElevationUnit}
+          layerStyleMap={activeLayerStyleMap}
           onSetLayerStyleColor={setLayerStyleColor}
           onSetLayerStyleOpacity={setLayerStyleOpacity}
           sunsetPrimaryGradient={sunsetPrimaryGradient}
           sunsetPrimaryGradientPresets={SUNSET_PRIMARY_GRADIENT_PRESETS}
           onSetSunsetPrimaryGradient={applySunsetPrimaryGradient}
           visualEffectPresets={VISUAL_EFFECT_PRESETS}
-          selectedFilterEffectId={selectedFilterEffectId}
-          selectedBlurEffectId={selectedBlurEffectId}
+          selectedFilterEffectId={activeFilterEffectId}
+          selectedBlurEffectId={activeBlurEffectId}
           onSetFilterEffect={(effectId) =>
             setSelectedFilterEffectId(effectId as FilterEffectId)
           }
@@ -2116,6 +2835,8 @@ export default function PreviewScreen() {
           quickExportBusy={busy}
           helpPopoverOpen={helpPopoverOpen}
           onCloseHelpPopover={() => setHelpPopoverOpen(false)}
+          quickTemplateMode={templateMode}
+          allowVideoBackground={!templateDisablesVideoBackground}
         />
       </View>
     </>
@@ -2308,40 +3029,55 @@ function createStyles(colors: ThemeColors) {
       flex: 1,
       backgroundColor: colors.panelSurfaceAlt,
     },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerFormatButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: colors.panelSurface,
-    borderWidth: 1,
-    borderColor: colors.panelBorder,
-  },
-  headerFormatButtonDisabled: {
-    opacity: 0.5,
-  },
-  headerExportButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: colors.primary,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  headerHelpButtonActive: {
-    borderColor: colors.primaryBorderOnLight,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 16,
-    gap: 16,
-    backgroundColor: colors.background,
-  },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    headerTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    headerTitleText: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: colors.panelText,
+    },
+    headerTemplateNav: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    headerFormatButton: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: colors.panelSurface,
+      borderWidth: 1,
+      borderColor: colors.panelBorder,
+    },
+    headerFormatButtonDisabled: {
+      opacity: 0.5,
+    },
+    headerExportButton: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: colors.primary,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    headerHelpButtonActive: {
+      borderColor: colors.primaryBorderOnLight,
+    },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      padding: 16,
+      gap: 16,
+      backgroundColor: colors.background,
+    },
     note: {
       color: colors.panelTextMuted,
     },

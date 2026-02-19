@@ -1,13 +1,5 @@
 import { RefObject, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
 import type * as ImagePicker from 'expo-image-picker';
 import { ResizeMode, Video } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,9 +8,13 @@ import {
   Canvas,
   ColorType,
   Fill,
+  Group,
   ImageShader,
+  Rect,
   RuntimeShader,
   Skia,
+  Text as SkiaText,
+  matchFont,
   useImage,
 } from '@shopify/react-native-skia';
 import { DirectionalBackgroundBlur } from '@/components/preview/DirectionalBackgroundBlur';
@@ -37,6 +33,8 @@ import type {
   FontPreset,
   ImageOverlay,
   LayerId,
+  PreviewTemplateDefinition,
+  PreviewTemplateRenderableTextElement,
   RouteMapVariant,
   RouteMode,
   StatsLayout,
@@ -143,6 +141,9 @@ type Props = {
   imageOverlays: ImageOverlay[];
   imageOverlayMaxInitial: number;
   isPremium: boolean;
+  quickTemplateMode?: boolean;
+  templateFixedTextElements?: PreviewTemplateRenderableTextElement[];
+  templateBackgroundMediaFrame?: PreviewTemplateDefinition['backgroundMediaFrame'] | null;
   onDragGuideChange: (guides: GuideState) => void;
   onRotationGuideChange: (active: boolean) => void;
 };
@@ -242,6 +243,9 @@ export function PreviewEditorCanvas({
   imageOverlays,
   imageOverlayMaxInitial,
   isPremium,
+  quickTemplateMode = false,
+  templateFixedTextElements = [],
+  templateBackgroundMediaFrame = null,
   onDragGuideChange,
   onRotationGuideChange,
 }: Props) {
@@ -256,6 +260,153 @@ export function PreviewEditorCanvas({
     y: number;
   } | null>(null);
   const showSelectionOutline = !isCapturingOverlay && !isExportingPng;
+  const interactionLocked = quickTemplateMode;
+  const resolvedTemplateBackgroundFrame = useMemo(() => {
+    if (!quickTemplateMode || !templateBackgroundMediaFrame) return null;
+    const width = Math.max(1, templateBackgroundMediaFrame.width);
+    const height = Math.max(1, templateBackgroundMediaFrame.height);
+    return {
+      width,
+      height,
+      left:
+        templateBackgroundMediaFrame.x ??
+        Math.round((canvasDisplayWidth - width) / 2),
+      top:
+        templateBackgroundMediaFrame.y ??
+        Math.round((canvasDisplayHeight - height) / 2),
+      fit: templateBackgroundMediaFrame.fit ?? 'cover',
+      mediaScale: Math.max(0.1, templateBackgroundMediaFrame.mediaScale ?? 1),
+      mediaOffsetX: templateBackgroundMediaFrame.mediaOffsetX ?? 0,
+      mediaOffsetY: templateBackgroundMediaFrame.mediaOffsetY ?? 0,
+    };
+  }, [
+    canvasDisplayHeight,
+    canvasDisplayWidth,
+    quickTemplateMode,
+    templateBackgroundMediaFrame,
+  ]);
+  const backgroundMediaStyle = resolvedTemplateBackgroundFrame
+    ? {
+        left: resolvedTemplateBackgroundFrame.left,
+        top: resolvedTemplateBackgroundFrame.top,
+        width: resolvedTemplateBackgroundFrame.width,
+        height: resolvedTemplateBackgroundFrame.height,
+      }
+    : null;
+  const backgroundMediaFit = resolvedTemplateBackgroundFrame?.fit ?? 'cover';
+  const backgroundMediaResizeMode =
+    backgroundMediaFit === 'contain' ? 'contain' : 'cover';
+  const backgroundRenderWidth =
+    resolvedTemplateBackgroundFrame?.width ?? canvasDisplayWidth;
+  const backgroundRenderHeight =
+    resolvedTemplateBackgroundFrame?.height ?? canvasDisplayHeight;
+  const framedBackgroundContentStyle = useMemo(() => {
+    if (!resolvedTemplateBackgroundFrame) return null;
+    const mediaWidth = media?.width ?? 0;
+    const mediaHeight = media?.height ?? 0;
+    if (mediaWidth <= 0 || mediaHeight <= 0) {
+      return {
+        left: 0,
+        top: 0,
+        width: resolvedTemplateBackgroundFrame.width,
+        height: resolvedTemplateBackgroundFrame.height,
+      };
+    }
+
+    const frameRatio =
+      resolvedTemplateBackgroundFrame.width /
+      resolvedTemplateBackgroundFrame.height;
+    const mediaRatio = mediaWidth / mediaHeight;
+
+    if (backgroundMediaFit === 'width-crop-center') {
+      const scaledWidth =
+        resolvedTemplateBackgroundFrame.width *
+        resolvedTemplateBackgroundFrame.mediaScale;
+      const scaledHeight = scaledWidth / mediaRatio;
+      return {
+        left:
+          (resolvedTemplateBackgroundFrame.width - scaledWidth) / 2 +
+          resolvedTemplateBackgroundFrame.mediaOffsetX,
+        top:
+          (resolvedTemplateBackgroundFrame.height - scaledHeight) / 2 +
+          resolvedTemplateBackgroundFrame.mediaOffsetY,
+        width: scaledWidth,
+        height: scaledHeight,
+      };
+    }
+
+    if (backgroundMediaResizeMode === 'contain') {
+      if (mediaRatio > frameRatio) {
+        const fittedHeight =
+          (resolvedTemplateBackgroundFrame.width / mediaRatio) *
+          resolvedTemplateBackgroundFrame.mediaScale;
+        const fittedWidth =
+          resolvedTemplateBackgroundFrame.width *
+          resolvedTemplateBackgroundFrame.mediaScale;
+        return {
+          left:
+            (resolvedTemplateBackgroundFrame.width - fittedWidth) / 2 +
+            resolvedTemplateBackgroundFrame.mediaOffsetX,
+          top:
+            (resolvedTemplateBackgroundFrame.height - fittedHeight) / 2 +
+            resolvedTemplateBackgroundFrame.mediaOffsetY,
+          width: fittedWidth,
+          height: fittedHeight,
+        };
+      }
+      const fittedWidth =
+        resolvedTemplateBackgroundFrame.height *
+        mediaRatio *
+        resolvedTemplateBackgroundFrame.mediaScale;
+      const fittedHeight =
+        resolvedTemplateBackgroundFrame.height *
+        resolvedTemplateBackgroundFrame.mediaScale;
+      return {
+        left:
+          (resolvedTemplateBackgroundFrame.width - fittedWidth) / 2 +
+          resolvedTemplateBackgroundFrame.mediaOffsetX,
+        top:
+          (resolvedTemplateBackgroundFrame.height - fittedHeight) / 2 +
+          resolvedTemplateBackgroundFrame.mediaOffsetY,
+        width: fittedWidth,
+        height: fittedHeight,
+      };
+    }
+
+    if (mediaRatio > frameRatio) {
+      const scaledHeight =
+        resolvedTemplateBackgroundFrame.height *
+        resolvedTemplateBackgroundFrame.mediaScale;
+      const scaledWidth = scaledHeight * mediaRatio;
+      return {
+        left:
+          (resolvedTemplateBackgroundFrame.width - scaledWidth) / 2 +
+          resolvedTemplateBackgroundFrame.mediaOffsetX,
+        top: 0 + resolvedTemplateBackgroundFrame.mediaOffsetY,
+        width: scaledWidth,
+        height: scaledHeight,
+      };
+    }
+
+    const scaledWidth =
+      resolvedTemplateBackgroundFrame.width *
+      resolvedTemplateBackgroundFrame.mediaScale;
+    const scaledHeight = scaledWidth / mediaRatio;
+    return {
+      left: 0 + resolvedTemplateBackgroundFrame.mediaOffsetX,
+      top:
+        (resolvedTemplateBackgroundFrame.height - scaledHeight) / 2 +
+        resolvedTemplateBackgroundFrame.mediaOffsetY,
+      width: scaledWidth,
+      height: scaledHeight,
+    };
+  }, [
+    backgroundMediaFit,
+    backgroundMediaResizeMode,
+    media?.height,
+    media?.width,
+    resolvedTemplateBackgroundFrame,
+  ]);
   const mergedBackgroundFilter = [
     ...(selectedFilterEffect.backgroundFilter ?? []),
     ...(selectedBlurEffect.backgroundFilter ?? []),
@@ -277,7 +428,7 @@ export function PreviewEditorCanvas({
     Boolean(media?.uri);
   const useBackgroundSkiaShader = useRadialBlurShader || useMotionBlurShader;
   const skiaBackgroundImage = useImage(
-    useBackgroundSkiaShader ? media?.uri ?? null : null,
+    useBackgroundSkiaShader ? (media?.uri ?? null) : null,
   );
   const skiaSubjectImage = useImage(
     useRadialBlurShader && autoSubjectUri ? autoSubjectUri : null,
@@ -317,7 +468,10 @@ export function PreviewEditorCanvas({
     }
 
     // Scan alpha channel to locate the subject center from transparency mask.
-    const stride = Math.max(1, Math.floor(Math.max(imageWidth, imageHeight) / 720));
+    const stride = Math.max(
+      1,
+      Math.floor(Math.max(imageWidth, imageHeight) / 720),
+    );
     let sumX = 0;
     let sumY = 0;
     let sumA = 0;
@@ -388,8 +542,7 @@ export function PreviewEditorCanvas({
   ]);
   const usesSunsetHeader =
     template.layout === 'sunset-hero' || template.layout === 'morning-glass';
-  const usesLayoutHeader =
-    usesSunsetHeader || template.layout === 'split-bold';
+  const usesLayoutHeader = usesSunsetHeader || template.layout === 'split-bold';
   const hasHeaderContent =
     (headerVisible.title && activityName.length > 0) ||
     (headerVisible.date && dateText.length > 0) ||
@@ -600,46 +753,87 @@ export function PreviewEditorCanvas({
           ) : null}
 
           {media?.type === 'video' ? (
-            <Video
-              source={{ uri: media.uri }}
-              style={[
-                styles.media,
-                mergedBackgroundFilter.length > 0
-                  ? ({ filter: mergedBackgroundFilter } as any)
-                  : null,
-                (isCapturingOverlay ||
-                  (isExportingPng && pngTransparentOnly)) &&
-                  styles.hiddenForCapture,
-              ]}
-              shouldPlay
-              isLooping
-              isMuted={false}
-              resizeMode={ResizeMode.COVER}
-            />
+            resolvedTemplateBackgroundFrame ? (
+              <View
+                style={[
+                  styles.mediaFrameClip,
+                  backgroundMediaStyle,
+                  (isCapturingOverlay ||
+                    (isExportingPng && pngTransparentOnly)) &&
+                    styles.hiddenForCapture,
+                ]}
+              >
+                <Video
+                  source={{ uri: media.uri }}
+                  style={[
+                    styles.mediaFrameContent,
+                    framedBackgroundContentStyle,
+                    mergedBackgroundFilter.length > 0
+                      ? ({ filter: mergedBackgroundFilter } as any)
+                      : null,
+                  ]}
+                  shouldPlay
+                  isLooping
+                  isMuted={false}
+                  resizeMode={ResizeMode.COVER}
+                />
+              </View>
+            ) : (
+              <Video
+                source={{ uri: media.uri }}
+                style={[
+                  styles.media,
+                  mergedBackgroundFilter.length > 0
+                    ? ({ filter: mergedBackgroundFilter } as any)
+                    : null,
+                  (isCapturingOverlay ||
+                    (isExportingPng && pngTransparentOnly)) &&
+                    styles.hiddenForCapture,
+                ]}
+                shouldPlay
+                isLooping
+                isMuted={false}
+                resizeMode={ResizeMode.COVER}
+              />
+            )
           ) : media?.uri ? (
             useRadialBlurShader && skiaBackgroundImage && RADIAL_BLUR_EFFECT ? (
               <Canvas
                 style={[
                   styles.media,
-                  isExportingPng && pngTransparentOnly && styles.hiddenForCapture,
+                  backgroundMediaStyle,
+                  isExportingPng &&
+                    pngTransparentOnly &&
+                    styles.hiddenForCapture,
                 ]}
               >
                 <Fill>
                   <RuntimeShader
                     source={RADIAL_BLUR_EFFECT}
                     uniforms={{
-                      resolution: [canvasDisplayWidth, canvasDisplayHeight],
-                      center: [resolvedRadialCenter.x, resolvedRadialCenter.y],
-                      intensity: Math.min(canvasDisplayWidth, canvasDisplayHeight) * 0.26,
-                      radius: Math.min(canvasDisplayWidth, canvasDisplayHeight) * 0.58,
+                      resolution: [backgroundRenderWidth, backgroundRenderHeight],
+                      center: [
+                        resolvedTemplateBackgroundFrame
+                          ? backgroundRenderWidth * 0.5
+                          : resolvedRadialCenter.x,
+                        resolvedTemplateBackgroundFrame
+                          ? backgroundRenderHeight * 0.5
+                          : resolvedRadialCenter.y,
+                      ],
+                      intensity:
+                        Math.min(backgroundRenderWidth, backgroundRenderHeight) *
+                        0.26,
+                      radius:
+                        Math.min(backgroundRenderWidth, backgroundRenderHeight) *
+                        0.58,
                     }}
                   >
                     <ImageShader
                       image={skiaBackgroundImage}
                       x={0}
                       y={0}
-                      width={canvasDisplayWidth}
-                      height={canvasDisplayHeight}
+                      width={backgroundRenderWidth}
+                      height={backgroundRenderHeight}
                       fit="cover"
                     />
                   </RuntimeShader>
@@ -648,29 +842,62 @@ export function PreviewEditorCanvas({
             ) : useMotionBlurShader && skiaBackgroundImage ? (
               <DirectionalBackgroundBlur
                 image={skiaBackgroundImage}
-                width={canvasDisplayWidth}
-                height={canvasDisplayHeight}
+                width={backgroundRenderWidth}
+                height={backgroundRenderHeight}
                 direction={{ x: 1, y: 0 }}
-                intensity={Math.min(canvasDisplayWidth, canvasDisplayHeight) * 0.11}
+                intensity={
+                  Math.min(backgroundRenderWidth, backgroundRenderHeight) * 0.11
+                }
                 samples={12}
                 style={[
                   styles.media,
-                  isExportingPng && pngTransparentOnly && styles.hiddenForCapture,
+                  backgroundMediaStyle,
+                  isExportingPng &&
+                    pngTransparentOnly &&
+                    styles.hiddenForCapture,
                 ]}
               />
             ) : (
-              <Image
-                source={{ uri: media.uri }}
-                blurRadius={selectedBlurEffect.backgroundBlurRadius ?? 0}
-                style={[
-                  styles.media,
-                  mergedBackgroundFilter.length > 0
-                    ? ({ filter: mergedBackgroundFilter } as any)
-                    : null,
-                  isExportingPng && pngTransparentOnly && styles.hiddenForCapture,
-                ]}
-                resizeMode="cover"
-              />
+              resolvedTemplateBackgroundFrame ? (
+                <View
+                  style={[
+                    styles.mediaFrameClip,
+                    backgroundMediaStyle,
+                    isExportingPng &&
+                      pngTransparentOnly &&
+                      styles.hiddenForCapture,
+                  ]}
+                >
+                  <Image
+                    source={{ uri: media.uri }}
+                    blurRadius={selectedBlurEffect.backgroundBlurRadius ?? 0}
+                    style={[
+                      styles.mediaFrameContent,
+                      framedBackgroundContentStyle,
+                      mergedBackgroundFilter.length > 0
+                        ? ({ filter: mergedBackgroundFilter } as any)
+                        : null,
+                    ]}
+                    resizeMode="cover"
+                  />
+                </View>
+              ) : (
+                <Image
+                  source={{ uri: media.uri }}
+                  blurRadius={selectedBlurEffect.backgroundBlurRadius ?? 0}
+                  style={[
+                    styles.media,
+                    backgroundMediaStyle,
+                    mergedBackgroundFilter.length > 0
+                      ? ({ filter: mergedBackgroundFilter } as any)
+                      : null,
+                    isExportingPng &&
+                      pngTransparentOnly &&
+                      styles.hiddenForCapture,
+                  ]}
+                  resizeMode={backgroundMediaResizeMode}
+                />
+              )
             )
           ) : null}
           {!media && backgroundGradient ? (
@@ -765,7 +992,13 @@ export function PreviewEditorCanvas({
               ]}
             />
           ) : null}
-          <Pressable style={styles.canvasTapCatcher} onPress={onCanvasTouch} />
+          <View
+            style={[
+              styles.canvasTapCatcher,
+              quickTemplateMode ? styles.canvasTapCatcherTemplate : null,
+            ]}
+            onTouchEnd={onCanvasTouch}
+          />
 
           {visibleLayers.meta && hasHeaderContent ? (
             <DraggableBlock
@@ -782,7 +1015,12 @@ export function PreviewEditorCanvas({
               }
               initialScale={layerTransforms.meta?.scale ?? 1}
               rotationDeg={layerTransforms.meta?.rotationDeg ?? 0}
-              selected={showSelectionOutline && selectedLayer === 'meta'}
+              selected={
+                showSelectionOutline &&
+                !interactionLocked &&
+                selectedLayer === 'meta'
+              }
+              locked={interactionLocked}
               outlineRadius={0}
               canvasWidth={canvasDisplayWidth}
               canvasHeight={canvasDisplayHeight}
@@ -812,9 +1050,7 @@ export function PreviewEditorCanvas({
                     },
                   ]}
                 >
-                  {usesLayoutHeader
-                    ? activityName.toUpperCase()
-                    : activityName}
+                  {usesLayoutHeader ? activityName.toUpperCase() : activityName}
                 </Text>
               ) : null}
               {usesLayoutHeader && headerVisible.title ? (
@@ -864,14 +1100,19 @@ export function PreviewEditorCanvas({
               initialY={layerTransforms.stats?.y ?? defaultStatsY}
               initialScale={layerTransforms.stats?.scale ?? 1}
               rotationDeg={layerTransforms.stats?.rotationDeg ?? 0}
-              selected={showSelectionOutline && selectedLayer === 'stats'}
+              selected={
+                showSelectionOutline &&
+                !interactionLocked &&
+                selectedLayer === 'stats'
+              }
+              locked={interactionLocked}
               outlineRadius={template.radius}
               canvasWidth={canvasDisplayWidth}
               canvasHeight={canvasDisplayHeight}
               onDragGuideChange={onDragGuideChange}
               onRotationGuideChange={onRotationGuideChange}
               onSelect={() => setSelectedLayer('stats')}
-              onTap={cycleStatsLayout}
+              onTap={interactionLocked ? undefined : cycleStatsLayout}
               onInteractionChange={(active) =>
                 setActiveLayer(active ? 'stats' : null)
               }
@@ -915,7 +1156,12 @@ export function PreviewEditorCanvas({
               initialY={layerTransforms.primary?.y ?? defaultPrimaryY}
               initialScale={layerTransforms.primary?.scale ?? 1}
               rotationDeg={layerTransforms.primary?.rotationDeg ?? 0}
-              selected={showSelectionOutline && selectedLayer === 'primary'}
+              selected={
+                showSelectionOutline &&
+                !interactionLocked &&
+                selectedLayer === 'primary'
+              }
+              locked={interactionLocked}
               outlineRadius={0}
               canvasWidth={canvasDisplayWidth}
               canvasHeight={canvasDisplayHeight}
@@ -960,14 +1206,19 @@ export function PreviewEditorCanvas({
               initialY={layerTransforms.route?.y ?? defaultRouteY}
               initialScale={layerTransforms.route?.scale ?? 1}
               rotationDeg={layerTransforms.route?.rotationDeg ?? 0}
-              selected={showSelectionOutline && selectedLayer === 'route'}
+              selected={
+                showSelectionOutline &&
+                !interactionLocked &&
+                selectedLayer === 'route'
+              }
+              locked={interactionLocked}
               outlineRadius={0}
               canvasWidth={canvasDisplayWidth}
               canvasHeight={canvasDisplayHeight}
               onDragGuideChange={onDragGuideChange}
               onRotationGuideChange={onRotationGuideChange}
               onSelect={() => setSelectedLayer('route')}
-              onTap={cycleRouteMode}
+              onTap={interactionLocked ? undefined : cycleRouteMode}
               onInteractionChange={(active) =>
                 setActiveLayer(active ? 'route' : null)
               }
@@ -992,6 +1243,13 @@ export function PreviewEditorCanvas({
           {imageOverlays.map((overlay, index) => {
             const layerId: LayerId = `image:${overlay.id}`;
             if (!visibleLayers[layerId]) return null;
+            const overlaySource =
+              typeof overlay.asset === 'number'
+                ? overlay.asset
+                : overlay.uri
+                  ? { uri: overlay.uri }
+                  : null;
+            if (!overlaySource) return null;
 
             return (
               <DraggableBlock
@@ -1005,7 +1263,12 @@ export function PreviewEditorCanvas({
                   Math.round((80 + index * 12) * canvasScaleY)
                 }
                 initialScale={layerTransforms[layerId]?.scale ?? 1}
-                selected={showSelectionOutline && selectedLayer === layerId}
+                selected={
+                  showSelectionOutline &&
+                  !interactionLocked &&
+                  selectedLayer === layerId
+                }
+                locked={interactionLocked}
                 outlineRadius={0}
                 canvasWidth={canvasDisplayWidth}
                 canvasHeight={canvasDisplayHeight}
@@ -1035,13 +1298,241 @@ export function PreviewEditorCanvas({
                 ]}
               >
                 <Image
-                  source={{ uri: overlay.uri }}
+                  source={overlaySource}
                   style={styles.imageOverlayImage}
                   resizeMode="contain"
                 />
               </DraggableBlock>
             );
           })}
+
+          {quickTemplateMode
+            ? templateFixedTextElements.map((item) => (
+                (() => {
+                  const resolvedTextColor =
+                    normalizeTemplateColor(item.color) ?? '#FFFFFF';
+                  const resolvedBackgroundColor = normalizeTemplateColor(
+                    item.backgroundColor,
+                  );
+                  const hasTransparentAccentToken = item.tokens.some(
+                    (token) =>
+                      token.accent &&
+                      normalizeTemplateColor(token.color) === 'rgba(0,0,0,0)',
+                  );
+                  const resolvedBorderColor = normalizeTemplateColor(
+                    item.borderColor,
+                  );
+                  const borderWidth =
+                    item.borderWidth !== undefined
+                      ? Math.max(0, item.borderWidth)
+                      : 0;
+                  const borderRadius =
+                    item.borderRadius !== undefined
+                      ? Math.max(
+                          0,
+                          Math.round(
+                            item.borderRadius *
+                              Math.min(canvasScaleX, canvasScaleY),
+                          ),
+                        )
+                      : 0;
+                  const usesCutout =
+                    (resolvedTextColor === 'rgba(0,0,0,0)' ||
+                      hasTransparentAccentToken) &&
+                    Boolean(resolvedBackgroundColor);
+                  const plainText = item.tokens.map((token) => token.text).join('');
+                  const fontSize =
+                    item.fontSize !== undefined
+                      ? Math.round(item.fontSize * canvasScaleX)
+                      : 14;
+                  const lineHeight =
+                    item.lineHeight !== undefined
+                      ? Math.round(item.lineHeight * canvasScaleY)
+                      : Math.round(fontSize * 1.2);
+                  const paddingX =
+                    item.paddingX !== undefined
+                      ? Math.max(0, Math.round(item.paddingX * canvasScaleX))
+                      : Math.max(5, Math.round(fontSize * 0.22));
+                  const paddingY =
+                    item.paddingY !== undefined
+                      ? Math.max(0, Math.round(item.paddingY * canvasScaleY))
+                      : Math.max(3, Math.round(fontSize * 0.16));
+                  const letterSpacing = item.letterSpacing ?? 0.2;
+                  const fontWeightNumeric = Number(item.fontWeight ?? '700');
+                  const widthFactor =
+                    Number.isFinite(fontWeightNumeric) && fontWeightNumeric >= 700
+                      ? 0.58
+                      : 0.55;
+                  const leftPos = Math.round(item.x * canvasScaleX);
+                  const maxWidthFromCanvas = Math.max(1, canvasDisplayWidth - leftPos);
+                  const targetBlockWidth =
+                    item.width !== undefined
+                      ? Math.round(item.width * canvasScaleX)
+                      : undefined;
+                  const availableTextWidth = Math.max(
+                    1,
+                    (targetBlockWidth ?? maxWidthFromCanvas) - paddingX * 2,
+                  );
+                  const textLines = wrapTemplateTextLines({
+                    text: plainText,
+                    maxTextWidth: availableTextWidth,
+                    fontSize,
+                    letterSpacing,
+                    widthFactor,
+                  });
+                  const estimatedTextWidth = Math.max(
+                    ...textLines.map((line) =>
+                      measureTemplateTextLineWidth({
+                        line,
+                        fontSize,
+                        letterSpacing,
+                        widthFactor,
+                      }),
+                    ),
+                  );
+                  const contentWidth = Math.max(1, Math.round(estimatedTextWidth));
+                  const blockWidth = targetBlockWidth
+                    ? Math.min(maxWidthFromCanvas, targetBlockWidth)
+                    : Math.min(maxWidthFromCanvas, contentWidth + paddingX * 2);
+                  const blockHeight = Math.max(
+                    lineHeight * textLines.length + paddingY * 2,
+                    fontSize + paddingY * 2,
+                  );
+                  const skiaFont = matchFont({
+                    fontSize,
+                    fontFamily:
+                      typeof item.fontFamily === 'string' &&
+                      item.fontFamily.trim().length > 0
+                        ? item.fontFamily
+                        : 'Arial',
+                    fontWeight: item.fontWeight ?? '700',
+                  });
+
+                  return (
+                    <View
+                      key={item.id}
+                      pointerEvents="none"
+                      style={[
+                        styles.templateTextLayer,
+                        {
+                          left: leftPos,
+                          top: Math.round(item.y * canvasScaleY),
+                          zIndex: item.isBehind ? 2 : 180,
+                          elevation: item.isBehind ? 2 : 180,
+                          width: usesCutout ? blockWidth : undefined,
+                          height: usesCutout ? blockHeight : undefined,
+                        },
+                      ]}
+                    >
+                      {usesCutout ? (
+                        <View
+                          style={[
+                            {
+                              width: blockWidth,
+                              height: blockHeight,
+                              borderColor: resolvedBorderColor,
+                              borderWidth,
+                              borderRadius,
+                              overflow: 'hidden',
+                            },
+                          ]}
+                        >
+                          <Canvas style={{ width: blockWidth, height: blockHeight }}>
+                            <Rect
+                              x={0}
+                              y={0}
+                              width={blockWidth}
+                              height={blockHeight}
+                              color={resolvedBackgroundColor as string}
+                            />
+                            <Group blendMode="dstOut">
+                              {textLines.map((line, lineIndex) => {
+                                const lineWidth = Math.round(
+                                  Math.max(1, line.length) * fontSize * widthFactor +
+                                    Math.max(0, line.length - 1) * letterSpacing,
+                                );
+                                const x =
+                                  item.align === 'right'
+                                    ? blockWidth - paddingX - lineWidth
+                                    : item.align === 'center'
+                                      ? Math.round((blockWidth - lineWidth) / 2)
+                                      : paddingX;
+                                const y =
+                                  paddingY + fontSize + lineIndex * lineHeight;
+                                return (
+                                  <SkiaText
+                                    key={`${item.id}-cutout-line-${lineIndex}`}
+                                    x={x}
+                                    y={y}
+                                    text={line}
+                                    font={skiaFont}
+                                    color="#FFFFFF"
+                                  />
+                                );
+                              })}
+                            </Group>
+                          </Canvas>
+                        </View>
+                      ) : (
+                        <Text
+                          style={[
+                            styles.templateTextValue,
+                            {
+                              color: resolvedTextColor,
+                              backgroundColor: resolvedBackgroundColor,
+                              borderColor: resolvedBorderColor,
+                              borderWidth,
+                              borderRadius,
+                              paddingHorizontal: paddingX,
+                              paddingVertical: paddingY,
+                              opacity: item.opacity ?? 1,
+                              textAlign: item.align ?? 'left',
+                              fontSize,
+                              fontFamily: item.fontFamily,
+                              fontWeight: item.fontWeight ?? '700',
+                              letterSpacing:
+                                item.letterSpacing !== undefined
+                                  ? item.letterSpacing
+                                  : 0.2,
+                              lineHeight,
+                              width:
+                                item.width !== undefined
+                                  ? Math.min(
+                                      maxWidthFromCanvas,
+                                      Math.round(item.width * canvasScaleX),
+                                    )
+                                  : undefined,
+                            },
+                          ]}
+                        >
+                          {item.tokens.map((token, index) => (
+                            <Text
+                              key={`${item.id}-token-${index}`}
+                              style={[
+                                token.accent
+                                  ? styles.templateTextValueAccent
+                                  : undefined,
+                                token.accent
+                                  ? {
+                                      fontFamily: token.fontFamily,
+                                      fontSize: token.fontSize,
+                                      fontWeight: token.fontWeight,
+                                      letterSpacing: token.letterSpacing,
+                                      color: normalizeTemplateColor(token.color),
+                                    }
+                                  : undefined,
+                              ]}
+                            >
+                              {token.text}
+                            </Text>
+                          ))}
+                        </Text>
+                      )}
+                    </View>
+                  );
+                })()
+              ))
+            : null}
 
           {!isPremium ? <Text style={styles.watermark}>PACEFRAME</Text> : null}
         </View>
@@ -1050,27 +1541,128 @@ export function PreviewEditorCanvas({
   );
 }
 
+function normalizeTemplateColor(value?: string) {
+  if (!value) return undefined;
+  if (value.trim().toLowerCase() === 'transparent') {
+    return 'rgba(0,0,0,0)';
+  }
+  return value;
+}
+
+function measureTemplateTextLineWidth({
+  line,
+  fontSize,
+  letterSpacing,
+  widthFactor,
+}: {
+  line: string;
+  fontSize: number;
+  letterSpacing: number;
+  widthFactor: number;
+}) {
+  const charCount = Math.max(1, line.length);
+  return (
+    charCount * fontSize * widthFactor +
+    Math.max(0, charCount - 1) * letterSpacing
+  );
+}
+
+function wrapTemplateTextLines({
+  text,
+  maxTextWidth,
+  fontSize,
+  letterSpacing,
+  widthFactor,
+}: {
+  text: string;
+  maxTextWidth: number;
+  fontSize: number;
+  letterSpacing: number;
+  widthFactor: number;
+}) {
+  const sourceLines = text.split('\n');
+  const wrapped: string[] = [];
+
+  for (const sourceLine of sourceLines) {
+    if (!sourceLine.trim()) {
+      wrapped.push('');
+      continue;
+    }
+
+    const words = sourceLine.split(/\s+/).filter(Boolean);
+    let current = '';
+
+    const flush = () => {
+      if (current.length > 0) {
+        wrapped.push(current);
+        current = '';
+      }
+    };
+
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      const candidateWidth = measureTemplateTextLineWidth({
+        line: candidate,
+        fontSize,
+        letterSpacing,
+        widthFactor,
+      });
+
+      if (candidateWidth <= maxTextWidth) {
+        current = candidate;
+        continue;
+      }
+
+      if (current) {
+        flush();
+      }
+
+      let remainder = word;
+      while (remainder.length > 0) {
+        let sliceLen = remainder.length;
+        while (sliceLen > 1) {
+          const slice = remainder.slice(0, sliceLen);
+          const sliceWidth = measureTemplateTextLineWidth({
+            line: slice,
+            fontSize,
+            letterSpacing,
+            widthFactor,
+          });
+          if (sliceWidth <= maxTextWidth) break;
+          sliceLen -= 1;
+        }
+        wrapped.push(remainder.slice(0, sliceLen));
+        remainder = remainder.slice(sliceLen);
+      }
+    }
+
+    flush();
+  }
+
+  return wrapped.length > 0 ? wrapped : [''];
+}
+
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     stageWrap: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 0,
-    paddingBottom: 0,
-  },
-  stageWrapTop: {
-    justifyContent: 'flex-start',
-    paddingTop: 2,
-  },
-  stageWrapCentered: {
-    justifyContent: 'center',
-    paddingTop: 2,
-    paddingBottom: 120,
-  },
-  canvasScaleWrap: {
-    overflow: 'hidden',
-    borderRadius: radius.lg,
-  },
+      flex: 1,
+      alignItems: 'center',
+      paddingHorizontal: 0,
+      paddingBottom: 0,
+    },
+    stageWrapTop: {
+      justifyContent: 'flex-start',
+      paddingTop: 2,
+    },
+    stageWrapCentered: {
+      justifyContent: 'center',
+      paddingTop: 2,
+      paddingBottom: 120,
+    },
+    canvasScaleWrap: {
+      overflow: 'hidden',
+      borderRadius: radius.lg,
+    },
     storyCanvas: {
       width: '100%',
       height: '100%',
@@ -1080,45 +1672,54 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: 'transparent',
     },
-  storyCanvasSquare: {
-    borderRadius: 0,
-  },
-  storyCanvasNoBorder: {
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  storyCanvasTransparent: {
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  media: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    zIndex: 0,
-    elevation: 0,
-  },
-  gradientLayer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    zIndex: 0,
-    elevation: 0,
-    overflow: 'hidden',
-  },
-  checkerboardBase: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    overflow: 'hidden',
-    opacity: 1,
-  },
-  checkerTile: {
-    position: 'absolute',
-    width: CHECKER_SIZE,
-    height: CHECKER_SIZE,
-  },
+    storyCanvasSquare: {
+      borderRadius: 0,
+    },
+    storyCanvasNoBorder: {
+      borderWidth: 0,
+      borderColor: 'transparent',
+    },
+    storyCanvasTransparent: {
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      borderColor: 'transparent',
+    },
+    media: {
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
+      zIndex: 0,
+      elevation: 0,
+    },
+    mediaFrameClip: {
+      position: 'absolute',
+      overflow: 'hidden',
+      zIndex: 0,
+      elevation: 0,
+    },
+    mediaFrameContent: {
+      position: 'absolute',
+    },
+    gradientLayer: {
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
+      zIndex: 0,
+      elevation: 0,
+      overflow: 'hidden',
+    },
+    checkerboardBase: {
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
+      overflow: 'hidden',
+      opacity: 1,
+    },
+    checkerTile: {
+      position: 'absolute',
+      width: CHECKER_SIZE,
+      height: CHECKER_SIZE,
+    },
     checkerTileDark: {
       backgroundColor: colors.previewCheckerDark,
     },
@@ -1126,172 +1727,189 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.previewCheckerLight,
     },
     centerGuideVertical: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: '50%',
-    width: 1,
-    marginLeft: -0.5,
-    backgroundColor: colors.previewGuide,
-    zIndex: 999,
-    elevation: 999,
-  },
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: '50%',
+      width: 1,
+      marginLeft: -0.5,
+      backgroundColor: colors.previewGuide,
+      zIndex: 999,
+      elevation: 999,
+    },
     centerGuideHorizontal: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: '50%',
-    height: 1,
-    marginTop: -0.5,
-    backgroundColor: colors.previewGuide,
-    zIndex: 999,
-    elevation: 999,
-  },
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: '50%',
+      height: 1,
+      marginTop: -0.5,
+      backgroundColor: colors.previewGuide,
+      zIndex: 999,
+      elevation: 999,
+    },
     rotationGuideBadge: {
-    position: 'absolute',
-    top: 12,
-    alignSelf: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: colors.previewGuide,
-    zIndex: 1000,
-    elevation: 1000,
-  },
+      position: 'absolute',
+      top: 12,
+      alignSelf: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 999,
+      backgroundColor: colors.previewGuide,
+      zIndex: 1000,
+      elevation: 1000,
+    },
     rotationGuideBadgeText: {
       color: colors.previewGuideText,
-    fontWeight: '800',
-    fontSize: 12,
-  },
-  hiddenForCapture: {
-    opacity: 0,
-  },
-  autoSubjectLayer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    zIndex: 5,
-    elevation: 5,
-  },
-  backgroundFilterLayer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    zIndex: 4,
-    elevation: 4,
-  },
-  subjectFilterOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
+      fontWeight: '800',
+      fontSize: 12,
+    },
+    hiddenForCapture: {
+      opacity: 0,
+    },
+    autoSubjectLayer: {
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
+      zIndex: 5,
+      elevation: 5,
+    },
+    backgroundFilterLayer: {
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
+      zIndex: 4,
+      elevation: 4,
+    },
+    subjectFilterOverlay: {
+      ...StyleSheet.absoluteFillObject,
+    },
     trueBlackWhiteBlendLayer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    zIndex: 6,
-    elevation: 6,
-    backgroundColor: colors.solidBlack,
-    mixBlendMode: 'saturation',
-  },
-  canvasTapCatcher: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    zIndex: 1,
-    elevation: 1,
-  },
-  statsBlock: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    alignItems: 'stretch',
-  },
-  primaryBlock: {
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    alignItems: 'stretch',
-    backgroundColor: 'transparent',
-  },
-  metaBlock: {
-    width: 240,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 0,
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    borderColor: 'transparent',
-    alignItems: 'center',
-  },
-  metaBlockSunset: {
-    width: 280,
-    paddingTop: 4,
-  },
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
+      zIndex: 6,
+      elevation: 6,
+      backgroundColor: colors.solidBlack,
+      mixBlendMode: 'saturation',
+    },
+    canvasTapCatcher: {
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
+      zIndex: 1,
+      elevation: 1,
+    },
+    canvasTapCatcherTemplate: {
+      zIndex: 999,
+      elevation: 999,
+    },
+    statsBlock: {
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      alignItems: 'stretch',
+    },
+    primaryBlock: {
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+      alignItems: 'stretch',
+      backgroundColor: 'transparent',
+    },
+    metaBlock: {
+      width: 240,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 0,
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      borderColor: 'transparent',
+      alignItems: 'center',
+    },
+    metaBlockSunset: {
+      width: 280,
+      paddingTop: 4,
+    },
     metaSubtitle: {
       color: colors.onImageText,
-    fontSize: 12,
-    marginTop: 2,
-    textShadowColor: colors.onImageShadow,
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
+      fontSize: 12,
+      marginTop: 2,
+      textShadowColor: colors.onImageShadow,
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
+    },
     metaSubtitleSunset: {
       color: colors.onImageTextMuted,
-    fontSize: 13,
-    letterSpacing: 0.2,
-    marginTop: 6,
-  },
+      fontSize: 13,
+      letterSpacing: 0.2,
+      marginTop: 6,
+    },
     metaLocation: {
       color: colors.onImageText,
-    fontSize: 12,
-    marginTop: 2,
-    textShadowColor: colors.onImageShadow,
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
+      fontSize: 12,
+      marginTop: 2,
+      textShadowColor: colors.onImageShadow,
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
+    },
     metaTitle: {
-    width: '100%',
-    color: colors.onImageText,
-    fontSize: 18,
-    fontWeight: '800',
-    textAlign: 'center',
-    textShadowColor: colors.onImageShadowStrong,
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  metaTitleSunset: {
-    fontSize: 24,
-    letterSpacing: 2.2,
-    marginBottom: 6,
-  },
+      width: '100%',
+      color: colors.onImageText,
+      fontSize: 18,
+      fontWeight: '800',
+      textAlign: 'center',
+      textShadowColor: colors.onImageShadowStrong,
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
+    },
+    metaTitleSunset: {
+      fontSize: 24,
+      letterSpacing: 2.2,
+      marginBottom: 6,
+    },
     metaDividerSunset: {
-    width: '82%',
-    height: 1,
-    backgroundColor: colors.onImageDivider,
-    marginTop: 2,
-  },
-  routeBlock: {
-    padding: 0,
-    borderRadius: 0,
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  imageOverlayBlock: {
-    borderRadius: 0,
-    overflow: 'hidden',
-    backgroundColor: 'transparent',
-  },
-  imageOverlayImage: {
-    width: '100%',
-    height: '100%',
-  },
+      width: '82%',
+      height: 1,
+      backgroundColor: colors.onImageDivider,
+      marginTop: 2,
+    },
+    routeBlock: {
+      padding: 0,
+      borderRadius: 0,
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      borderColor: 'transparent',
+    },
+    imageOverlayBlock: {
+      borderRadius: 0,
+      overflow: 'hidden',
+      backgroundColor: 'transparent',
+    },
+    imageOverlayImage: {
+      width: '100%',
+      height: '100%',
+    },
+    templateTextLayer: {
+      position: 'absolute',
+      zIndex: 180,
+      elevation: 180,
+    },
+    templateTextValue: {
+      color: '#FFFFFF',
+    },
+    templateTextValueAccent: {
+      fontWeight: '900',
+      fontSize: 22,
+      letterSpacing: 0.2,
+    },
     watermark: {
-    position: 'absolute',
-    right: 14,
-    bottom: 16,
-    color: colors.watermarkOnImage,
-    fontWeight: '800',
-    letterSpacing: 1,
-    zIndex: 5000,
-    elevation: 5000,
+      position: 'absolute',
+      right: 14,
+      bottom: 16,
+      color: colors.watermarkOnImage,
+      fontWeight: '800',
+      letterSpacing: 1,
+      zIndex: 5000,
+      elevation: 5000,
     },
   });
 }

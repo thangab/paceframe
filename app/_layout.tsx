@@ -3,6 +3,8 @@ import 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import { Monoton_400Regular } from '@expo-google-fonts/monoton';
 import { useAuthStore } from '@/store/authStore';
 import { useAppBootstrap } from '@/hooks/useAppBootstrap';
 import { ThemeColors } from '@/constants/theme';
@@ -11,13 +13,16 @@ import { useThemeStore } from '@/store/themeStore';
 
 export default function RootLayout() {
   useAppBootstrap();
+  const [fontsLoaded] = useFonts({
+    Monoton: Monoton_400Regular,
+  });
   const colors = useThemeColors();
   const isHydrated = useAuthStore((s) => s.isHydrated);
   const isThemeHydrated = useThemeStore((s) => s.isHydrated);
   const styles = createStyles(colors);
   const statusBarStyle = useThemeStore((s) => (s.mode === 'dark' ? 'light' : 'dark'));
 
-  if (!isHydrated || !isThemeHydrated) {
+  if (!isHydrated || !isThemeHydrated || !fontsLoaded) {
     return (
       <View style={styles.loading}>
         <StatusBar style={statusBarStyle} />

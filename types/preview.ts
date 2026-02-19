@@ -50,6 +50,7 @@ export type FontPreset = {
 export type ImageOverlay = {
   id: string;
   uri: string;
+  asset?: number;
   name: string;
   opacity: number;
   rotationDeg: number;
@@ -60,4 +61,110 @@ export type ImageOverlay = {
 export type BackgroundGradient = {
   colors: [string, string, string];
   direction: 'vertical' | 'horizontal';
+};
+
+export type TemplateLayerStyleId = 'meta' | 'stats' | 'route' | 'primary';
+
+export type TemplateLayerStyle = {
+  color: string;
+  opacity: number;
+};
+
+export type PreviewTemplateImageElement = {
+  id: string;
+  name: string;
+  uri?: string;
+  asset?: number;
+  isBehind?: boolean;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  opacity?: number;
+  rotationDeg?: number;
+};
+
+export type PreviewTemplateTextElement = {
+  id: string;
+  text: string;
+  formatDate?: string;
+  requiredDataFields?: FieldId[];
+  isBehind?: boolean;
+  x: number;
+  y: number;
+  width?: number;
+  align?: 'left' | 'center' | 'right';
+  color?: string;
+  backgroundColor?: string;
+  borderColor?: string;
+  borderWidth?: number;
+  borderRadius?: number;
+  paddingX?: number;
+  paddingY?: number;
+  opacity?: number;
+  fontFamily?: string;
+  fontSize?: number;
+  fontWeight?: '300' | '400' | '500' | '600' | '700' | '800' | '900';
+  letterSpacing?: number;
+  lineHeight?: number;
+  uppercase?: boolean;
+  accentFontSize?: number;
+  accentFontWeight?: '400' | '500' | '600' | '700' | '800' | '900';
+  accentLetterSpacing?: number;
+  accentColor?: string;
+  accentFontFamily?: string;
+};
+
+export type PreviewTemplateTextToken = {
+  text: string;
+  accent?: boolean;
+  fontFamily?: string;
+  fontSize?: number;
+  fontWeight?: '400' | '500' | '600' | '700' | '800' | '900';
+  letterSpacing?: number;
+  color?: string;
+};
+
+export type PreviewTemplateRenderableTextElement = Omit<
+  PreviewTemplateTextElement,
+  'text' | 'uppercase'
+> & {
+  tokens: PreviewTemplateTextToken[];
+};
+
+export type PreviewTemplateDefinition = {
+  id: string;
+  name: string;
+  premium?: boolean;
+  disableBackgroundRemoval?: boolean;
+  disableVideoBackground?: boolean;
+  imagePickerCropSize?: {
+    width: number;
+    height: number;
+  };
+  defaultBackground?: 'activity-photo' | 'none';
+  defaultFilterEffectId?: string;
+  defaultBlurEffectId?: string;
+  showRoute?: boolean;
+  routeTransform?: {
+    x: number;
+    y: number;
+    scale?: number;
+    rotationDeg?: number;
+  };
+  layerStyleOverrides?: Partial<
+    Record<TemplateLayerStyleId, TemplateLayerStyle>
+  >;
+  fixedImageElements?: PreviewTemplateImageElement[];
+  fixedTextElements?: PreviewTemplateTextElement[];
+  backgroundMediaFrame?: {
+    width: number;
+    height: number;
+    x?: number;
+    y?: number;
+    mediaScale?: number;
+    mediaOffsetX?: number;
+    mediaOffsetY?: number;
+    fit?: 'cover' | 'contain' | 'width-crop-center';
+  };
 };
