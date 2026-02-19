@@ -3042,7 +3042,7 @@ function createStyles(colors: ThemeColors) {
     headerTitleText: {
       fontSize: 17,
       fontWeight: '700',
-      color: colors.panelText,
+      color: colors.text,
     },
     headerTemplateNav: {
       flexDirection: 'row',
