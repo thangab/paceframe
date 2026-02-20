@@ -1,5 +1,25 @@
 import { StravaActivity } from '@/types/strava';
 
+function buildMockLaps(baseId: number, count: number) {
+  return Array.from({ length: count }, (_, index) => {
+    const lapIndex = index + 1;
+    const movingTime = 280 + ((lapIndex * 7) % 22) - 11;
+    const elapsedTime = movingTime + 4;
+    const averageSpeed = 1000 / movingTime;
+    const averageHeartrate = 148 + ((lapIndex * 3) % 18);
+    return {
+      id: baseId + lapIndex,
+      lap_index: lapIndex,
+      distance: 1000,
+      moving_time: movingTime,
+      elapsed_time: elapsedTime,
+      average_speed: Number(averageSpeed.toFixed(2)),
+      average_heartrate: averageHeartrate,
+      max_heartrate: averageHeartrate + 8,
+    };
+  });
+}
+
 export const mockActivities: StravaActivity[] = [
   {
     id: 900001,
@@ -20,38 +40,7 @@ export const mockActivities: StravaActivity[] = [
     map: {
       summary_polyline: 'gfo}EtohhUxD@bAxJmGF',
     },
-    laps: [
-      {
-        id: 9000011,
-        lap_index: 1,
-        distance: 1000,
-        moving_time: 290,
-        elapsed_time: 295,
-        average_speed: 3.45,
-        average_heartrate: 151,
-        max_heartrate: 160,
-      },
-      {
-        id: 9000012,
-        lap_index: 2,
-        distance: 1000,
-        moving_time: 282,
-        elapsed_time: 286,
-        average_speed: 3.54,
-        average_heartrate: 156,
-        max_heartrate: 165,
-      },
-      {
-        id: 9000013,
-        lap_index: 3,
-        distance: 1000,
-        moving_time: 278,
-        elapsed_time: 282,
-        average_speed: 3.6,
-        average_heartrate: 160,
-        max_heartrate: 168,
-      },
-    ],
+    laps: buildMockLaps(9_000_010, 11),
     heartRateStream: [
       { seconds: 0, bpm: 118 },
       { seconds: 300, bpm: 144 },
@@ -87,28 +76,8 @@ export const mockActivities: StravaActivity[] = [
     map: {
       summary_polyline: 'o~ocF~kbkVfS~@vCjBvD',
     },
-    laps: [
-      {
-        id: 9000021,
-        lap_index: 1,
-        distance: 1000,
-        moving_time: 340,
-        elapsed_time: 345,
-        average_speed: 2.94,
-        average_heartrate: 138,
-        max_heartrate: 146,
-      },
-      {
-        id: 9000022,
-        lap_index: 2,
-        distance: 1000,
-        moving_time: 345,
-        elapsed_time: 350,
-        average_speed: 2.9,
-        average_heartrate: 141,
-        max_heartrate: 148,
-      },
-    ],
+    laps: buildMockLaps(9_000_010, 6),
+
     heartRateStream: [
       { seconds: 0, bpm: 112 },
       { seconds: 240, bpm: 126 },
@@ -141,48 +110,8 @@ export const mockActivities: StravaActivity[] = [
     map: {
       summary_polyline: 'mfp_Ix~vpAqCwAqBsBqCaC',
     },
-    laps: [
-      {
-        id: 9000031,
-        lap_index: 1,
-        distance: 1000,
-        moving_time: 338,
-        elapsed_time: 342,
-        average_speed: 2.96,
-        average_heartrate: 145,
-        max_heartrate: 152,
-      },
-      {
-        id: 9000032,
-        lap_index: 2,
-        distance: 1000,
-        moving_time: 330,
-        elapsed_time: 334,
-        average_speed: 3.03,
-        average_heartrate: 150,
-        max_heartrate: 158,
-      },
-      {
-        id: 9000033,
-        lap_index: 3,
-        distance: 1000,
-        moving_time: 326,
-        elapsed_time: 330,
-        average_speed: 3.07,
-        average_heartrate: 154,
-        max_heartrate: 162,
-      },
-      {
-        id: 9000034,
-        lap_index: 4,
-        distance: 1000,
-        moving_time: 322,
-        elapsed_time: 326,
-        average_speed: 3.1,
-        average_heartrate: 157,
-        max_heartrate: 165,
-      },
-    ],
+    laps: buildMockLaps(9_000_010, 22),
+
     heartRateStream: [
       { seconds: 0, bpm: 110 },
       { seconds: 600, bpm: 132 },

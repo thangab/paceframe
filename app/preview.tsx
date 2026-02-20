@@ -584,11 +584,26 @@ function formatDateWithPattern(isoDate: string, pattern: string) {
 
   const day = `${date.getDate()}`.padStart(2, '0');
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const monthShort = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ][date.getMonth()];
   const year = `${date.getFullYear()}`;
   const yearShort = year.slice(-2);
 
   return pattern
     .replaceAll('dd', day)
+    .replaceAll('MMM', monthShort)
     .replaceAll('mm', month)
     .replaceAll('YYYY', year)
     .replaceAll('YY', yearShort);
