@@ -25,6 +25,8 @@ import { FONT_PRESETS, TEMPLATES } from '@/lib/previewConfig';
 import { useThemeStore, type AppThemeMode } from '@/store/themeStore';
 import type {
   BackgroundGradient,
+  ChartFillStyle,
+  ChartOrientation,
   FieldId,
   LayerId,
   RouteMode,
@@ -48,6 +50,13 @@ type VisualEffectPreset = {
   subjectOverlayColor: string;
   subjectOverlayOpacity: number;
 };
+type StyleLayerId =
+  | 'meta'
+  | 'stats'
+  | 'route'
+  | 'primary'
+  | 'chartPace'
+  | 'chartHr';
 
 type Props = {
   panelOpen: boolean;
@@ -101,16 +110,13 @@ type Props = {
   onSetDistanceUnit: (unit: DistanceUnit) => void;
   elevationUnit: ElevationUnit;
   onSetElevationUnit: (unit: ElevationUnit) => void;
-  layerStyleMap: Record<
-    'meta' | 'stats' | 'route' | 'primary',
-    { color: string; opacity: number }
-  >;
+  layerStyleMap: Record<StyleLayerId, { color: string; opacity: number }>;
   onSetLayerStyleColor: (
-    layerId: 'meta' | 'stats' | 'route' | 'primary',
+    layerId: StyleLayerId,
     color: string,
   ) => void;
   onSetLayerStyleOpacity: (
-    layerId: 'meta' | 'stats' | 'route' | 'primary',
+    layerId: StyleLayerId,
     opacity: number,
   ) => void;
   sunsetPrimaryGradient: [string, string, string];
@@ -135,6 +141,16 @@ type Props = {
   quickTemplateMode?: boolean;
   allowVideoBackground?: boolean;
   showBackgroundTab?: boolean;
+  hasLapPaceLayer: boolean;
+  hasHeartRateLayer: boolean;
+  showChartAxes: boolean;
+  onSetShowChartAxes: (value: boolean) => void;
+  showChartGrid: boolean;
+  onSetShowChartGrid: (value: boolean) => void;
+  paceChartOrientation: ChartOrientation;
+  onSetPaceChartOrientation: (value: ChartOrientation) => void;
+  paceChartFill: ChartFillStyle;
+  onSetPaceChartFill: (value: ChartFillStyle) => void;
 };
 
 export function PreviewEditorPanel({
@@ -212,23 +228,31 @@ export function PreviewEditorPanel({
   quickTemplateMode = false,
   allowVideoBackground = true,
   showBackgroundTab = true,
+  hasLapPaceLayer,
+  hasHeartRateLayer,
+  showChartAxes,
+  onSetShowChartAxes,
+  showChartGrid,
+  onSetShowChartGrid,
+  paceChartOrientation,
+  onSetPaceChartOrientation,
+  paceChartFill,
+  onSetPaceChartFill,
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const themeMode = useThemeStore((s) => s.mode);
   const setThemeMode = useThemeStore((s) => s.setMode);
-  const [selectedStyleLayer, setSelectedStyleLayer] = useState<
-    'meta' | 'stats' | 'route' | 'primary'
-  >('meta');
+  const [selectedStyleLayer, setSelectedStyleLayer] =
+    useState<StyleLayerId>('meta');
   const [stylePickerOpen, setStylePickerOpen] = useState(false);
-  const styleLayerButtons: {
-    id: 'meta' | 'stats' | 'route' | 'primary';
-    label: string;
-  }[] = [
+  const styleLayerButtons: { id: StyleLayerId; label: string }[] = [
     { id: 'meta', label: 'Header' },
     { id: 'stats', label: 'Stats' },
     { id: 'route', label: 'Route' },
+    ...(hasLapPaceLayer ? [{ id: 'chartPace' as const, label: 'Pace Chart' }] : []),
+    ...(hasHeartRateLayer ? [{ id: 'chartHr' as const, label: 'HR Chart' }] : []),
     ...(supportsPrimaryLayer && visibleLayers.primary
       ? [{ id: 'primary' as const, label: 'Primary' }]
       : []),
@@ -374,7 +398,19 @@ export function PreviewEditorPanel({
     ) {
       setSelectedStyleLayer('meta');
     }
-  }, [selectedStyleLayer, supportsPrimaryLayer, visibleLayers.primary]);
+    if (selectedStyleLayer === 'chartPace' && !hasLapPaceLayer) {
+      setSelectedStyleLayer('meta');
+    }
+    if (selectedStyleLayer === 'chartHr' && !hasHeartRateLayer) {
+      setSelectedStyleLayer('meta');
+    }
+  }, [
+    hasHeartRateLayer,
+    hasLapPaceLayer,
+    selectedStyleLayer,
+    supportsPrimaryLayer,
+    visibleLayers.primary,
+  ]);
 
   useEffect(() => {
     panelBodyAnim.stopAnimation();
@@ -1008,6 +1044,119 @@ export function PreviewEditorPanel({
                     );
                   })}
                     </View>
+
+                    {(hasLapPaceLayer || hasHeartRateLayer) ? (
+                      <>
+                        <Text style={styles.sectionTitle}>Chart Axes</Text>
+                        <View style={styles.mediaPickRow}>
+                          <Pressable
+                            style={[
+                              styles.chip,
+                              showChartAxes && styles.chipSelected,
+                              styles.unitChip,
+                            ]}
+                            onPress={() => onSetShowChartAxes(true)}
+                          >
+                            <Text style={styles.chipText}>Show X/Y</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[
+                              styles.chip,
+                              !showChartAxes && styles.chipSelected,
+                              styles.unitChip,
+                            ]}
+                            onPress={() => onSetShowChartAxes(false)}
+                          >
+                            <Text style={styles.chipText}>Hide X/Y</Text>
+                          </Pressable>
+                        </View>
+                        <Text style={styles.sectionTitle}>Chart Grid</Text>
+                        <View style={styles.mediaPickRow}>
+                          <Pressable
+                            style={[
+                              styles.chip,
+                              showChartGrid && styles.chipSelected,
+                              styles.unitChip,
+                            ]}
+                            onPress={() => onSetShowChartGrid(true)}
+                          >
+                            <Text style={styles.chipText}>Show Grid</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[
+                              styles.chip,
+                              !showChartGrid && styles.chipSelected,
+                              styles.unitChip,
+                            ]}
+                            onPress={() => onSetShowChartGrid(false)}
+                          >
+                            <Text style={styles.chipText}>Hide Grid</Text>
+                          </Pressable>
+                        </View>
+                        {hasLapPaceLayer ? (
+                          <>
+                            <Text style={styles.sectionTitle}>
+                              Pace Chart Direction
+                            </Text>
+                            <View style={styles.mediaPickRow}>
+                              <Pressable
+                                style={[
+                                  styles.chip,
+                                  paceChartOrientation === 'vertical' &&
+                                    styles.chipSelected,
+                                  styles.unitChip,
+                                ]}
+                                onPress={() =>
+                                  onSetPaceChartOrientation('vertical')
+                                }
+                              >
+                                <Text style={styles.chipText}>Vertical</Text>
+                              </Pressable>
+                              <Pressable
+                                style={[
+                                  styles.chip,
+                                  paceChartOrientation === 'horizontal' &&
+                                    styles.chipSelected,
+                                  styles.unitChip,
+                                ]}
+                                onPress={() =>
+                                  onSetPaceChartOrientation('horizontal')
+                                }
+                              >
+                                <Text style={styles.chipText}>Horizontal</Text>
+                              </Pressable>
+                            </View>
+                            <Text style={styles.sectionTitle}>
+                              Pace Chart Fill
+                            </Text>
+                            <View style={styles.mediaPickRow}>
+                              <Pressable
+                                style={[
+                                  styles.chip,
+                                  paceChartFill === 'gradient' &&
+                                    styles.chipSelected,
+                                  styles.unitChip,
+                                ]}
+                                onPress={() => onSetPaceChartFill('gradient')}
+                              >
+                                <Text style={styles.chipText}>Gradient</Text>
+                              </Pressable>
+                              <Pressable
+                                style={[
+                                  styles.chip,
+                                  paceChartFill === 'plain' &&
+                                    styles.chipSelected,
+                                  styles.unitChip,
+                                ]}
+                                onPress={() => onSetPaceChartFill('plain')}
+                              >
+                                <Text style={styles.chipText}>Plain</Text>
+                              </Pressable>
+                            </View>
+                          </>
+                        ) : null}
+                      </>
+                    ) : null}
 
                     <Text style={styles.sectionTitle}>Header infos</Text>
                     <View style={styles.statsPillsWrap}>
@@ -2574,6 +2723,160 @@ function createStyles(colors: ThemeColors) {
   },
   statsPillTextSelected: {
     color: colors.primaryText,
+  },
+  chartCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  chartHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  chartTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  chartToggleRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  chartToggleBtn: {
+    minWidth: 26,
+    height: 24,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  chartToggleBtnSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primaryBorderOnLight,
+  },
+  chartToggleText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  chartToggleTextSelected: {
+    color: colors.primaryText,
+  },
+  chartRows: {
+    gap: 6,
+  },
+  chartRowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chartRowLabel: {
+    width: 22,
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  chartRowTrack: {
+    flex: 1,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: colors.surfaceAlt,
+    overflow: 'hidden',
+  },
+  chartRowFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+  },
+  chartRowValue: {
+    width: 56,
+    textAlign: 'right',
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  verticalBarsWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 6,
+    minHeight: 104,
+    paddingTop: 6,
+  },
+  verticalBarItem: {
+    flex: 1,
+    alignItems: 'center',
+    minWidth: 0,
+    gap: 4,
+  },
+  verticalBarTrack: {
+    width: '100%',
+    maxWidth: 28,
+    height: 90,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceAlt,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  verticalBarFill: {
+    width: '100%',
+    backgroundColor: colors.primary,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  verticalBarLabel: {
+    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  chartFallbackText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  chartBadgeText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  areaChartWrap: {
+    height: 106,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: 2,
+    paddingBottom: 2,
+  },
+  areaColumn: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  areaColumnFill: {
+    width: '100%',
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  areaChartAxisRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  areaAxisLabel: {
+    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: '600',
   },
   styleLayerButtonsRow: {
     flexDirection: 'row',

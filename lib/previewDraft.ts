@@ -2,6 +2,8 @@ import type * as ImagePicker from 'expo-image-picker';
 import type { DistanceUnit, ElevationUnit } from '@/lib/format';
 import type {
   BackgroundGradient,
+  ChartFillStyle,
+  ChartOrientation,
   FieldId,
   ImageOverlay,
   LayerId,
@@ -10,7 +12,14 @@ import type {
   StatsLayoutKind,
 } from '@/types/preview';
 
-export const BASE_LAYER_ORDER: LayerId[] = ['route', 'stats', 'primary', 'meta'];
+export const BASE_LAYER_ORDER: LayerId[] = [
+  'chartPace',
+  'chartHr',
+  'route',
+  'stats',
+  'primary',
+  'meta',
+];
 
 export type LayerTransform = {
   x: number;
@@ -19,7 +28,13 @@ export type LayerTransform = {
   rotationDeg: number;
 };
 
-type StyleLayerId = 'meta' | 'stats' | 'route' | 'primary';
+type StyleLayerId =
+  | 'meta'
+  | 'stats'
+  | 'route'
+  | 'primary'
+  | 'chartPace'
+  | 'chartHr';
 type LayerStyleSettings = {
   color: string;
   opacity: number;
@@ -70,6 +85,10 @@ export type PreviewDraft = {
   behindSubjectLayers: Partial<Record<LayerId, boolean>>;
   layerTransforms: Partial<Record<LayerId, LayerTransform>>;
   isSquareFormat: boolean;
+  showChartAxes?: boolean;
+  showChartGrid?: boolean;
+  paceChartOrientation?: ChartOrientation;
+  paceChartFill?: ChartFillStyle;
   layerStyleMap?: LayerStyleMap;
   layerStyleMapByLayout?: Partial<Record<StatsLayoutKind, LayerStyleMap>>;
   sunsetPrimaryGradient?: [string, string, string];
@@ -97,6 +116,10 @@ type SanitizeOptions = {
     };
     visibleLayers: Partial<Record<LayerId, boolean>>;
     isSquareFormat: boolean;
+    showChartAxes: boolean;
+    showChartGrid: boolean;
+    paceChartOrientation: ChartOrientation;
+    paceChartFill: ChartFillStyle;
   };
 };
 
@@ -110,6 +133,8 @@ function isLayerId(value: string): value is LayerId {
     value === 'stats' ||
     value === 'route' ||
     value === 'primary' ||
+    value === 'chartPace' ||
+    value === 'chartHr' ||
     value.startsWith('image:')
   );
 }
@@ -124,6 +149,20 @@ function asNumber(value: unknown, fallback: number) {
 
 function asString(value: unknown, fallback = '') {
   return typeof value === 'string' ? value : fallback;
+}
+
+function asChartOrientation(
+  value: unknown,
+  fallback: ChartOrientation,
+): ChartOrientation {
+  return value === 'horizontal' || value === 'vertical' ? value : fallback;
+}
+
+function asChartFillStyle(
+  value: unknown,
+  fallback: ChartFillStyle,
+): ChartFillStyle {
+  return value === 'plain' || value === 'gradient' ? value : fallback;
 }
 
 function sanitizeMedia(input: unknown): ImagePicker.ImagePickerAsset | null {
@@ -241,7 +280,9 @@ function isStyleLayerId(value: string): value is StyleLayerId {
     value === 'meta' ||
     value === 'stats' ||
     value === 'route' ||
-    value === 'primary'
+    value === 'primary' ||
+    value === 'chartPace' ||
+    value === 'chartHr'
   );
 }
 
@@ -252,6 +293,8 @@ function sanitizeLayerStyleMap(input: unknown): LayerStyleMap | undefined {
     stats: { color: '#FFFFFF', opacity: 1 },
     route: { color: '#D4FF54', opacity: 1 },
     primary: { color: '#FFFFFF', opacity: 1 },
+    chartPace: { color: '#FFFFFF', opacity: 1 },
+    chartHr: { color: '#FFFFFF', opacity: 1 },
   };
   const next: LayerStyleMap = { ...defaults };
 
@@ -428,6 +471,8 @@ export function sanitizePreviewDraft(
     layerId === 'stats' ||
     layerId === 'primary' ||
     layerId === 'route' ||
+    layerId === 'chartPace' ||
+    layerId === 'chartHr' ||
     overlayLayerIds.has(layerId);
   const layerOrder = sanitizeLayerOrder(input.layerOrder).filter(keepLayerKey);
   const visibleLayers = sanitizeLayerBoolMap(input.visibleLayers);
@@ -492,6 +537,16 @@ export function sanitizePreviewDraft(
     isSquareFormat: asBoolean(
       input.isSquareFormat,
       options.defaults.isSquareFormat,
+    ),
+    showChartAxes: asBoolean(input.showChartAxes, options.defaults.showChartAxes),
+    showChartGrid: asBoolean(input.showChartGrid, options.defaults.showChartGrid),
+    paceChartOrientation: asChartOrientation(
+      input.paceChartOrientation,
+      options.defaults.paceChartOrientation,
+    ),
+    paceChartFill: asChartFillStyle(
+      input.paceChartFill,
+      options.defaults.paceChartFill,
     ),
     layerStyleMap,
     layerStyleMapByLayout,

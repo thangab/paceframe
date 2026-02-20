@@ -8,6 +8,8 @@ export type FieldId =
   | 'avgHr';
 export type RouteMode = 'off' | 'map' | 'trace';
 export type RouteMapVariant = 'standard' | 'dark' | 'satellite';
+export type ChartOrientation = 'vertical' | 'horizontal';
+export type ChartFillStyle = 'gradient' | 'plain';
 export type StatsLayoutKind =
   | 'hero'
   | 'vertical'
@@ -22,7 +24,13 @@ export type StatsLayoutKind =
   | 'sunset-hero'
   | 'morning-glass'
   | 'split-bold';
-export type BaseLayerId = 'meta' | 'stats' | 'route' | 'primary';
+export type BaseLayerId =
+  | 'meta'
+  | 'stats'
+  | 'route'
+  | 'primary'
+  | 'chartPace'
+  | 'chartHr';
 export type LayerId = BaseLayerId | `image:${string}`;
 
 export type StatsLayout = {
@@ -63,7 +71,13 @@ export type BackgroundGradient = {
   direction: 'vertical' | 'horizontal';
 };
 
-export type TemplateLayerStyleId = 'meta' | 'stats' | 'route' | 'primary';
+export type TemplateLayerStyleId =
+  | 'meta'
+  | 'stats'
+  | 'route'
+  | 'primary'
+  | 'chartPace'
+  | 'chartHr';
 
 export type TemplateLayerStyle = {
   color: string;
@@ -82,6 +96,22 @@ export type PreviewTemplateImageElement = {
   height: number;
   opacity?: number;
   rotationDeg?: number;
+};
+
+export type PreviewTemplateChartElement = {
+  id: string;
+  kind: 'pace' | 'hr';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  isBehind?: boolean;
+  opacity?: number;
+  color?: string;
+  showAxes?: boolean;
+  showGrid?: boolean;
+  orientation?: ChartOrientation;
+  fillStyle?: ChartFillStyle;
 };
 
 export type PreviewTemplateTextElement = {
@@ -162,6 +192,7 @@ export type PreviewTemplateDefinition = {
     Record<TemplateLayerStyleId, TemplateLayerStyle>
   >;
   fixedImageElements?: PreviewTemplateImageElement[];
+  fixedChartElements?: PreviewTemplateChartElement[];
   fixedTextElements?: PreviewTemplateTextElement[];
   backgroundMediaFrame?: {
     width: number;

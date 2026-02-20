@@ -1,4 +1,9 @@
-import { AuthTokens, StravaActivity } from '@/types/strava';
+import {
+  AuthTokens,
+  StravaActivity,
+  StravaHeartRatePoint,
+  StravaLap,
+} from '@/types/strava';
 import { mockActivities } from '@/lib/mockData';
 
 const STRAVA_BASE = 'https://www.strava.com/api/v3';
@@ -118,12 +123,69 @@ export async function fetchActivities(
 
   const enriched = await Promise.all(
     runs.map(async (activity) => {
-      const photoUrl = await fetchActivityPhotoUrl(accessToken, activity.id);
-      return { ...activity, photoUrl };
+      const [photoUrl, laps, heartRateStream] = await Promise.all([
+        fetchActivityPhotoUrl(accessToken, activity.id),
+        fetchActivityLaps(accessToken, activity.id),
+        fetchActivityHeartRateStream(accessToken, activity.id),
+      ]);
+
+      return { ...activity, photoUrl, laps, heartRateStream };
     }),
   );
   // console.log('enriched', enriched);
   return enriched;
+}
+
+export type LapPaceChartPoint = {
+  lapLabel: string;
+  paceSecPerKm: number;
+  paceText: string;
+  distanceMeters: number;
+  movingTimeSec: number;
+  averageHeartrate: number | null;
+};
+
+export type HeartRateAreaChartPoint = {
+  timeSec: number;
+  timeLabel: string;
+  bpm: number;
+};
+
+export function buildLapPaceChartData(
+  activity: Pick<StravaActivity, 'laps'> | null | undefined,
+): LapPaceChartPoint[] {
+  if (!activity?.laps?.length) return [];
+
+  return activity.laps
+    .map((lap, index) => {
+      const paceSecPerKm = computePaceSecPerKm(lap.distance, lap.moving_time);
+      if (!paceSecPerKm) return null;
+
+      return {
+        lapLabel: `Lap ${index + 1}`,
+        paceSecPerKm,
+        paceText: formatPaceSecPerKm(paceSecPerKm),
+        distanceMeters: lap.distance,
+        movingTimeSec: lap.moving_time,
+        averageHeartrate:
+          typeof lap.average_heartrate === 'number'
+            ? Math.round(lap.average_heartrate)
+            : null,
+      };
+    })
+    .filter((item): item is LapPaceChartPoint => Boolean(item));
+}
+
+export function buildHeartRateAreaChartData(
+  activity: Pick<StravaActivity, 'heartRateStream'> | null | undefined,
+): HeartRateAreaChartPoint[] {
+  if (!activity?.heartRateStream?.length) return [];
+
+  return activity.heartRateStream.map((point) => ({
+    timeSec: point.seconds,
+    timeLabel: formatClock(point.seconds),
+    bpm: point.bpm,
+  }));
 }
 
 export function isMockStravaEnabled() {
@@ -190,4 +252,144 @@ async function fetchActivityPhotoUrl(
   } catch {
     return null;
   }
+}
+
+async function fetchActivityLaps(
+  accessToken: string,
+  activityId: number,
+): Promise<StravaLap[]> {
+  try {
+    const response = await fetch(`${STRAVA_BASE}/activities/${activityId}/laps`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) return [];
+    const laps = (await response.json()) as Array<{
+      id?: number;
+      name?: string | null;
+      distance?: number;
+      moving_time?: number;
+      elapsed_time?: number;
+      average_speed?: number | null;
+      average_heartrate?: number | null;
+      max_heartrate?: number | null;
+      lap_index?: number;
+      split?: number;
+    }>;
+
+    const normalized: StravaLap[] = [];
+    laps.forEach((lap, index) => {
+      const distance = lap.distance ?? 0;
+      const moving_time = lap.moving_time ?? 0;
+      const elapsed_time = lap.elapsed_time ?? moving_time;
+      if (distance <= 0 || moving_time <= 0) return;
+
+      normalized.push({
+        id: lap.id,
+        name: lap.name ?? null,
+        lap_index:
+          typeof lap.lap_index === 'number'
+            ? lap.lap_index
+            : typeof lap.split === 'number'
+              ? lap.split
+              : index + 1,
+        distance,
+        moving_time,
+        elapsed_time,
+        average_speed:
+          typeof lap.average_speed === 'number' ? lap.average_speed : null,
+        average_heartrate:
+          typeof lap.average_heartrate === 'number'
+            ? lap.average_heartrate
+            : null,
+        max_heartrate:
+          typeof lap.max_heartrate === 'number' ? lap.max_heartrate : null,
+      });
+    });
+
+    return normalized;
+  } catch {
+    return [];
+  }
+}
+
+async function fetchActivityHeartRateStream(
+  accessToken: string,
+  activityId: number,
+): Promise<StravaHeartRatePoint[]> {
+  try {
+    const response = await fetch(
+      `${STRAVA_BASE}/activities/${activityId}/streams?keys=time,heartrate&key_by_type=true`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+
+    if (!response.ok) return [];
+
+    const streams = (await response.json()) as {
+      time?: { data?: number[] };
+      heartrate?: { data?: number[] };
+    };
+
+    const time = streams.time?.data ?? [];
+    const heartrate = streams.heartrate?.data ?? [];
+    const pointsCount = Math.min(time.length, heartrate.length);
+
+    if (!pointsCount) return [];
+
+    const points: StravaHeartRatePoint[] = [];
+    for (let i = 0; i < pointsCount; i += 1) {
+      const seconds = time[i];
+      const bpm = heartrate[i];
+      if (
+        typeof seconds !== 'number' ||
+        !Number.isFinite(seconds) ||
+        typeof bpm !== 'number' ||
+        !Number.isFinite(bpm)
+      ) {
+        continue;
+      }
+      points.push({
+        seconds: Math.max(0, Math.round(seconds)),
+        bpm: Math.round(bpm),
+      });
+    }
+
+    return points;
+  } catch {
+    return [];
+  }
+}
+
+function computePaceSecPerKm(
+  distanceMeters: number,
+  movingTimeSec: number,
+): number | null {
+  if (distanceMeters <= 0 || movingTimeSec <= 0) return null;
+  return movingTimeSec / (distanceMeters / 1000);
+}
+
+function formatPaceSecPerKm(paceSecPerKm: number): string {
+  const total = Math.max(0, Math.round(paceSecPerKm));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}/km`;
+}
+
+function formatClock(totalSeconds: number): string {
+  const rounded = Math.max(0, Math.round(totalSeconds));
+  const hours = Math.floor(rounded / 3600);
+  const minutes = Math.floor((rounded % 3600) / 60);
+  const seconds = rounded % 60;
+
+  if (hours > 0) {
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }

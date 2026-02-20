@@ -10,13 +10,16 @@ import {
   Fill,
   Group,
   ImageShader,
+  LinearGradient as SkiaLinearGradient,
   Rect,
   RuntimeShader,
   Skia,
   Text as SkiaText,
   matchFont,
   useImage,
+  vec,
 } from '@shopify/react-native-skia';
+import { Area, CartesianChart, Line } from 'victory-native';
 import { DirectionalBackgroundBlur } from '@/components/preview/DirectionalBackgroundBlur';
 import { DraggableBlock } from '@/components/DraggableBlock';
 import { RouteLayer } from '@/components/RouteLayer';
@@ -27,13 +30,18 @@ import {
 import { radius, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { CHECKER_SIZE } from '@/lib/previewConfig';
+import type { DistanceUnit } from '@/lib/format';
+import type { HeartRateAreaChartPoint, LapPaceChartPoint } from '@/lib/strava';
 import type {
   BackgroundGradient,
+  ChartFillStyle,
+  ChartOrientation,
   FieldId,
   FontPreset,
   ImageOverlay,
   LayerId,
   PreviewTemplateDefinition,
+  PreviewTemplateChartElement,
   PreviewTemplateRenderableTextElement,
   RouteMapVariant,
   RouteMode,
@@ -54,6 +62,8 @@ type LayerStyleSettings = {
   stats: { color: string; opacity: number };
   route: { color: string; opacity: number };
   primary: { color: string; opacity: number };
+  chartPace: { color: string; opacity: number };
+  chartHr: { color: string; opacity: number };
 };
 type VisualEffectPreset = {
   id: string;
@@ -143,9 +153,19 @@ type Props = {
   isPremium: boolean;
   quickTemplateMode?: boolean;
   templateFixedTextElements?: PreviewTemplateRenderableTextElement[];
-  templateBackgroundMediaFrame?: PreviewTemplateDefinition['backgroundMediaFrame'] | null;
+  templateFixedChartElements?: PreviewTemplateChartElement[];
+  templateBackgroundMediaFrame?:
+    | PreviewTemplateDefinition['backgroundMediaFrame']
+    | null;
   onDragGuideChange: (guides: GuideState) => void;
   onRotationGuideChange: (active: boolean) => void;
+  lapPaceChartData: LapPaceChartPoint[];
+  heartRateAreaChartData: HeartRateAreaChartPoint[];
+  showChartAxes: boolean;
+  showChartGrid: boolean;
+  paceChartOrientation: ChartOrientation;
+  paceChartFill: ChartFillStyle;
+  distanceUnit: DistanceUnit;
 };
 
 const RADIAL_BLUR_EFFECT = Skia.RuntimeEffect.Make(`
@@ -245,9 +265,17 @@ export function PreviewEditorCanvas({
   isPremium,
   quickTemplateMode = false,
   templateFixedTextElements = [],
+  templateFixedChartElements = [],
   templateBackgroundMediaFrame = null,
   onDragGuideChange,
   onRotationGuideChange,
+  lapPaceChartData,
+  heartRateAreaChartData,
+  showChartAxes,
+  showChartGrid,
+  paceChartOrientation,
+  paceChartFill,
+  distanceUnit,
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -655,6 +683,37 @@ export function PreviewEditorCanvas({
     }
     return routeInitialXDisplay;
   })();
+  const sampledHeartRateData = useMemo(
+    () => sampleChartPoints(heartRateAreaChartData, 36),
+    [heartRateAreaChartData],
+  );
+  const chartAxisFont = useMemo(
+    () =>
+      matchFont({
+        fontSize: 9,
+        fontFamily: fontPreset.family,
+        fontWeight: '500',
+      }),
+    [fontPreset.family],
+  );
+  const lapPaceVictoryData = useMemo(
+    () => buildPaceSplitsByUnit(lapPaceChartData, distanceUnit),
+    [distanceUnit, lapPaceChartData],
+  );
+  const heartRateVictoryData = useMemo(
+    () =>
+      sampledHeartRateData.map((item) => ({
+        timeSec: item.timeSec,
+        bpm: item.bpm,
+      })),
+    [sampledHeartRateData],
+  );
+  const isMainPaceChartHorizontal = paceChartOrientation === 'horizontal';
+
+  const defaultChartPaceX = Math.round(18 * canvasScaleX);
+  const defaultChartPaceY = Math.round(300 * canvasScaleY);
+  const defaultChartHrX = Math.round(18 * canvasScaleX);
+  const defaultChartHrY = Math.round(430 * canvasScaleY);
   const canRenderRouteLayer =
     routeMode !== 'off' &&
     Boolean(visibleLayers.route) &&
@@ -811,7 +870,10 @@ export function PreviewEditorCanvas({
                   <RuntimeShader
                     source={RADIAL_BLUR_EFFECT}
                     uniforms={{
-                      resolution: [backgroundRenderWidth, backgroundRenderHeight],
+                      resolution: [
+                        backgroundRenderWidth,
+                        backgroundRenderHeight,
+                      ],
                       center: [
                         resolvedTemplateBackgroundFrame
                           ? backgroundRenderWidth * 0.5
@@ -821,11 +883,15 @@ export function PreviewEditorCanvas({
                           : resolvedRadialCenter.y,
                       ],
                       intensity:
-                        Math.min(backgroundRenderWidth, backgroundRenderHeight) *
-                        0.26,
+                        Math.min(
+                          backgroundRenderWidth,
+                          backgroundRenderHeight,
+                        ) * 0.26,
                       radius:
-                        Math.min(backgroundRenderWidth, backgroundRenderHeight) *
-                        0.58,
+                        Math.min(
+                          backgroundRenderWidth,
+                          backgroundRenderHeight,
+                        ) * 0.58,
                     }}
                   >
                     <ImageShader
@@ -857,47 +923,45 @@ export function PreviewEditorCanvas({
                     styles.hiddenForCapture,
                 ]}
               />
-            ) : (
-              resolvedTemplateBackgroundFrame ? (
-                <View
-                  style={[
-                    styles.mediaFrameClip,
-                    backgroundMediaStyle,
-                    isExportingPng &&
-                      pngTransparentOnly &&
-                      styles.hiddenForCapture,
-                  ]}
-                >
-                  <Image
-                    source={{ uri: media.uri }}
-                    blurRadius={selectedBlurEffect.backgroundBlurRadius ?? 0}
-                    style={[
-                      styles.mediaFrameContent,
-                      framedBackgroundContentStyle,
-                      mergedBackgroundFilter.length > 0
-                        ? ({ filter: mergedBackgroundFilter } as any)
-                        : null,
-                    ]}
-                    resizeMode="cover"
-                  />
-                </View>
-              ) : (
+            ) : resolvedTemplateBackgroundFrame ? (
+              <View
+                style={[
+                  styles.mediaFrameClip,
+                  backgroundMediaStyle,
+                  isExportingPng &&
+                    pngTransparentOnly &&
+                    styles.hiddenForCapture,
+                ]}
+              >
                 <Image
                   source={{ uri: media.uri }}
                   blurRadius={selectedBlurEffect.backgroundBlurRadius ?? 0}
                   style={[
-                    styles.media,
-                    backgroundMediaStyle,
+                    styles.mediaFrameContent,
+                    framedBackgroundContentStyle,
                     mergedBackgroundFilter.length > 0
                       ? ({ filter: mergedBackgroundFilter } as any)
                       : null,
-                    isExportingPng &&
-                      pngTransparentOnly &&
-                      styles.hiddenForCapture,
                   ]}
-                  resizeMode={backgroundMediaResizeMode}
+                  resizeMode="cover"
                 />
-              )
+              </View>
+            ) : (
+              <Image
+                source={{ uri: media.uri }}
+                blurRadius={selectedBlurEffect.backgroundBlurRadius ?? 0}
+                style={[
+                  styles.media,
+                  backgroundMediaStyle,
+                  mergedBackgroundFilter.length > 0
+                    ? ({ filter: mergedBackgroundFilter } as any)
+                    : null,
+                  isExportingPng &&
+                    pngTransparentOnly &&
+                    styles.hiddenForCapture,
+                ]}
+                resizeMode={backgroundMediaResizeMode}
+              />
             )
           ) : null}
           {!media && backgroundGradient ? (
@@ -1240,6 +1304,279 @@ export function PreviewEditorCanvas({
             </DraggableBlock>
           ) : null}
 
+          {visibleLayers.chartPace && lapPaceChartData.length ? (
+            <DraggableBlock
+              key="chart-pace-layer"
+              initialX={layerTransforms.chartPace?.x ?? defaultChartPaceX}
+              initialY={layerTransforms.chartPace?.y ?? defaultChartPaceY}
+              initialScale={layerTransforms.chartPace?.scale ?? 1}
+              rotationDeg={layerTransforms.chartPace?.rotationDeg ?? 0}
+              selected={
+                showSelectionOutline &&
+                !interactionLocked &&
+                selectedLayer === 'chartPace'
+              }
+              locked={interactionLocked}
+              outlineRadius={12}
+              canvasWidth={canvasDisplayWidth}
+              canvasHeight={canvasDisplayHeight}
+              onDragGuideChange={onDragGuideChange}
+              onRotationGuideChange={onRotationGuideChange}
+              onSelect={() => setSelectedLayer('chartPace')}
+              onInteractionChange={(active) =>
+                setActiveLayer(active ? 'chartPace' : null)
+              }
+              onTransformEnd={(next) =>
+                onLayerTransformChange('chartPace', next)
+              }
+              style={[
+                styles.chartBlock,
+                styles.chartPaceBlock,
+                { opacity: layerStyleSettings.chartPace.opacity },
+                {
+                  zIndex: baseLayerZ('chartPace'),
+                  elevation: baseLayerZ('chartPace'),
+                },
+              ]}
+            >
+              <View style={styles.chartCanvasWrapPace}>
+                <CartesianChart
+                  data={lapPaceVictoryData}
+                  xKey={isMainPaceChartHorizontal ? 'pace' : 'lap'}
+                  yKeys={isMainPaceChartHorizontal ? ['lap'] : ['pace']}
+                  padding={{ left: 6, right: 6, top: 6, bottom: 6 }}
+                  domainPadding={{ left: 10, right: 10, top: 8 }}
+                  xAxis={
+                    showChartAxes
+                      ? {
+                          font: chartAxisFont,
+                          lineColor: `${layerStyleSettings.chartPace.color}7A`,
+                          lineWidth: showChartGrid ? 1 : 0,
+                          labelColor: `${layerStyleSettings.chartPace.color}CC`,
+                          labelPosition: 'outset',
+                          labelOffset: 2,
+                          tickCount: isMainPaceChartHorizontal
+                            ? 3
+                            : Math.min(6, lapPaceVictoryData.length),
+                          formatXLabel: (value) =>
+                            isMainPaceChartHorizontal
+                              ? formatPaceAxisLabel(Number(value))
+                              : formatPaceSplitLabel(
+                                  Number(value),
+                                  distanceUnit,
+                                ),
+                        }
+                      : undefined
+                  }
+                  yAxis={
+                    showChartAxes
+                      ? [
+                          {
+                            font: chartAxisFont,
+                            lineColor: `${layerStyleSettings.chartPace.color}7A`,
+                            lineWidth: showChartGrid ? 1 : 0,
+                            labelColor: `${layerStyleSettings.chartPace.color}CC`,
+                            labelPosition: 'outset',
+                            labelOffset: 2,
+                            tickCount: isMainPaceChartHorizontal
+                              ? Math.min(6, lapPaceVictoryData.length)
+                              : 3,
+                            formatYLabel: (value) =>
+                              isMainPaceChartHorizontal
+                                ? formatPaceSplitLabel(
+                                    Number(value),
+                                    distanceUnit,
+                                  )
+                                : formatPaceAxisLabel(Number(value)),
+                          },
+                        ]
+                      : undefined
+                  }
+                >
+                  {({ points, chartBounds }) => {
+                    const pacePoints = (
+                      isMainPaceChartHorizontal ? points.lap : points.pace
+                    ).filter(
+                      (point) =>
+                        typeof point.y === 'number' && point.y !== null,
+                    );
+                    if (!pacePoints.length) return null;
+
+                    const step = pacePoints.length > 1
+                      ? Math.abs(
+                          (isMainPaceChartHorizontal
+                            ? (pacePoints[1]?.y ?? 0)
+                            : pacePoints[1]?.x) -
+                            (isMainPaceChartHorizontal
+                              ? (pacePoints[0]?.y ?? 0)
+                              : pacePoints[0]?.x),
+                        )
+                      : (isMainPaceChartHorizontal
+                          ? chartBounds.bottom - chartBounds.top
+                          : chartBounds.right - chartBounds.left) * 0.35;
+                    const slot = isMainPaceChartHorizontal
+                      ? (chartBounds.bottom - chartBounds.top) /
+                        Math.max(1, pacePoints.length)
+                      : (chartBounds.right - chartBounds.left) /
+                        Math.max(1, pacePoints.length);
+                    const maxThickness = isMainPaceChartHorizontal
+                      ? Math.max(1, slot * 0.82)
+                      : 28;
+                    const minThickness = isMainPaceChartHorizontal ? 1 : 4;
+                    const thickness = Math.max(
+                      minThickness,
+                      Math.min(maxThickness, step * 0.62),
+                    );
+                    const topColor = withAlpha(
+                      layerStyleSettings.chartPace.color,
+                      'FF',
+                    );
+                    const bottomColor =
+                      paceChartFill === 'plain'
+                        ? topColor
+                        : withAlpha(layerStyleSettings.chartPace.color, '4A');
+
+                    return (
+                      <>
+                        {pacePoints.map((point, index) => {
+                          const left = isMainPaceChartHorizontal
+                            ? chartBounds.left
+                            : point.x - thickness / 2;
+                          const pointY = point.y ?? chartBounds.bottom;
+                          const slot = (chartBounds.bottom - chartBounds.top) /
+                            Math.max(1, pacePoints.length);
+                          const top = isMainPaceChartHorizontal
+                            ? chartBounds.top +
+                              index * slot +
+                              Math.max(0, (slot - thickness) / 2)
+                            : pointY;
+                          const width = isMainPaceChartHorizontal
+                            ? Math.max(1, point.x - chartBounds.left)
+                            : thickness;
+                          const height = isMainPaceChartHorizontal
+                            ? thickness
+                            : Math.max(1, chartBounds.bottom - top);
+
+                          return (
+                            <Rect
+                              key={`pace-bar-${index}`}
+                              x={left}
+                              y={top}
+                              width={width}
+                              height={height}
+                            >
+                              <SkiaLinearGradient
+                                start={vec(left, top)}
+                                end={
+                                  isMainPaceChartHorizontal
+                                    ? vec(left + width, top)
+                                    : vec(left, chartBounds.bottom)
+                                }
+                                colors={[topColor, bottomColor]}
+                              />
+                            </Rect>
+                          );
+                        })}
+                      </>
+                    );
+                  }}
+                </CartesianChart>
+              </View>
+            </DraggableBlock>
+          ) : null}
+
+          {visibleLayers.chartHr && sampledHeartRateData.length ? (
+            <DraggableBlock
+              key="chart-hr-layer"
+              initialX={layerTransforms.chartHr?.x ?? defaultChartHrX}
+              initialY={layerTransforms.chartHr?.y ?? defaultChartHrY}
+              initialScale={layerTransforms.chartHr?.scale ?? 1}
+              rotationDeg={layerTransforms.chartHr?.rotationDeg ?? 0}
+              selected={
+                showSelectionOutline &&
+                !interactionLocked &&
+                selectedLayer === 'chartHr'
+              }
+              locked={interactionLocked}
+              outlineRadius={12}
+              canvasWidth={canvasDisplayWidth}
+              canvasHeight={canvasDisplayHeight}
+              onDragGuideChange={onDragGuideChange}
+              onRotationGuideChange={onRotationGuideChange}
+              onSelect={() => setSelectedLayer('chartHr')}
+              onInteractionChange={(active) =>
+                setActiveLayer(active ? 'chartHr' : null)
+              }
+              onTransformEnd={(next) => onLayerTransformChange('chartHr', next)}
+              style={[
+                styles.chartBlock,
+                styles.chartHrBlock,
+                { opacity: layerStyleSettings.chartHr.opacity },
+                {
+                  zIndex: baseLayerZ('chartHr'),
+                  elevation: baseLayerZ('chartHr'),
+                },
+              ]}
+            >
+              <View style={styles.chartCanvasWrapHr}>
+                <CartesianChart
+                  data={heartRateVictoryData}
+                  xKey="timeSec"
+                  yKeys={['bpm']}
+                  padding={{ left: 4, right: 4, top: 6, bottom: 6 }}
+                  domainPadding={{ left: 0, right: 0, top: 8 }}
+                  xAxis={
+                    showChartAxes
+                      ? {
+                          font: chartAxisFont,
+                          lineColor: `${layerStyleSettings.chartHr.color}7A`,
+                          lineWidth: showChartGrid ? 1 : 0,
+                          labelColor: `${layerStyleSettings.chartHr.color}CC`,
+                          labelPosition: 'outset',
+                          labelOffset: 2,
+                          tickCount: 3,
+                          formatXLabel: (value) =>
+                            formatElapsedAxisLabel(Number(value)),
+                        }
+                      : undefined
+                  }
+                  yAxis={
+                    showChartAxes
+                      ? [
+                          {
+                            font: chartAxisFont,
+                            lineColor: `${layerStyleSettings.chartHr.color}7A`,
+                            lineWidth: showChartGrid ? 1 : 0,
+                            labelColor: `${layerStyleSettings.chartHr.color}CC`,
+                            labelPosition: 'outset',
+                            labelOffset: 2,
+                            tickCount: 3,
+                            formatYLabel: (value) =>
+                              `${Math.round(Number(value))}`,
+                          },
+                        ]
+                      : undefined
+                  }
+                >
+                  {({ points, chartBounds }) => (
+                    <>
+                      <Area
+                        points={points.bpm}
+                        y0={chartBounds.bottom}
+                        color={`${layerStyleSettings.chartHr.color}66`}
+                      />
+                      <Line
+                        points={points.bpm}
+                        color={layerStyleSettings.chartHr.color}
+                        strokeWidth={2}
+                      />
+                    </>
+                  )}
+                </CartesianChart>
+              </View>
+            </DraggableBlock>
+          ) : null}
+
           {imageOverlays.map((overlay, index) => {
             const layerId: LayerId = `image:${overlay.id}`;
             if (!visibleLayers[layerId]) return null;
@@ -1307,14 +1644,258 @@ export function PreviewEditorCanvas({
           })}
 
           {quickTemplateMode
-            ? templateFixedTextElements.map((item) => (
+            ? templateFixedChartElements.map((item) => {
+                const left = Math.round(item.x * canvasScaleX);
+                const top = Math.round(item.y * canvasScaleY);
+                const width = Math.max(1, Math.round(item.width * canvasScaleX));
+                const height = Math.max(
+                  1,
+                  Math.round(item.height * canvasScaleY),
+                );
+                const color =
+                  normalizeTemplateColor(item.color) ??
+                  (item.kind === 'pace'
+                    ? layerStyleSettings.chartPace.color
+                    : layerStyleSettings.chartHr.color);
+                const opacity = item.opacity ?? 1;
+                const showAxesForItem = item.showAxes ?? showChartAxes;
+                const showGridForItem = item.showGrid ?? showChartGrid;
+                const paceOrientationForItem =
+                  item.orientation ?? paceChartOrientation;
+                const isPaceHorizontalForItem =
+                  paceOrientationForItem === 'horizontal';
+                const paceFillForItem = item.fillStyle ?? paceChartFill;
+                const zIndex = item.isBehind ? 8 : 170;
+
+                return (
+                  <View
+                    key={item.id}
+                    pointerEvents="none"
+                    style={[
+                      styles.templateChartLayer,
+                      {
+                        left,
+                        top,
+                        width,
+                        height,
+                        opacity,
+                        zIndex,
+                        elevation: zIndex,
+                      },
+                    ]}
+                  >
+                    {item.kind === 'pace' ? (
+                      <CartesianChart
+                        data={lapPaceVictoryData}
+                        xKey={isPaceHorizontalForItem ? 'pace' : 'lap'}
+                        yKeys={isPaceHorizontalForItem ? ['lap'] : ['pace']}
+                        padding={{ left: 6, right: 6, top: 6, bottom: 6 }}
+                        domainPadding={{ left: 10, right: 10, top: 8 }}
+                        xAxis={
+                          showAxesForItem
+                            ? {
+                                font: chartAxisFont,
+                                lineColor: `${color}7A`,
+                                lineWidth: showGridForItem ? 1 : 0,
+                                labelColor: `${color}CC`,
+                                labelPosition: 'outset',
+                                labelOffset: 2,
+                                tickCount: isPaceHorizontalForItem
+                                  ? 3
+                                  : Math.min(6, lapPaceVictoryData.length),
+                                formatXLabel: (value) =>
+                                  isPaceHorizontalForItem
+                                    ? formatPaceAxisLabel(Number(value))
+                                    : formatPaceSplitLabel(
+                                        Number(value),
+                                        distanceUnit,
+                                      ),
+                              }
+                            : undefined
+                        }
+                        yAxis={
+                          showAxesForItem
+                            ? [
+                                {
+                                  font: chartAxisFont,
+                                  lineColor: `${color}7A`,
+                                  lineWidth: showGridForItem ? 1 : 0,
+                                  labelColor: `${color}CC`,
+                                  labelPosition: 'outset',
+                                  labelOffset: 2,
+                                  tickCount: isPaceHorizontalForItem
+                                    ? Math.min(6, lapPaceVictoryData.length)
+                                    : 3,
+                                  formatYLabel: (value) =>
+                                    isPaceHorizontalForItem
+                                      ? formatPaceSplitLabel(
+                                          Number(value),
+                                          distanceUnit,
+                                        )
+                                      : formatPaceAxisLabel(Number(value)),
+                                },
+                              ]
+                            : undefined
+                        }
+                      >
+                        {({ points, chartBounds }) => {
+                          const pacePoints = (
+                            isPaceHorizontalForItem ? points.lap : points.pace
+                          ).filter(
+                            (point) =>
+                              typeof point.y === 'number' && point.y !== null,
+                          );
+                          if (!pacePoints.length) return null;
+
+                          const step = pacePoints.length > 1
+                            ? Math.abs(
+                                (isPaceHorizontalForItem
+                                  ? (pacePoints[1]?.y ?? 0)
+                                  : pacePoints[1]?.x) -
+                                  (isPaceHorizontalForItem
+                                    ? (pacePoints[0]?.y ?? 0)
+                                    : pacePoints[0]?.x),
+                              )
+                            : (isPaceHorizontalForItem
+                                ? chartBounds.bottom - chartBounds.top
+                                : chartBounds.right - chartBounds.left) * 0.35;
+                          const slot = isPaceHorizontalForItem
+                            ? (chartBounds.bottom - chartBounds.top) /
+                              Math.max(1, pacePoints.length)
+                            : (chartBounds.right - chartBounds.left) /
+                              Math.max(1, pacePoints.length);
+                          const maxThickness = isPaceHorizontalForItem
+                            ? Math.max(1, slot * 0.82)
+                            : 28;
+                          const minThickness = isPaceHorizontalForItem ? 1 : 4;
+                          const thickness = Math.max(
+                            minThickness,
+                            Math.min(maxThickness, step * 0.62),
+                          );
+                          const topColor = withAlpha(color, 'FF');
+                          const bottomColor =
+                            paceFillForItem === 'plain'
+                              ? topColor
+                              : withAlpha(color, '4A');
+
+                          return (
+                            <>
+                              {pacePoints.map((point, index) => {
+                                const barLeft = isPaceHorizontalForItem
+                                  ? chartBounds.left
+                                  : point.x - thickness / 2;
+                                const pointY = point.y ?? chartBounds.bottom;
+                                const slot =
+                                  (chartBounds.bottom - chartBounds.top) /
+                                  Math.max(1, pacePoints.length);
+                                const barTop = isPaceHorizontalForItem
+                                  ? chartBounds.top +
+                                    index * slot +
+                                    Math.max(0, (slot - thickness) / 2)
+                                  : pointY;
+                                const barWidth = isPaceHorizontalForItem
+                                  ? Math.max(1, point.x - chartBounds.left)
+                                  : thickness;
+                                const barHeight = isPaceHorizontalForItem
+                                  ? thickness
+                                  : Math.max(1, chartBounds.bottom - barTop);
+
+                                return (
+                                  <Rect
+                                    key={`template-pace-bar-${item.id}-${index}`}
+                                    x={barLeft}
+                                    y={barTop}
+                                    width={barWidth}
+                                    height={barHeight}
+                                  >
+                                    <SkiaLinearGradient
+                                      start={vec(barLeft, barTop)}
+                                      end={
+                                        isPaceHorizontalForItem
+                                          ? vec(barLeft + barWidth, barTop)
+                                          : vec(barLeft, chartBounds.bottom)
+                                      }
+                                      colors={[topColor, bottomColor]}
+                                    />
+                                  </Rect>
+                                );
+                              })}
+                            </>
+                          );
+                        }}
+                      </CartesianChart>
+                    ) : (
+                      <CartesianChart
+                        data={heartRateVictoryData}
+                        xKey="timeSec"
+                        yKeys={['bpm']}
+                        padding={{ left: 4, right: 4, top: 6, bottom: 6 }}
+                        domainPadding={{ left: 0, right: 0, top: 8 }}
+                        xAxis={
+                          showAxesForItem
+                            ? {
+                                font: chartAxisFont,
+                                lineColor: `${color}7A`,
+                                lineWidth: showGridForItem ? 1 : 0,
+                                labelColor: `${color}CC`,
+                                labelPosition: 'outset',
+                                labelOffset: 2,
+                                tickCount: 3,
+                                formatXLabel: (value) =>
+                                  formatElapsedAxisLabel(Number(value)),
+                              }
+                            : undefined
+                        }
+                        yAxis={
+                          showAxesForItem
+                            ? [
+                                {
+                                  font: chartAxisFont,
+                                  lineColor: `${color}7A`,
+                                  lineWidth: showGridForItem ? 1 : 0,
+                                  labelColor: `${color}CC`,
+                                  labelPosition: 'outset',
+                                  labelOffset: 2,
+                                  tickCount: 3,
+                                  formatYLabel: (value) =>
+                                    `${Math.round(Number(value))}`,
+                                },
+                              ]
+                            : undefined
+                        }
+                      >
+                        {({ points, chartBounds }) => (
+                          <>
+                            <Area
+                              points={points.bpm}
+                              y0={chartBounds.bottom}
+                              color={`${color}66`}
+                            />
+                            <Line
+                              points={points.bpm}
+                              color={color}
+                              strokeWidth={2}
+                            />
+                          </>
+                        )}
+                      </CartesianChart>
+                    )}
+                  </View>
+                );
+              })
+            : null}
+
+          {quickTemplateMode
+            ? templateFixedTextElements.map((item) =>
                 (() => {
                   const resolvedTextColor =
                     normalizeTemplateColor(item.color) ?? '#FFFFFF';
                   const resolvedBackgroundColor = normalizeTemplateColor(
                     item.backgroundColor,
                   );
-                  const resolvedGlowColor = normalizeTemplateColor(item.glowColor);
+                  const resolvedGlowColor = normalizeTemplateColor(
+                    item.glowColor,
+                  );
                   const glowRadius = Math.max(0, item.glowRadius ?? 0);
                   const glowOffsetX = Math.round(
                     (item.glowOffsetX ?? 0) * canvasScaleX,
@@ -1348,7 +1929,9 @@ export function PreviewEditorCanvas({
                     (resolvedTextColor === 'rgba(0,0,0,0)' ||
                       hasTransparentAccentToken) &&
                     Boolean(resolvedBackgroundColor);
-                  const plainText = item.tokens.map((token) => token.text).join('');
+                  const plainText = item.tokens
+                    .map((token) => token.text)
+                    .join('');
                   const fontSize =
                     item.fontSize !== undefined
                       ? Math.round(item.fontSize * canvasScaleX)
@@ -1368,11 +1951,15 @@ export function PreviewEditorCanvas({
                   const letterSpacing = item.letterSpacing ?? 0.2;
                   const fontWeightNumeric = Number(item.fontWeight ?? '700');
                   const widthFactor =
-                    Number.isFinite(fontWeightNumeric) && fontWeightNumeric >= 700
+                    Number.isFinite(fontWeightNumeric) &&
+                    fontWeightNumeric >= 700
                       ? 0.58
                       : 0.55;
                   const leftPos = Math.round(item.x * canvasScaleX);
-                  const maxWidthFromCanvas = Math.max(1, canvasDisplayWidth - leftPos);
+                  const maxWidthFromCanvas = Math.max(
+                    1,
+                    canvasDisplayWidth - leftPos,
+                  );
                   const targetBlockWidth =
                     item.width !== undefined
                       ? Math.round(item.width * canvasScaleX)
@@ -1398,7 +1985,10 @@ export function PreviewEditorCanvas({
                       }),
                     ),
                   );
-                  const contentWidth = Math.max(1, Math.round(estimatedTextWidth));
+                  const contentWidth = Math.max(
+                    1,
+                    Math.round(estimatedTextWidth),
+                  );
                   const blockWidth = targetBlockWidth
                     ? Math.min(maxWidthFromCanvas, targetBlockWidth)
                     : Math.min(maxWidthFromCanvas, contentWidth + paddingX * 2);
@@ -1447,7 +2037,9 @@ export function PreviewEditorCanvas({
                             },
                           ]}
                         >
-                          <Canvas style={{ width: blockWidth, height: blockHeight }}>
+                          <Canvas
+                            style={{ width: blockWidth, height: blockHeight }}
+                          >
                             <Rect
                               x={0}
                               y={0}
@@ -1458,8 +2050,11 @@ export function PreviewEditorCanvas({
                             <Group blendMode="dstOut">
                               {textLines.map((line, lineIndex) => {
                                 const lineWidth = Math.round(
-                                  Math.max(1, line.length) * fontSize * widthFactor +
-                                    Math.max(0, line.length - 1) * letterSpacing,
+                                  Math.max(1, line.length) *
+                                    fontSize *
+                                    widthFactor +
+                                    Math.max(0, line.length - 1) *
+                                      letterSpacing,
                                 );
                                 const x =
                                   resolvedTextAlign === 'right'
@@ -1537,7 +2132,9 @@ export function PreviewEditorCanvas({
                                       fontSize: token.fontSize,
                                       fontWeight: token.fontWeight,
                                       letterSpacing: token.letterSpacing,
-                                      color: normalizeTemplateColor(token.color),
+                                      color: normalizeTemplateColor(
+                                        token.color,
+                                      ),
                                     }
                                   : undefined,
                               ]}
@@ -1549,8 +2146,8 @@ export function PreviewEditorCanvas({
                       )}
                     </View>
                   );
-                })()
-              ))
+                })(),
+              )
             : null}
 
           {!isPremium ? <Text style={styles.watermark}>PACEFRAME</Text> : null}
@@ -1659,6 +2256,95 @@ function wrapTemplateTextLines({
   }
 
   return wrapped.length > 0 ? wrapped : [''];
+}
+
+function sampleChartPoints<T>(points: T[], maxPoints: number): T[] {
+  if (points.length <= maxPoints) return points;
+  const sampled: T[] = [];
+  const step = (points.length - 1) / (maxPoints - 1);
+  for (let i = 0; i < maxPoints; i += 1) {
+    sampled.push(points[Math.round(i * step)]);
+  }
+  return sampled;
+}
+
+function buildPaceSplitsByUnit(
+  laps: LapPaceChartPoint[],
+  unit: DistanceUnit,
+): { lap: number; pace: number }[] {
+  const metersPerUnit = unit === 'mi' ? 1609.344 : 1000;
+  const splits: { lap: number; pace: number }[] = [];
+  let carryDistance = 0;
+  let carryTime = 0;
+
+  laps.forEach((lap) => {
+    const distance = lap.distanceMeters;
+    const movingTime = lap.movingTimeSec;
+    if (distance <= 0 || movingTime <= 0) return;
+
+    const secondsPerMeter = movingTime / distance;
+    let remainingDistance = distance;
+
+    while (remainingDistance > 0.0001) {
+      const neededDistance = metersPerUnit - carryDistance;
+      const chunkDistance = Math.min(neededDistance, remainingDistance);
+      const chunkTime = chunkDistance * secondsPerMeter;
+
+      carryDistance += chunkDistance;
+      carryTime += chunkTime;
+      remainingDistance -= chunkDistance;
+
+      if (carryDistance >= metersPerUnit - 0.0001) {
+        const splitIndex = splits.length + 1;
+        splits.push({ lap: splitIndex, pace: carryTime });
+        carryDistance = 0;
+        carryTime = 0;
+      }
+    }
+  });
+
+  if (carryDistance > 0.0001 && carryTime > 0) {
+    const splitIndex = splits.length + 1;
+    const normalizedPace = carryTime / (carryDistance / metersPerUnit);
+    splits.push({ lap: splitIndex, pace: normalizedPace });
+  }
+
+  return splits;
+}
+
+function formatPaceAxisLabel(secondsPerKm: number): string {
+  if (!Number.isFinite(secondsPerKm) || secondsPerKm <= 0) return '--';
+  const rounded = Math.round(secondsPerKm);
+  const min = Math.floor(rounded / 60);
+  const sec = rounded % 60;
+  return `${min}:${String(sec).padStart(2, '0')}`;
+}
+
+function formatPaceSplitLabel(value: number, unit: DistanceUnit): string {
+  const lapNumber = Math.max(1, Math.round(value));
+  return `${unit === 'mi' ? 'M' : 'K'}${lapNumber}`;
+}
+
+function formatElapsedAxisLabel(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return '--';
+  const rounded = Math.round(totalSeconds);
+  const min = Math.floor(rounded / 60);
+  const sec = rounded % 60;
+  return `${min}:${String(sec).padStart(2, '0')}`;
+}
+
+function withAlpha(color: string, alphaHex: string): string {
+  const normalized = color.trim();
+  if (/^#([A-Fa-f0-9]{6})$/.test(normalized)) {
+    return `${normalized}${alphaHex}`;
+  }
+  if (/^#([A-Fa-f0-9]{3})$/.test(normalized)) {
+    const r = normalized[1];
+    const g = normalized[2];
+    const b = normalized[3];
+    return `#${r}${r}${g}${g}${b}${b}${alphaHex}`;
+  }
+  return normalized;
 }
 
 function createStyles(colors: ThemeColors) {
@@ -1898,6 +2584,47 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 0,
       borderColor: 'transparent',
     },
+    chartBlock: {
+      borderRadius: 0,
+      backgroundColor: 'transparent',
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      gap: 6,
+    },
+    chartPaceBlock: {
+      width: 208,
+    },
+    chartHrBlock: {
+      width: 208,
+    },
+    chartTitleRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    chartTitle: {
+      fontSize: 12,
+      fontWeight: '800',
+      letterSpacing: 0.2,
+    },
+    chartTag: {
+      fontSize: 10,
+      fontWeight: '700',
+    },
+    chartCanvasWrapPace: {
+      width: '100%',
+      height: 82,
+      backgroundColor: 'transparent',
+      borderRadius: 0,
+      overflow: 'hidden',
+    },
+    chartCanvasWrapHr: {
+      width: '100%',
+      height: 76,
+      backgroundColor: 'transparent',
+      borderRadius: 0,
+      overflow: 'hidden',
+    },
     imageOverlayBlock: {
       borderRadius: 0,
       overflow: 'hidden',
@@ -1906,6 +2633,10 @@ function createStyles(colors: ThemeColors) {
     imageOverlayImage: {
       width: '100%',
       height: '100%',
+    },
+    templateChartLayer: {
+      position: 'absolute',
+      overflow: 'hidden',
     },
     templateTextLayer: {
       position: 'absolute',

@@ -12,6 +12,23 @@ export type StravaActivityPhotos = {
   count?: number;
 };
 
+export type StravaLap = {
+  id?: number;
+  name?: string | null;
+  lap_index: number;
+  distance: number;
+  moving_time: number;
+  elapsed_time: number;
+  average_speed?: number | null;
+  average_heartrate?: number | null;
+  max_heartrate?: number | null;
+};
+
+export type StravaHeartRatePoint = {
+  seconds: number;
+  bpm: number;
+};
+
 export type StravaActivity = {
   id: number;
   name: string;
@@ -34,6 +51,8 @@ export type StravaActivity = {
   map: StravaPolylineMap;
   photos?: StravaActivityPhotos;
   photoUrl?: string | null;
+  laps?: StravaLap[];
+  heartRateStream?: StravaHeartRatePoint[];
 };
 
 export type AuthTokens = {

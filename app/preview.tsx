@@ -51,6 +51,10 @@ import {
 import { removeBackgroundOnDevice } from '@/lib/backgroundRemoval';
 import { composeVideoWithOverlay } from '@/lib/nativeVideoComposer';
 import {
+  buildHeartRateAreaChartData,
+  buildLapPaceChartData,
+} from '@/lib/strava';
+import {
   DistanceUnit,
   ElevationUnit,
   formatDistanceMeters,
@@ -62,9 +66,12 @@ import { useActivityStore } from '@/store/activityStore';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import {
   BackgroundGradient,
+  ChartFillStyle,
+  ChartOrientation,
   FieldId,
   ImageOverlay,
   LayerId,
+  PreviewTemplateChartElement,
   PreviewTemplateRenderableTextElement,
   RouteMapVariant,
   RouteMode,
@@ -106,6 +113,8 @@ const DEFAULT_VISIBLE_LAYERS: Partial<Record<LayerId, boolean>> = {
   stats: true,
   primary: true,
   route: false,
+  chartPace: false,
+  chartHr: false,
 };
 const PREVIEW_DRAFT_KEY_PREFIX = 'paceframe.preview.draft.';
 const PREVIEW_TEMPLATE_MEDIA_KEY_PREFIX = 'paceframe.preview.template-media.';
@@ -279,7 +288,13 @@ function isFilterEffectId(value: string): value is FilterEffectId {
 function isBlurEffectId(value: string): value is BlurEffectId {
   return BLUR_EFFECT_IDS.includes(value as BlurEffectId);
 }
-type StyleLayerId = 'meta' | 'stats' | 'route' | 'primary';
+type StyleLayerId =
+  | 'meta'
+  | 'stats'
+  | 'route'
+  | 'primary'
+  | 'chartPace'
+  | 'chartHr';
 type StyleLayerSettings = {
   color: string;
   opacity: number;
@@ -308,6 +323,10 @@ type NormalPreviewSnapshot = {
   >;
   behindSubjectLayers: Partial<Record<LayerId, boolean>>;
   layerStyleMapByLayout: LayerStyleMapByLayout;
+  showChartAxes: boolean;
+  showChartGrid: boolean;
+  paceChartOrientation: ChartOrientation;
+  paceChartFill: ChartFillStyle;
 };
 type TemplateMediaDraft = {
   v: 2;
@@ -327,6 +346,8 @@ const DEFAULT_LAYER_STYLE_MAP: LayerStyleMap = {
   stats: { color: '#FFFFFF', opacity: 1 },
   route: { color: '#D4FF54', opacity: 1 },
   primary: { color: '#FFFFFF', opacity: 1 },
+  chartPace: { color: '#FFFFFF', opacity: 1 },
+  chartHr: { color: '#FFFFFF', opacity: 1 },
 };
 
 function getDefaultLayerStyleMapForLayout(
@@ -338,6 +359,8 @@ function getDefaultLayerStyleMapForLayout(
       stats: { ...DEFAULT_LAYER_STYLE_MAP.stats },
       route: { ...DEFAULT_LAYER_STYLE_MAP.route },
       primary: { ...DEFAULT_LAYER_STYLE_MAP.primary },
+      chartPace: { ...DEFAULT_LAYER_STYLE_MAP.chartPace },
+      chartHr: { ...DEFAULT_LAYER_STYLE_MAP.chartHr },
     };
   }
 
@@ -352,6 +375,8 @@ function getDefaultLayerStyleMapForLayout(
       ...DEFAULT_LAYER_STYLE_MAP.primary,
       opacity: SPLIT_BOLD_DEFAULT_TEXT_OPACITY,
     },
+    chartPace: { ...DEFAULT_LAYER_STYLE_MAP.chartPace },
+    chartHr: { ...DEFAULT_LAYER_STYLE_MAP.chartHr },
   };
 }
 
@@ -661,6 +686,12 @@ export default function PreviewScreen() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [helpPopoverOpen, setHelpPopoverOpen] = useState(false);
   const [isSquareFormat, setIsSquareFormat] = useState(false);
+  const [showChartAxes, setShowChartAxes] = useState(true);
+  const [showChartGrid, setShowChartGrid] = useState(true);
+  const [paceChartOrientation, setPaceChartOrientation] =
+    useState<ChartOrientation>('vertical');
+  const [paceChartFill, setPaceChartFill] =
+    useState<ChartFillStyle>('gradient');
   const [resolvedLocationText, setResolvedLocationText] = useState('');
   const [draftReady, setDraftReady] = useState(false);
   const [isHydratingDraft, setIsHydratingDraft] = useState(false);
@@ -822,6 +853,16 @@ export default function PreviewScreen() {
     () => splitMetricValueUnit(avgHeartRateText),
     [avgHeartRateText],
   );
+  const lapPaceChartData = useMemo(
+    () => buildLapPaceChartData(activity),
+    [activity],
+  );
+  const heartRateAreaChartData = useMemo(
+    () => buildHeartRateAreaChartData(activity),
+    [activity],
+  );
+  const hasLapPaceLayer = lapPaceChartData.length > 0;
+  const hasHeartRateLayer = heartRateAreaChartData.length > 0;
   const hasAvgHeartRate = Boolean(
     activity?.average_heartrate && activity.average_heartrate > 0,
   );
@@ -933,6 +974,25 @@ export default function PreviewScreen() {
     hasCalories,
     hasAvgHeartRate,
   ]);
+  const templateFixedChartElements = useMemo<PreviewTemplateChartElement[]>(
+    () => {
+      if (!templateMode || !selectedTemplateDefinition) return [];
+      return (selectedTemplateDefinition.fixedChartElements ?? []).filter(
+        (item) =>
+          item.kind === 'pace'
+            ? hasLapPaceLayer
+            : item.kind === 'hr'
+              ? hasHeartRateLayer
+              : false,
+      );
+    },
+    [
+      hasHeartRateLayer,
+      hasLapPaceLayer,
+      selectedTemplateDefinition,
+      templateMode,
+    ],
+  );
   const templateHiddenVisibleConfig: Record<FieldId, boolean> = {
     distance: false,
     time: false,
@@ -1278,6 +1338,8 @@ export default function PreviewScreen() {
       ['stats', 'Stats'],
       ['primary', 'Primary'],
       ['route', 'Route'],
+      ['chartPace', 'Pace Chart'],
+      ['chartHr', 'HR Chart'],
     ]);
     activeImageOverlays.forEach((item) => {
       labelMap.set(`image:${item.id}`, item.name);
@@ -1287,6 +1349,8 @@ export default function PreviewScreen() {
       .reverse()
       .filter((id) => (hasRouteLayer ? true : id !== 'route'))
       .filter((id) => (supportsPrimaryLayer ? true : id !== 'primary'))
+      .filter((id) => (hasLapPaceLayer ? true : id !== 'chartPace'))
+      .filter((id) => (hasHeartRateLayer ? true : id !== 'chartHr'))
       .map((id) => ({
         id,
         label: labelMap.get(id) ?? id,
@@ -1296,6 +1360,8 @@ export default function PreviewScreen() {
     activeBehindSubjectLayers,
     activeImageOverlays,
     activeLayerOrder,
+    hasHeartRateLayer,
+    hasLapPaceLayer,
     hasRouteLayer,
     supportsPrimaryLayer,
   ]);
@@ -1456,6 +1522,10 @@ export default function PreviewScreen() {
     setBehindSubjectLayers({});
     setLayerTransforms({});
     setIsSquareFormat(false);
+    setShowChartAxes(true);
+    setShowChartGrid(true);
+    setPaceChartOrientation('vertical');
+    setPaceChartFill('gradient');
     setLayerStyleMapByLayout({
       [nextLayoutLayout]: getDefaultLayerStyleMapForLayout(nextLayoutLayout),
     });
@@ -1497,6 +1567,10 @@ export default function PreviewScreen() {
     setBehindSubjectLayers(draft.behindSubjectLayers ?? {});
     setLayerTransforms(draft.layerTransforms ?? {});
     setIsSquareFormat(Boolean(draft.isSquareFormat));
+    setShowChartAxes(draft.showChartAxes ?? true);
+    setShowChartGrid(draft.showChartGrid ?? true);
+    setPaceChartOrientation(draft.paceChartOrientation ?? 'vertical');
+    setPaceChartFill(draft.paceChartFill ?? 'gradient');
     if (draft.layerStyleMapByLayout) {
       setLayerStyleMapByLayout(draft.layerStyleMapByLayout);
     } else if (draft.layerStyleMap) {
@@ -1571,6 +1645,10 @@ export default function PreviewScreen() {
               headerVisible: DEFAULT_HEADER_VISIBLE,
               visibleLayers: DEFAULT_VISIBLE_LAYERS,
               isSquareFormat: false,
+              showChartAxes: true,
+              showChartGrid: true,
+              paceChartOrientation: 'vertical',
+              paceChartFill: 'gradient',
             },
           });
           if (draft) {
@@ -1636,6 +1714,10 @@ export default function PreviewScreen() {
       behindSubjectLayers,
       layerTransforms,
       isSquareFormat,
+      showChartAxes,
+      showChartGrid,
+      paceChartOrientation,
+      paceChartFill,
       layerStyleMap,
       layerStyleMapByLayout,
       sunsetPrimaryGradient,
@@ -1665,7 +1747,11 @@ export default function PreviewScreen() {
     headerVisible,
     imageOverlays,
     isSquareFormat,
-    layerOrder,
+      showChartAxes,
+      showChartGrid,
+      paceChartOrientation,
+      paceChartFill,
+      layerOrder,
     media,
     routeMapVariant,
     routeMode,
@@ -1824,6 +1910,38 @@ export default function PreviewScreen() {
   }, [selectedLayer, supportsPrimaryLayer]);
 
   useEffect(() => {
+    if (hasLapPaceLayer) return;
+    setVisibleLayers((prev) =>
+      prev.chartPace ? { ...prev, chartPace: false } : prev,
+    );
+    setBehindSubjectLayers((prev) =>
+      prev.chartPace ? { ...prev, chartPace: false } : prev,
+    );
+  }, [hasLapPaceLayer]);
+
+  useEffect(() => {
+    if (hasHeartRateLayer) return;
+    setVisibleLayers((prev) =>
+      prev.chartHr ? { ...prev, chartHr: false } : prev,
+    );
+    setBehindSubjectLayers((prev) =>
+      prev.chartHr ? { ...prev, chartHr: false } : prev,
+    );
+  }, [hasHeartRateLayer]);
+
+  useEffect(() => {
+    if (hasLapPaceLayer || selectedLayer !== 'chartPace') return;
+    setSelectedLayer('stats');
+    setOutlinedLayer('stats');
+  }, [hasLapPaceLayer, selectedLayer]);
+
+  useEffect(() => {
+    if (hasHeartRateLayer || selectedLayer !== 'chartHr') return;
+    setSelectedLayer('stats');
+    setOutlinedLayer('stats');
+  }, [hasHeartRateLayer, selectedLayer]);
+
+  useEffect(() => {
     if (templateMode) {
       if (!normalSnapshotRef.current) {
         normalSnapshotRef.current = {
@@ -1843,6 +1961,10 @@ export default function PreviewScreen() {
           layerTransforms,
           behindSubjectLayers,
           layerStyleMapByLayout,
+          showChartAxes,
+          showChartGrid,
+          paceChartOrientation,
+          paceChartFill,
         };
       }
       return;
@@ -1869,6 +1991,10 @@ export default function PreviewScreen() {
     setLayerTransforms(snapshot.layerTransforms);
     setBehindSubjectLayers(snapshot.behindSubjectLayers);
     setLayerStyleMapByLayout(snapshot.layerStyleMapByLayout);
+    setShowChartAxes(snapshot.showChartAxes);
+    setShowChartGrid(snapshot.showChartGrid);
+    setPaceChartOrientation(snapshot.paceChartOrientation);
+    setPaceChartFill(snapshot.paceChartFill);
   }, [
     autoSubjectUri,
     autoSubjectSourceUri,
@@ -1884,6 +2010,10 @@ export default function PreviewScreen() {
     routeMapVariant,
     routeMode,
     selectedLayoutId,
+    showChartAxes,
+    showChartGrid,
+    paceChartOrientation,
+    paceChartFill,
     templateMode,
     visible,
     visibleLayers,
@@ -3058,9 +3188,17 @@ export default function PreviewScreen() {
           isPremium={isPremium}
           quickTemplateMode={templateMode}
           templateFixedTextElements={templateFixedTextElements}
+          templateFixedChartElements={templateFixedChartElements}
           templateBackgroundMediaFrame={templateBackgroundMediaFrame}
           onDragGuideChange={setCenterGuides}
           onRotationGuideChange={setShowRotationGuide}
+          lapPaceChartData={lapPaceChartData}
+          heartRateAreaChartData={heartRateAreaChartData}
+          showChartAxes={showChartAxes}
+          showChartGrid={showChartGrid}
+          paceChartOrientation={paceChartOrientation}
+          paceChartFill={paceChartFill}
+          distanceUnit={distanceUnit}
         />
 
         <PreviewEditorPanel
@@ -3151,6 +3289,16 @@ export default function PreviewScreen() {
           quickTemplateMode={templateMode}
           allowVideoBackground={!templateDisablesVideoBackground}
           showBackgroundTab={showTemplateBackgroundTab}
+          hasLapPaceLayer={hasLapPaceLayer}
+          hasHeartRateLayer={hasHeartRateLayer}
+          showChartAxes={showChartAxes}
+          onSetShowChartAxes={setShowChartAxes}
+          showChartGrid={showChartGrid}
+          onSetShowChartGrid={setShowChartGrid}
+          paceChartOrientation={paceChartOrientation}
+          onSetPaceChartOrientation={setPaceChartOrientation}
+          paceChartFill={paceChartFill}
+          onSetPaceChartFill={setPaceChartFill}
         />
       </View>
     </>
