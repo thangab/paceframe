@@ -376,6 +376,30 @@ function normalizeLocalUri(path: string) {
   return `file://${path}`;
 }
 
+function splitMetricValueUnit(text: string): { value: string; unit: string } {
+  const trimmed = text.trim();
+  if (!trimmed) return { value: '', unit: '' };
+
+  const lastSpace = trimmed.lastIndexOf(' ');
+  if (lastSpace > 0) {
+    const value = trimmed.slice(0, lastSpace).trim();
+    const unit = trimmed.slice(lastSpace + 1).trim();
+    if (unit) {
+      return { value, unit };
+    }
+  }
+
+  const compactMatch = trimmed.match(/^(.*?)(\/[A-Za-z]+|[A-Za-z%]+)$/);
+  if (compactMatch) {
+    return {
+      value: compactMatch[1].trim(),
+      unit: compactMatch[2].trim(),
+    };
+  }
+
+  return { value: trimmed, unit: '' };
+}
+
 function sanitizeTemplateMediaAsset(
   input: unknown,
 ): ImagePicker.ImagePickerAsset | null {
@@ -457,11 +481,19 @@ function resolveTemplateText(
     dateIso: string;
     dateText: string;
     distanceText: string;
+    distanceValue: string;
+    distanceUnit: string;
     durationText: string;
     paceText: string;
+    paceValue: string;
+    paceUnit: string;
     elevText: string;
+    elevValue: string;
+    elevUnit: string;
     caloriesText: string;
     avgHeartRateText: string;
+    avgHeartRateValue: string;
+    avgHeartRateUnit: string;
   },
   options?: {
     formatDate?: string;
@@ -476,11 +508,19 @@ function resolveTemplateText(
     .replaceAll('{location}', vars.locationText)
     .replaceAll('{date}', resolvedDate)
     .replaceAll('{distance}', vars.distanceText)
+    .replaceAll('{distanceValue}', vars.distanceValue)
+    .replaceAll('{distanceUnit}', vars.distanceUnit)
     .replaceAll('{time}', vars.durationText)
     .replaceAll('{pace}', vars.paceText)
+    .replaceAll('{paceValue}', vars.paceValue)
+    .replaceAll('{paceUnit}', vars.paceUnit)
     .replaceAll('{elev}', vars.elevText)
+    .replaceAll('{elevValue}', vars.elevValue)
+    .replaceAll('{elevUnit}', vars.elevUnit)
     .replaceAll('{calories}', vars.caloriesText)
-    .replaceAll('{avgHr}', vars.avgHeartRateText);
+    .replaceAll('{avgHr}', vars.avgHeartRateText)
+    .replaceAll('{avgHrValue}', vars.avgHeartRateValue)
+    .replaceAll('{avgHrUnit}', vars.avgHeartRateUnit);
 }
 
 function tokenizeTemplateText(
@@ -639,12 +679,22 @@ export default function PreviewScreen() {
       loading: false,
       hasStoredDraft: false,
     });
+  const showTemplateBackgroundTab =
+    !templateMode ||
+    getPreviewTemplateById(selectedTemplateId)?.showBackgroundTab !== false;
 
   useEffect(() => {
     if (!templateMode) return;
     setPanelOpen(false);
-    setActivePanel('background');
-  }, [templateMode]);
+    setActivePanel(showTemplateBackgroundTab ? 'background' : 'design');
+  }, [showTemplateBackgroundTab, templateMode]);
+
+  useEffect(() => {
+    if (!templateMode || showTemplateBackgroundTab) return;
+    if (activePanel === 'background') {
+      setActivePanel('design');
+    }
+  }, [activePanel, showTemplateBackgroundTab, templateMode]);
 
   useEffect(() => {
     if (!selectedTemplateParam) return;
@@ -762,6 +812,16 @@ export default function PreviewScreen() {
     activity?.average_heartrate && activity.average_heartrate > 0
       ? `${Math.round(activity.average_heartrate)} bpm`
       : '-- bpm';
+  const distanceParts = useMemo(
+    () => splitMetricValueUnit(distanceText),
+    [distanceText],
+  );
+  const paceParts = useMemo(() => splitMetricValueUnit(paceText), [paceText]);
+  const elevParts = useMemo(() => splitMetricValueUnit(elevText), [elevText]);
+  const avgHeartRateParts = useMemo(
+    () => splitMetricValueUnit(avgHeartRateText),
+    [avgHeartRateText],
+  );
   const hasAvgHeartRate = Boolean(
     activity?.average_heartrate && activity.average_heartrate > 0,
   );
@@ -807,11 +867,19 @@ export default function PreviewScreen() {
       dateIso: activity?.start_date ?? '',
       dateText,
       distanceText,
+      distanceValue: distanceParts.value,
+      distanceUnit: distanceParts.unit,
       durationText,
       paceText,
+      paceValue: paceParts.value,
+      paceUnit: paceParts.unit,
       elevText,
+      elevValue: elevParts.value,
+      elevUnit: elevParts.unit,
       caloriesText,
       avgHeartRateText,
+      avgHeartRateValue: avgHeartRateParts.value,
+      avgHeartRateUnit: avgHeartRateParts.unit,
     };
     return (selectedTemplateDefinition.fixedTextElements ?? [])
       .filter((item) =>
@@ -844,12 +912,20 @@ export default function PreviewScreen() {
     activity?.total_elevation_gain,
     activity?.name,
     avgHeartRateText,
+    avgHeartRateParts.unit,
+    avgHeartRateParts.value,
     caloriesText,
     dateText,
+    distanceParts.unit,
+    distanceParts.value,
     distanceText,
     durationText,
+    elevParts.unit,
+    elevParts.value,
     elevText,
     locationText,
+    paceParts.unit,
+    paceParts.value,
     paceText,
     selectedTemplateDefinition,
     templateMode,
@@ -3074,6 +3150,7 @@ export default function PreviewScreen() {
           onCloseHelpPopover={() => setHelpPopoverOpen(false)}
           quickTemplateMode={templateMode}
           allowVideoBackground={!templateDisablesVideoBackground}
+          showBackgroundTab={showTemplateBackgroundTab}
         />
       </View>
     </>

@@ -1314,6 +1314,14 @@ export function PreviewEditorCanvas({
                   const resolvedBackgroundColor = normalizeTemplateColor(
                     item.backgroundColor,
                   );
+                  const resolvedGlowColor = normalizeTemplateColor(item.glowColor);
+                  const glowRadius = Math.max(0, item.glowRadius ?? 0);
+                  const glowOffsetX = Math.round(
+                    (item.glowOffsetX ?? 0) * canvasScaleX,
+                  );
+                  const glowOffsetY = Math.round(
+                    (item.glowOffsetY ?? 0) * canvasScaleY,
+                  );
                   const hasTransparentAccentToken = item.tokens.some(
                     (token) =>
                       token.accent &&
@@ -1398,6 +1406,8 @@ export function PreviewEditorCanvas({
                     lineHeight * textLines.length + paddingY * 2,
                     fontSize + paddingY * 2,
                   );
+                  const resolvedTextAlign =
+                    item.textAlign ?? item.align ?? 'left';
                   const skiaFont = matchFont({
                     fontSize,
                     fontFamily:
@@ -1452,9 +1462,9 @@ export function PreviewEditorCanvas({
                                     Math.max(0, line.length - 1) * letterSpacing,
                                 );
                                 const x =
-                                  item.align === 'right'
+                                  resolvedTextAlign === 'right'
                                     ? blockWidth - paddingX - lineWidth
-                                    : item.align === 'center'
+                                    : resolvedTextAlign === 'center'
                                       ? Math.round((blockWidth - lineWidth) / 2)
                                       : paddingX;
                                 const y =
@@ -1486,7 +1496,7 @@ export function PreviewEditorCanvas({
                               paddingHorizontal: paddingX,
                               paddingVertical: paddingY,
                               opacity: item.opacity ?? 1,
-                              textAlign: item.align ?? 'left',
+                              textAlign: resolvedTextAlign,
                               fontSize,
                               fontFamily: item.fontFamily,
                               fontWeight: item.fontWeight ?? '700',
@@ -1495,6 +1505,15 @@ export function PreviewEditorCanvas({
                                   ? item.letterSpacing
                                   : 0.2,
                               lineHeight,
+                              textShadowColor:
+                                resolvedGlowColor && glowRadius > 0
+                                  ? resolvedGlowColor
+                                  : 'transparent',
+                              textShadowOffset: {
+                                width: glowOffsetX,
+                                height: glowOffsetY,
+                              },
+                              textShadowRadius: glowRadius,
                               width:
                                 item.width !== undefined
                                   ? Math.min(

@@ -94,6 +94,7 @@ export type PreviewTemplateTextElement = {
   y: number;
   width?: number;
   align?: 'left' | 'center' | 'right';
+  textAlign?: 'left' | 'center' | 'right';
   color?: string;
   backgroundColor?: string;
   borderColor?: string;
@@ -113,6 +114,10 @@ export type PreviewTemplateTextElement = {
   accentLetterSpacing?: number;
   accentColor?: string;
   accentFontFamily?: string;
+  glowColor?: string;
+  glowRadius?: number;
+  glowOffsetX?: number;
+  glowOffsetY?: number;
 };
 
 export type PreviewTemplateTextToken = {
@@ -136,6 +141,7 @@ export type PreviewTemplateDefinition = {
   id: string;
   name: string;
   premium?: boolean;
+  showBackgroundTab?: boolean;
   disableBackgroundRemoval?: boolean;
   disableVideoBackground?: boolean;
   imagePickerCropSize?: {

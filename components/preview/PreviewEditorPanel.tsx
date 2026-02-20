@@ -134,6 +134,7 @@ type Props = {
   onCloseHelpPopover?: () => void;
   quickTemplateMode?: boolean;
   allowVideoBackground?: boolean;
+  showBackgroundTab?: boolean;
 };
 
 export function PreviewEditorPanel({
@@ -210,6 +211,7 @@ export function PreviewEditorPanel({
   onCloseHelpPopover,
   quickTemplateMode = false,
   allowVideoBackground = true,
+  showBackgroundTab = true,
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -439,12 +441,17 @@ export function PreviewEditorPanel({
     { id: 'background', label: 'Background', icon: 'image-area-close' },
     { id: 'design', label: 'Templates', icon: 'view-grid-outline' },
   ] as const;
+  const tabsSource = quickTemplateMode ? quickTemplateTabs : defaultTabs;
   const mainTabs: {
     id: PreviewPanelTab;
     label: string;
     icon: keyof typeof MaterialCommunityIcons.glyphMap;
     disabled?: boolean;
-  }[] = quickTemplateMode ? [...quickTemplateTabs] : [...defaultTabs];
+  }[] = tabsSource.map((tab) =>
+    !showBackgroundTab && tab.id === 'background'
+      ? { ...tab, disabled: true }
+      : tab,
+  );
   const [orderedLayerEntries, setOrderedLayerEntries] = useState(layerEntries);
   const [draggingLayerId, setDraggingLayerId] = useState<LayerId | null>(null);
 
