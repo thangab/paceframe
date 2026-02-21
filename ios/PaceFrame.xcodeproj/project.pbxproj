@@ -3,46 +3,46 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		3385949C2F4A770D00FF1592 /* PaceFrameVideoComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3385949B2F4A770D00FF1592 /* PaceFrameVideoComposer.swift */; };
+		3385949D2F4A770D00FF1592 /* PaceFrameHealthKit.m in Sources */ = {isa = PBXBuildFile; fileRef = 338594962F4A770D00FF1592 /* PaceFrameHealthKit.m */; };
+		3385949E2F4A770D00FF1592 /* PaceFrameVideoComposer.m in Sources */ = {isa = PBXBuildFile; fileRef = 3385949A2F4A770D00FF1592 /* PaceFrameVideoComposer.m */; };
+		3385949F2F4A770D00FF1592 /* PaceFrameHealthKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 338594972F4A770D00FF1592 /* PaceFrameHealthKit.swift */; };
+		338594A02F4A770D00FF1592 /* PaceFrameMapSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 338594992F4A770D00FF1592 /* PaceFrameMapSnapshot.swift */; };
+		338594A12F4A770D00FF1592 /* PaceFrameMapSnapshot.m in Sources */ = {isa = PBXBuildFile; fileRef = 338594982F4A770D00FF1592 /* PaceFrameMapSnapshot.m */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		43AD23BB086024F9CB1C0F95 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C78986ED97513D35A3F0D463 /* PrivacyInfo.xcprivacy */; };
-		59A6CD3BA84D6500C1645C1F /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73131AC59E59530DC0B1EB67 /* ExpoModulesProvider.swift */; };
-		8C5B996A2F33AA1200A1D001 /* PaceFrameVideoComposer.m in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B99692F33AA1200A1D001 /* PaceFrameVideoComposer.m */; };
-		8C5B996C2F33AA2200A1D001 /* PaceFrameVideoComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B996B2F33AA2200A1D001 /* PaceFrameVideoComposer.swift */; };
-		8C5B997A2F33AB1200A1D001 /* PaceFrameMapSnapshot.m in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B99792F33AB1200A1D001 /* PaceFrameMapSnapshot.m */; };
-		8C5B997C2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B997B2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift */; };
-		8C5B998A2F33AC1200A1D001 /* PaceFrameHealthKit.m in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B99892F33AC1200A1D001 /* PaceFrameHealthKit.m */; };
-		8C5B998C2F33AC2200A1D001 /* PaceFrameHealthKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B998B2F33AC2200A1D001 /* PaceFrameHealthKit.swift */; };
+		4C92C137BFAEA4632AB5F84D /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5D38EEAE8D918BD1D809167 /* ExpoModulesProvider.swift */; };
+		837C3B4171D8282AD7B0A494 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 55F9E26F6D0E333105692F44 /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		D5057F58F03B7C2797C991E3 /* libPods-PaceFrame.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 80A205EF101242D69FE581E8 /* libPods-PaceFrame.a */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		FF3A14F3C10921455FD95F6C /* libPods-PaceFrame.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4DD5A0A0000188B77728288F /* libPods-PaceFrame.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* PaceFrame.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PaceFrame.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = PaceFrame/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = PaceFrame/Info.plist; sourceTree = "<group>"; };
-		4DD5A0A0000188B77728288F /* libPods-PaceFrame.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-PaceFrame.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		73131AC59E59530DC0B1EB67 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-PaceFrame/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		8C5B99692F33AA1200A1D001 /* PaceFrameVideoComposer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = PaceFrameVideoComposer.m; path = PaceFrame/PaceFrameVideoComposer.m; sourceTree = "<group>"; };
-		8C5B996B2F33AA2200A1D001 /* PaceFrameVideoComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PaceFrameVideoComposer.swift; path = PaceFrame/PaceFrameVideoComposer.swift; sourceTree = "<group>"; };
-		8C5B99792F33AB1200A1D001 /* PaceFrameMapSnapshot.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = PaceFrameMapSnapshot.m; path = PaceFrame/PaceFrameMapSnapshot.m; sourceTree = "<group>"; };
-		8C5B997B2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PaceFrameMapSnapshot.swift; path = PaceFrame/PaceFrameMapSnapshot.swift; sourceTree = "<group>"; };
-		8C5B99892F33AC1200A1D001 /* PaceFrameHealthKit.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = PaceFrameHealthKit.m; path = PaceFrame/PaceFrameHealthKit.m; sourceTree = "<group>"; };
-		8C5B998B2F33AC2200A1D001 /* PaceFrameHealthKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PaceFrameHealthKit.swift; path = PaceFrame/PaceFrameHealthKit.swift; sourceTree = "<group>"; };
+		338594892F4A765100FF1592 /* PaceFrame.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PaceFrame.entitlements; sourceTree = "<group>"; };
+		338594962F4A770D00FF1592 /* PaceFrameHealthKit.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PaceFrameHealthKit.m; sourceTree = "<group>"; };
+		338594972F4A770D00FF1592 /* PaceFrameHealthKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaceFrameHealthKit.swift; sourceTree = "<group>"; };
+		338594982F4A770D00FF1592 /* PaceFrameMapSnapshot.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PaceFrameMapSnapshot.m; sourceTree = "<group>"; };
+		338594992F4A770D00FF1592 /* PaceFrameMapSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaceFrameMapSnapshot.swift; sourceTree = "<group>"; };
+		3385949A2F4A770D00FF1592 /* PaceFrameVideoComposer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PaceFrameVideoComposer.m; sourceTree = "<group>"; };
+		3385949B2F4A770D00FF1592 /* PaceFrameVideoComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaceFrameVideoComposer.swift; sourceTree = "<group>"; };
+		55F9E26F6D0E333105692F44 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = PaceFrame/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		80A205EF101242D69FE581E8 /* libPods-PaceFrame.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-PaceFrame.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		9C5D66947F3B33BCFBDD8C84 /* Pods-PaceFrame.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PaceFrame.release.xcconfig"; path = "Target Support Files/Pods-PaceFrame/Pods-PaceFrame.release.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = PaceFrame/SplashScreen.storyboard; sourceTree = "<group>"; };
-		B0A9F9BBA39F19A9ED9083CF /* Pods-PaceFrame.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PaceFrame.release.xcconfig"; path = "Target Support Files/Pods-PaceFrame/Pods-PaceFrame.release.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		C78986ED97513D35A3F0D463 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = PaceFrame/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		D54CDC9AFE24B4724716CEC4 /* Pods-PaceFrame.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PaceFrame.debug.xcconfig"; path = "Target Support Files/Pods-PaceFrame/Pods-PaceFrame.debug.xcconfig"; sourceTree = "<group>"; };
+		D5D38EEAE8D918BD1D809167 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-PaceFrame/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = PaceFrame/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* PaceFrame-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "PaceFrame-Bridging-Header.h"; path = "PaceFrame/PaceFrame-Bridging-Header.h"; sourceTree = "<group>"; };
-		F11748452D0722820044C1D9 /* PaceFrame.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = PaceFrame.entitlements; path = PaceFrame/PaceFrame.entitlements; sourceTree = "<group>"; };
-		F71F63E470F0913BAC9D9009 /* Pods-PaceFrame.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PaceFrame.debug.xcconfig"; path = "Target Support Files/Pods-PaceFrame/Pods-PaceFrame.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -50,7 +50,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FF3A14F3C10921455FD95F6C /* libPods-PaceFrame.a in Frameworks */,
+				D5057F58F03B7C2797C991E3 /* libPods-PaceFrame.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -60,20 +60,20 @@
 		13B07FAE1A68108700A75B9A /* PaceFrame */ = {
 			isa = PBXGroup;
 			children = (
+				338594962F4A770D00FF1592 /* PaceFrameHealthKit.m */,
+				338594972F4A770D00FF1592 /* PaceFrameHealthKit.swift */,
+				338594982F4A770D00FF1592 /* PaceFrameMapSnapshot.m */,
+				338594992F4A770D00FF1592 /* PaceFrameMapSnapshot.swift */,
+				3385949A2F4A770D00FF1592 /* PaceFrameVideoComposer.m */,
+				3385949B2F4A770D00FF1592 /* PaceFrameVideoComposer.swift */,
+				338594892F4A765100FF1592 /* PaceFrame.entitlements */,
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
 				F11748442D0722820044C1D9 /* PaceFrame-Bridging-Header.h */,
-				F11748452D0722820044C1D9 /* PaceFrame.entitlements */,
-				8C5B997B2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift */,
-				8C5B99792F33AB1200A1D001 /* PaceFrameMapSnapshot.m */,
-				8C5B998B2F33AC2200A1D001 /* PaceFrameHealthKit.swift */,
-				8C5B99892F33AC1200A1D001 /* PaceFrameHealthKit.m */,
-				8C5B996B2F33AA2200A1D001 /* PaceFrameVideoComposer.swift */,
-				8C5B99692F33AA1200A1D001 /* PaceFrameVideoComposer.m */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				C78986ED97513D35A3F0D463 /* PrivacyInfo.xcprivacy */,
+				55F9E26F6D0E333105692F44 /* PrivacyInfo.xcprivacy */,
 			);
 			name = PaceFrame;
 			sourceTree = "<group>";
@@ -82,18 +82,26 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				4DD5A0A0000188B77728288F /* libPods-PaceFrame.a */,
+				80A205EF101242D69FE581E8 /* libPods-PaceFrame.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		513EF8934349983CE56D7413 /* Pods */ = {
+		400BE7D28C926EA5E62D69EC /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				F71F63E470F0913BAC9D9009 /* Pods-PaceFrame.debug.xcconfig */,
-				B0A9F9BBA39F19A9ED9083CF /* Pods-PaceFrame.release.xcconfig */,
+				D54CDC9AFE24B4724716CEC4 /* Pods-PaceFrame.debug.xcconfig */,
+				9C5D66947F3B33BCFBDD8C84 /* Pods-PaceFrame.release.xcconfig */,
 			);
 			path = Pods;
+			sourceTree = "<group>";
+		};
+		66EB5D0CFBA717192BDC4959 /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				B5FE90C33B5871D601DA8CCF /* PaceFrame */,
+			);
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -110,8 +118,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				513EF8934349983CE56D7413 /* Pods */,
-				C4E0CAFE778A4C1879DB8704 /* ExpoModulesProviders */,
+				400BE7D28C926EA5E62D69EC /* Pods */,
+				66EB5D0CFBA717192BDC4959 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -126,6 +134,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		B5FE90C33B5871D601DA8CCF /* PaceFrame */ = {
+			isa = PBXGroup;
+			children = (
+				D5D38EEAE8D918BD1D809167 /* ExpoModulesProvider.swift */,
+			);
+			name = PaceFrame;
+			sourceTree = "<group>";
+		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
 			isa = PBXGroup;
 			children = (
@@ -133,22 +149,6 @@
 			);
 			name = Supporting;
 			path = PaceFrame/Supporting;
-			sourceTree = "<group>";
-		};
-		C4E0CAFE778A4C1879DB8704 /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				DED933022192BB508271C1C0 /* PaceFrame */,
-			);
-			name = ExpoModulesProviders;
-			sourceTree = "<group>";
-		};
-		DED933022192BB508271C1C0 /* PaceFrame */ = {
-			isa = PBXGroup;
-			children = (
-				73131AC59E59530DC0B1EB67 /* ExpoModulesProvider.swift */,
-			);
-			name = PaceFrame;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -159,13 +159,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "PaceFrame" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				B4EF993EE433C362EF70BE91 /* [Expo] Configure project */,
+				691ADFBE01D66FB9836A4EF6 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				9806D55209180E40B1A5BF59 /* [CP] Embed Pods Frameworks */,
+				3E11CD5B696B900AB097EE45 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -192,6 +192,7 @@
 				};
 			};
 			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "PaceFrame" */;
+			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -199,7 +200,6 @@
 				Base,
 			);
 			mainGroup = 83CBB9F61A601CBA00E9B192;
-			preferredProjectObjectVersion = 77;
 			productRefGroup = 83CBBA001A601CBA00E9B192 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -217,7 +217,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				43AD23BB086024F9CB1C0F95 /* PrivacyInfo.xcprivacy in Resources */,
+				837C3B4171D8282AD7B0A494 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -263,41 +263,29 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
+		3E11CD5B696B900AB097EE45 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-PaceFrame/Pods-PaceFrame-resources-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Copy Pods Resources";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-PaceFrame/Pods-PaceFrame-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-PaceFrame/Pods-PaceFrame-resources.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		9806D55209180E40B1A5BF59 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-PaceFrame/Pods-PaceFrame-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-PaceFrame/Pods-PaceFrame-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
 			);
 			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-PaceFrame/Pods-PaceFrame-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-PaceFrame/Pods-PaceFrame-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		B4EF993EE433C362EF70BE91 /* [Expo] Configure project */ = {
+		691ADFBE01D66FB9836A4EF6 /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -321,6 +309,48 @@
 			shellPath = /bin/sh;
 			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-PaceFrame/expo-configure-project.sh\"\n";
 		};
+		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-PaceFrame/Pods-PaceFrame-resources.sh",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXApplication/ExpoApplication_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/EXConstants.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/ExpoConstants_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoFileSystem/ExpoFileSystem_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoMediaLibrary/ExpoMediaLibrary_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/PurchasesHybridCommon/PurchasesHybridCommon.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RNCAsyncStorage/RNCAsyncStorage_resources.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RNImageCropPicker/RNImageCropPickerPrivacyInfo.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RNImageCropPicker/QBImagePicker.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/React-Core/React-Core_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/React-cxxreact/React-cxxreact_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RevenueCat/RevenueCat.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/TOCropViewController/TOCropViewControllerBundle.bundle",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoApplication_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXConstants.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoConstants_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoFileSystem_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoMediaLibrary_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/PurchasesHybridCommon.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNCAsyncStorage_resources.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNImageCropPickerPrivacyInfo.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/QBImagePicker.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-Core_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-cxxreact_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RevenueCat.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/TOCropViewControllerBundle.bundle",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-PaceFrame/Pods-PaceFrame-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -328,14 +358,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3385949C2F4A770D00FF1592 /* PaceFrameVideoComposer.swift in Sources */,
+				3385949D2F4A770D00FF1592 /* PaceFrameHealthKit.m in Sources */,
+				3385949E2F4A770D00FF1592 /* PaceFrameVideoComposer.m in Sources */,
+				3385949F2F4A770D00FF1592 /* PaceFrameHealthKit.swift in Sources */,
+				338594A02F4A770D00FF1592 /* PaceFrameMapSnapshot.swift in Sources */,
+				338594A12F4A770D00FF1592 /* PaceFrameMapSnapshot.m in Sources */,
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				8C5B997C2F33AB2200A1D001 /* PaceFrameMapSnapshot.swift in Sources */,
-				8C5B997A2F33AB1200A1D001 /* PaceFrameMapSnapshot.m in Sources */,
-				8C5B998C2F33AC2200A1D001 /* PaceFrameHealthKit.swift in Sources */,
-				8C5B998A2F33AC1200A1D001 /* PaceFrameHealthKit.m in Sources */,
-				8C5B996C2F33AA2200A1D001 /* PaceFrameVideoComposer.swift in Sources */,
-				8C5B996A2F33AA1200A1D001 /* PaceFrameVideoComposer.m in Sources */,
-				59A6CD3BA84D6500C1645C1F /* ExpoModulesProvider.swift in Sources */,
+				4C92C137BFAEA4632AB5F84D /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -344,11 +374,12 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = F71F63E470F0913BAC9D9009 /* Pods-PaceFrame.debug.xcconfig */;
+			baseConfigurationReference = D54CDC9AFE24B4724716CEC4 /* Pods-PaceFrame.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = PaceFrame/PaceFrame.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = R9XPB6JTAH;
@@ -382,11 +413,12 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = B0A9F9BBA39F19A9ED9083CF /* Pods-PaceFrame.release.xcconfig */;
+			baseConfigurationReference = 9C5D66947F3B33BCFBDD8C84 /* Pods-PaceFrame.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = PaceFrame/PaceFrame.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = R9XPB6JTAH;
