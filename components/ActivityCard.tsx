@@ -4,12 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StravaActivity } from '@/types/strava';
 import { radius, spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import {
-  formatDate,
-  formatDistanceMeters,
-  formatDuration,
-  formatPace,
-} from '@/lib/format';
+import { formatDistanceMeters, formatDuration, formatPace } from '@/lib/format';
 
 type Props = {
   activity: StravaActivity;
@@ -25,6 +20,7 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
   );
   const secondaryMetric = getSecondaryMetric(activity);
   const timeText = formatDuration(activity.moving_time);
+  const fallbackMetrics = getFallbackMetrics(activity, timeText);
   const whenText = formatWhen(activity.start_date);
   const icon = activityTypeIcon(activity.type);
   const detailedMetrics = shouldShowDetailedMetrics(activity.type);
@@ -53,7 +49,6 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
 
         <View style={styles.content}>
           <View style={styles.titleRow}>
-            {renderActivityIcon(16, colors.primaryOnLight)}
             <Text style={styles.title} numberOfLines={1}>
               {activity.name}
             </Text>
@@ -70,11 +65,19 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
               />
             </View>
           </View>
-          <Text style={styles.date}>{whenText}</Text>
+          <View style={styles.dateRow}>
+            <MaterialCommunityIcons
+              name={icon}
+              size={14}
+              color={colors.primaryOnLight}
+              style={styles.dateIcon}
+            />
+            <Text style={styles.date}>{whenText}</Text>
+          </View>
           {detailedMetrics ? (
             <View style={styles.metrics}>
               <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>DISTANCE</Text>
+                <Text style={styles.metricLabel}>Distance</Text>
                 <Text style={styles.metric}>{distanceText}</Text>
               </View>
               <View style={styles.metricCard}>
@@ -82,16 +85,21 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
                 <Text style={styles.metric}>{secondaryMetric.value}</Text>
               </View>
               <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>TIME</Text>
+                <Text style={styles.metricLabel}>Time</Text>
                 <Text style={styles.metric}>{timeText}</Text>
               </View>
             </View>
           ) : (
             <View style={styles.metricsSingle}>
-              <View style={[styles.metricCard, styles.metricCardSingle]}>
-                <Text style={styles.metricLabel}>TIME</Text>
-                <Text style={styles.metricSingle}>{timeText}</Text>
-              </View>
+              {fallbackMetrics.map((item) => (
+                <View
+                  key={item.label}
+                  style={[styles.metricCard, styles.metricCardSingle]}
+                >
+                  <Text style={styles.metricLabel}>{item.label}</Text>
+                  <Text style={styles.metricSingle}>{item.value}</Text>
+                </View>
+              ))}
             </View>
           )}
         </View>
@@ -126,23 +134,59 @@ function activityTypeIcon(
 }
 
 function getSecondaryMetric(activity: StravaActivity) {
+  if (isRideActivity(activity.type)) {
+    const kmh = activity.average_speed > 0 ? activity.average_speed * 3.6 : 0;
+    return {
+      label: 'Avg Speed',
+      value: kmh > 0 ? `${kmh.toFixed(1)} km/h` : '--.- km/h',
+    };
+  }
+
   if (isRunLikeActivity(activity.type)) {
     return {
-      label: 'PACE',
+      label: 'Pace',
       value: formatPace(activity.distance, activity.moving_time),
     };
   }
 
-  const kmh = activity.average_speed > 0 ? activity.average_speed * 3.6 : 0;
   return {
-    label: 'SPEED',
-    value: kmh > 0 ? `${kmh.toFixed(1)} km/h` : '--.- km/h',
+    label: 'Pace',
+    value: formatPace(activity.distance, activity.moving_time),
   };
 }
 
 function isRunLikeActivity(type: string) {
   const normalized = (type || '').toLowerCase();
   return normalized === 'run' || normalized === 'walk' || normalized === 'hike';
+}
+
+function isRideActivity(type: string) {
+  return (type || '').toLowerCase() === 'ride';
+}
+
+function getFallbackMetrics(activity: StravaActivity, timeText: string) {
+  const metrics: { label: string; value: string }[] = [
+    { label: 'Time', value: timeText },
+  ];
+
+  if (
+    typeof activity.average_heartrate === 'number' &&
+    activity.average_heartrate > 0
+  ) {
+    metrics.push({
+      label: 'Avg HR',
+      value: `${Math.round(activity.average_heartrate)} bpm`,
+    });
+  }
+
+  if (typeof activity.calories === 'number' && activity.calories > 0) {
+    metrics.push({
+      label: 'Cal',
+      value: `${Math.round(activity.calories)} kcal`,
+    });
+  }
+
+  return metrics;
 }
 
 function shouldShowDetailedMetrics(type: string) {
@@ -171,15 +215,20 @@ function formatWhen(isoDate: string) {
   const dayDiff = Math.round(
     (startOfToday.getTime() - startOfDate.getTime()) / (1000 * 60 * 60 * 24),
   );
+  const timeLabel = date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 
-  let dayLabel = formatDate(isoDate).toUpperCase();
-  if (dayDiff === 0) dayLabel = 'TODAY';
-  if (dayDiff === 1) dayLabel = 'YESTERDAY';
+  if (dayDiff === 0) return `Today at ${timeLabel}`;
+  if (dayDiff === 1) return `Yesterday at ${timeLabel}`;
 
-  const timeLabel = date
-    .toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-    .toUpperCase();
-  return `${dayLabel} • ${timeLabel}`;
+  const dateLabel = date.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  return `${dateLabel} at ${timeLabel}`;
 }
 
 function createStyles(colors: ThemeColors) {
@@ -241,15 +290,23 @@ function createStyles(colors: ThemeColors) {
     date: {
       color: colors.textMuted,
       fontSize: 12,
-      fontWeight: '600',
+      lineHeight: 14,
+      fontWeight: '400',
+    },
+    dateRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
       marginTop: 2,
       marginBottom: 8,
     },
+    dateIcon: {
+      marginTop: 2,
+    },
     metricLabel: {
       color: colors.textSubtle,
-      fontSize: 10,
-      fontWeight: '700',
-      letterSpacing: 0.3,
+      fontSize: 11,
+      fontWeight: '400',
     },
     metrics: {
       flexDirection: 'row',
@@ -261,12 +318,7 @@ function createStyles(colors: ThemeColors) {
     },
     metricCard: {
       flex: 1,
-      backgroundColor: colors.surfaceAlt,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
-      paddingHorizontal: 8,
-      paddingVertical: 7,
+      paddingVertical: 2,
       gap: 3,
     },
     metricCardSingle: {

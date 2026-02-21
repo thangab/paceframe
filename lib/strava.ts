@@ -55,7 +55,8 @@ export async function exchangeCodeWithSupabase({
     expiresAt: data.expires_at,
     athleteId: data.athlete?.id,
     athleteFirstName: data.athlete?.firstname ?? null,
-    athleteProfileUrl: data.athlete?.profile_medium ?? data.athlete?.profile ?? null,
+    athleteProfileUrl:
+      data.athlete?.profile_medium ?? data.athlete?.profile ?? null,
   };
 }
 
@@ -94,7 +95,8 @@ export async function refreshTokensWithSupabase({
     expiresAt: data.expires_at,
     athleteId: data.athlete?.id,
     athleteFirstName: data.athlete?.firstname ?? null,
-    athleteProfileUrl: data.athlete?.profile_medium ?? data.athlete?.profile ?? null,
+    athleteProfileUrl:
+      data.athlete?.profile_medium ?? data.athlete?.profile ?? null,
   };
 }
 
@@ -106,7 +108,7 @@ export async function fetchActivities(
     return mockActivities;
   }
 
-  const response = await fetch(`${STRAVA_BASE}/athlete/activities?per_page=3`, {
+  const response = await fetch(`${STRAVA_BASE}/athlete/activities?per_page=5`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
@@ -118,22 +120,73 @@ export async function fetchActivities(
   }
 
   const activities = (await response.json()) as StravaActivity[];
-  const runs = activities;
-  // .filter((activity) => activity.type === 'Run')
-
-  const enriched = await Promise.all(
-    runs.map(async (activity) => {
-      const [photoUrl, laps, heartRateStream] = await Promise.all([
-        fetchActivityPhotoUrl(accessToken, activity.id),
-        fetchActivityLaps(accessToken, activity.id),
-        fetchActivityHeartRateStream(accessToken, activity.id),
-      ]);
-
-      return { ...activity, photoUrl, laps, heartRateStream };
+  const activitiesWithPhotos = await Promise.all(
+    activities.map(async (activity) => {
+      const details = await fetchActivityDetails(accessToken, activity.id);
+      return {
+        ...activity,
+        calories:
+          typeof details.calories === 'number'
+            ? details.calories
+            : activity.calories,
+        photoUrl: details.photoUrl ?? extractActivityPhotoUrl(activity),
+      };
     }),
   );
-  // console.log('enriched', enriched);
-  return enriched;
+
+  return activitiesWithPhotos;
+}
+
+export async function fetchActivityStreams(
+  accessToken: string,
+  activityId: number,
+): Promise<Pick<StravaActivity, 'laps' | 'heartRateStream'>> {
+  const [laps, heartRateStream] = await Promise.all([
+    fetchActivityLaps(accessToken, activityId),
+    fetchActivityHeartRateStream(accessToken, activityId),
+  ]);
+
+  return { laps, heartRateStream };
+}
+
+export async function fetchActivityPhotoHighRes(
+  accessToken: string,
+  activityId: number,
+): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `${STRAVA_BASE}/activities/${activityId}/photos?size=2048`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+
+    if (!response.ok) return null;
+    const photos = (await response.json()) as {
+      urls?: Record<string, string>;
+    }[];
+    const first = photos[0];
+    if (!first?.urls) return null;
+
+    const directBest =
+      first.urls['2048'] ?? first.urls['1024'] ?? first.urls['600'];
+    if (directBest) return directBest;
+
+    const numericBest = Object.entries(first.urls)
+      .filter(([key, value]) => Number.isFinite(Number(key)) && Boolean(value))
+      .sort((a, b) => Number(b[0]) - Number(a[0]))[0]?.[1];
+    if (numericBest) return numericBest;
+
+    return (
+      first.urls['100'] ??
+      Object.values(first.urls).find((value) => typeof value === 'string') ??
+      null
+    );
+  } catch {
+    return null;
+  }
 }
 
 export type LapPaceChartPoint = {
@@ -202,55 +255,45 @@ export function getMockTokens(): AuthTokens {
   };
 }
 
-// function extractActivityPhotoUrl(activity: StravaActivity): string | null {
-//   const urls = activity.photos?.primary?.urls;
-//   if (!urls) return null;
+function extractActivityPhotoUrl(activity: StravaActivity): string | null {
+  const urls = activity.photos?.primary?.urls;
+  if (!urls) return null;
 
-//   return (
-//     urls['600'] ??
-//     urls['100'] ??
-//     Object.values(urls).find((value) => typeof value === 'string') ??
-//     null
-//   );
-// }
+  const directBest = urls['2048'] ?? urls['1024'] ?? urls['600'];
+  if (directBest) return directBest;
 
-async function fetchActivityPhotoUrl(
+  const numericBest = Object.entries(urls)
+    .filter(([key, value]) => Number.isFinite(Number(key)) && Boolean(value))
+    .sort((a, b) => Number(b[0]) - Number(a[0]))[0]?.[1];
+  if (numericBest) return numericBest;
+
+  return (
+    urls['100'] ??
+    Object.values(urls).find((value) => typeof value === 'string') ??
+    null
+  );
+}
+
+async function fetchActivityDetails(
   accessToken: string,
   activityId: number,
-): Promise<string | null> {
+): Promise<Pick<StravaActivity, 'calories' | 'photoUrl'>> {
   try {
-    const response = await fetch(
-      `${STRAVA_BASE}/activities/${activityId}/photos?size=2048`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+    const response = await fetch(`${STRAVA_BASE}/activities/${activityId}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
       },
-    );
+    });
 
-    if (!response.ok) return null;
-    const photos = (await response.json()) as {
-      urls?: Record<string, string>;
-    }[];
-    const first = photos[0];
-    if (!first?.urls) return null;
-
-    const directBest =
-      first.urls['2048'] ?? first.urls['1024'] ?? first.urls['600'];
-    if (directBest) return directBest;
-
-    const numericBest = Object.entries(first.urls)
-      .filter(([key, value]) => Number.isFinite(Number(key)) && Boolean(value))
-      .sort((a, b) => Number(b[0]) - Number(a[0]))[0]?.[1];
-    if (numericBest) return numericBest;
-
-    return (
-      first.urls['100'] ??
-      Object.values(first.urls).find((value) => typeof value === 'string') ??
-      null
-    );
+    if (!response.ok) return { calories: null, photoUrl: null };
+    const details = (await response.json()) as StravaActivity;
+    return {
+      calories:
+        typeof details.calories === 'number' ? details.calories : null,
+      photoUrl: extractActivityPhotoUrl(details),
+    };
   } catch {
-    return null;
+    return { calories: null, photoUrl: null };
   }
 }
 
@@ -259,14 +302,17 @@ async function fetchActivityLaps(
   activityId: number,
 ): Promise<StravaLap[]> {
   try {
-    const response = await fetch(`${STRAVA_BASE}/activities/${activityId}/laps`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
+    const response = await fetch(
+      `${STRAVA_BASE}/activities/${activityId}/laps`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       },
-    });
+    );
 
     if (!response.ok) return [];
-    const laps = (await response.json()) as Array<{
+    const laps = (await response.json()) as {
       id?: number;
       name?: string | null;
       distance?: number;
@@ -277,7 +323,7 @@ async function fetchActivityLaps(
       max_heartrate?: number | null;
       lap_index?: number;
       split?: number;
-    }>;
+    }[];
 
     const normalized: StravaLap[] = [];
     laps.forEach((lap, index) => {

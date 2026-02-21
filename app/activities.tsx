@@ -15,7 +15,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ActivityCard } from '@/components/ActivityCard';
 import { layout, spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { fetchActivities, refreshTokensWithSupabase } from '@/lib/strava';
+import {
+  fetchActivities,
+  fetchActivityPhotoHighRes,
+  fetchActivityStreams,
+  refreshTokensWithSupabase,
+} from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
@@ -33,6 +38,7 @@ export default function ActivitiesScreen() {
   const clearActivities = useActivityStore((s) => s.clearActivities);
   const selectedActivityId = useActivityStore((s) => s.selectedActivityId);
   const setActivities = useActivityStore((s) => s.setActivities);
+  const updateActivity = useActivityStore((s) => s.updateActivity);
   const selectActivity = useActivityStore((s) => s.selectActivity);
   const isHealthKitSource = source === 'healthkit';
   const refreshColor = themeMode === 'dark' ? colors.primary : colors.textMuted;
@@ -40,7 +46,29 @@ export default function ActivitiesScreen() {
   const welcomeTitle = firstName ? `Welcome ${firstName} !` : 'Welcome !';
 
   const [loading, setLoading] = useState(false);
+  const [isPreparingPreview, setIsPreparingPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const getValidTokens = useCallback(async () => {
+    if (!tokens?.accessToken) return null;
+
+    let activeTokens = tokens;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const refreshBufferSec = 120;
+    const shouldRefresh =
+      !tokens.accessToken.startsWith('mock-') &&
+      Boolean(tokens.refreshToken) &&
+      tokens.expiresAt <= nowSec + refreshBufferSec;
+
+    if (shouldRefresh && tokens.refreshToken) {
+      activeTokens = await refreshTokensWithSupabase({
+        refreshToken: tokens.refreshToken,
+      });
+      await login(activeTokens);
+    }
+
+    return activeTokens;
+  }, [login, tokens]);
 
   const loadActivities = useCallback(async () => {
     if (source === 'healthkit' && activities.length > 0) {
@@ -55,19 +83,10 @@ export default function ActivitiesScreen() {
     try {
       setLoading(true);
       setError(null);
-      let activeTokens = tokens;
-      const nowSec = Math.floor(Date.now() / 1000);
-      const refreshBufferSec = 120;
-      const shouldRefresh =
-        !tokens.accessToken.startsWith('mock-') &&
-        Boolean(tokens.refreshToken) &&
-        tokens.expiresAt <= nowSec + refreshBufferSec;
-
-      if (shouldRefresh && tokens.refreshToken) {
-        activeTokens = await refreshTokensWithSupabase({
-          refreshToken: tokens.refreshToken,
-        });
-        await login(activeTokens);
+      const activeTokens = await getValidTokens();
+      if (!activeTokens?.accessToken) {
+        router.replace('/login');
+        return;
       }
 
       const rows = await fetchActivities(activeTokens.accessToken);
@@ -79,7 +98,7 @@ export default function ActivitiesScreen() {
     } finally {
       setLoading(false);
     }
-  }, [source, activities.length, tokens, setActivities, login]);
+  }, [source, activities.length, tokens, setActivities, getValidTokens]);
 
   useEffect(() => {
     loadActivities();
@@ -89,6 +108,61 @@ export default function ActivitiesScreen() {
     await logout();
     clearActivities();
     router.replace('/login');
+  }
+
+  async function handleOpenPreview(target: '/preview' | '/preview?mode=templates') {
+    if (!selectedActivityId) return;
+    if (isHealthKitSource) {
+      router.push(target);
+      return;
+    }
+
+    try {
+      setIsPreparingPreview(true);
+      setError(null);
+      const activeTokens = await getValidTokens();
+      if (!activeTokens?.accessToken) {
+        router.replace('/login');
+        return;
+      }
+
+      const selected = activities.find((item) => item.id === selectedActivityId);
+      const hasLoadedStreams =
+        selected?.laps !== undefined && selected?.heartRateStream !== undefined;
+      const hasHighResPhoto = Boolean(
+        selected?.photoUrl &&
+          /\/(1024|2048)(?:\?|$)/.test(selected.photoUrl),
+      );
+
+      if (!hasLoadedStreams || !hasHighResPhoto) {
+        const [streams, photoUrl] = await Promise.all([
+          hasLoadedStreams
+            ? Promise.resolve({
+                laps: selected?.laps ?? [],
+                heartRateStream: selected?.heartRateStream ?? [],
+              })
+            : fetchActivityStreams(activeTokens.accessToken, selectedActivityId),
+          hasHighResPhoto
+            ? Promise.resolve(selected?.photoUrl ?? null)
+            : fetchActivityPhotoHighRes(
+                activeTokens.accessToken,
+                selectedActivityId,
+              ),
+        ]);
+        updateActivity(selectedActivityId, {
+          ...streams,
+          ...(photoUrl ? { photoUrl } : {}),
+        });
+      }
+
+      router.push(target);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not prepare activity data.',
+      );
+    } finally {
+      setIsPreparingPreview(false);
+    }
   }
 
   return (
@@ -256,16 +330,20 @@ export default function ActivitiesScreen() {
           <Pressable
             style={[
               styles.templatesBtn,
-              !selectedActivityId ? styles.generateBtnDisabled : null,
+              !selectedActivityId || isPreparingPreview
+                ? styles.generateBtnDisabled
+                : null,
             ]}
-            onPress={() => router.push('/preview?mode=templates')}
-            disabled={!selectedActivityId}
+            onPress={() => {
+              void handleOpenPreview('/preview?mode=templates');
+            }}
+            disabled={!selectedActivityId || isPreparingPreview}
           >
             <View style={styles.generateBtnContent}>
               <MaterialCommunityIcons
                 name="view-grid-outline"
                 size={17}
-                color={colors.text}
+                color="#111500"
               />
               <Text style={styles.templatesBtnText}>Choose Template</Text>
             </View>
@@ -273,17 +351,21 @@ export default function ActivitiesScreen() {
           <Pressable
             style={[
               styles.generateBtn,
-              !selectedActivityId ? styles.generateBtnDisabled : null,
+              !selectedActivityId || isPreparingPreview
+                ? styles.generateBtnDisabled
+                : null,
             ]}
-            onPress={() => router.push('/preview')}
-            disabled={!selectedActivityId}
+            onPress={() => {
+              void handleOpenPreview('/preview');
+            }}
+            disabled={!selectedActivityId || isPreparingPreview}
           >
             <View style={styles.generateBtnContent}>
               <Text style={styles.generateBtnText}>Make it pop</Text>
               <MaterialCommunityIcons
                 name="star-four-points-outline"
                 size={18}
-                color={colors.primaryText}
+                color="#E6EDF8"
               />
             </View>
           </Pressable>
@@ -479,20 +561,31 @@ function createStyles(colors: ThemeColors) {
       left: spacing.md,
       right: spacing.md,
       bottom: layout.floatingBottomOffset,
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: 10,
     },
     templatesBtn: {
-      borderRadius: 18,
-      backgroundColor: colors.surface,
+      flex: 1,
+      borderRadius: 20,
+      backgroundColor: '#D4FF54',
       borderWidth: 1,
-      borderColor: colors.borderStrong,
-      height: 52,
+      borderColor: '#D4FF54',
+      height: 62,
       alignItems: 'center',
       justifyContent: 'center',
+      shadowColor: colors.text,
+      shadowOpacity: 0.14,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 6,
     },
     generateBtn: {
+      flex: 1,
       borderRadius: 20,
-      backgroundColor: colors.primary,
+      backgroundColor: '#131B2E',
+      borderWidth: 1,
+      borderColor: '#2E3A52',
       height: 62,
       alignItems: 'center',
       justifyContent: 'center',
@@ -506,15 +599,15 @@ function createStyles(colors: ThemeColors) {
       opacity: 0.5,
     },
     generateBtnText: {
-      color: colors.primaryText,
-      fontSize: 18,
-      fontWeight: '900',
+      color: '#E6EDF8',
+      fontSize: 16,
+      fontWeight: '800',
       letterSpacing: 0.2,
     },
     templatesBtnText: {
-      color: colors.text,
-      fontSize: 15,
-      fontWeight: '700',
+      color: '#111500',
+      fontSize: 16,
+      fontWeight: '800',
       letterSpacing: 0.2,
     },
     generateBtnContent: {

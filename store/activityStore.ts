@@ -8,6 +8,10 @@ type ActivityState = {
   selectedActivityId: number | null;
   source: ActivitySource;
   setActivities: (activities: StravaActivity[], source?: ActivitySource) => void;
+  updateActivity: (
+    activityId: number,
+    patch: Partial<StravaActivity>,
+  ) => void;
   clearActivities: () => void;
   selectActivity: (activityId: number) => void;
   selectedActivity: () => StravaActivity | null;
@@ -27,6 +31,12 @@ export const useActivityStore = create<ActivityState>((set, get) => ({
       selectedActivityId: stillExists ? selected : activities[0]?.id ?? null,
     });
   },
+  updateActivity: (activityId, patch) =>
+    set((state) => ({
+      activities: state.activities.map((item) =>
+        item.id === activityId ? { ...item, ...patch } : item,
+      ),
+    })),
   clearActivities: () =>
     set({
       activities: [],
