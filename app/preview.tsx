@@ -327,6 +327,7 @@ type NormalPreviewSnapshot = {
   showChartGrid: boolean;
   paceChartOrientation: ChartOrientation;
   paceChartFill: ChartFillStyle;
+  isSquareFormat: boolean;
 };
 type TemplateMediaDraft = {
   v: 2;
@@ -2008,7 +2009,11 @@ export default function PreviewScreen() {
           showChartGrid,
           paceChartOrientation,
           paceChartFill,
+          isSquareFormat,
         };
+      }
+      if (isSquareFormat) {
+        setIsSquareFormat(false);
       }
       return;
     }
@@ -2038,6 +2043,7 @@ export default function PreviewScreen() {
     setShowChartGrid(snapshot.showChartGrid);
     setPaceChartOrientation(snapshot.paceChartOrientation);
     setPaceChartFill(snapshot.paceChartFill);
+    setIsSquareFormat(snapshot.isSquareFormat);
   }, [
     autoSubjectUri,
     autoSubjectSourceUri,
@@ -2057,6 +2063,7 @@ export default function PreviewScreen() {
     showChartGrid,
     paceChartOrientation,
     paceChartFill,
+    isSquareFormat,
     templateMode,
     visible,
     visibleLayers,
