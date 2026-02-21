@@ -12,6 +12,8 @@ type Props = {
   onPress: () => void;
 };
 
+const PACEFRAME_LOGO_GREY = require('../assets/logo/paceframe-grey.png');
+
 export function ActivityCard({ activity, selected, onPress }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -25,10 +27,6 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
   const deviceName = activity.device_name?.trim() || null;
   const icon = activityTypeIcon(activity.type);
   const detailedMetrics = shouldShowDetailedMetrics(activity.type);
-
-  function renderActivityIcon(size: number, color: string) {
-    return <MaterialCommunityIcons name={icon} size={size} color={color} />;
-  }
 
   return (
     <Pressable
@@ -44,7 +42,11 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
           <Image source={{ uri: activity.photoUrl }} style={styles.thumbnail} />
         ) : (
           <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
-            {renderActivityIcon(30, colors.textSubtle)}
+            <Image
+              source={PACEFRAME_LOGO_GREY}
+              style={styles.thumbnailLogo}
+              resizeMode="contain"
+            />
           </View>
         )}
 
@@ -282,6 +284,10 @@ function createStyles(colors: ThemeColors) {
     thumbnailPlaceholder: {
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    thumbnailLogo: {
+      width: 30,
+      height: 30,
     },
     content: {
       flex: 1,

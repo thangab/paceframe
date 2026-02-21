@@ -1,19 +1,25 @@
 import { useMemo, useState } from 'react';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  Image,
+} from 'react-native';
 import { FontAwesome6, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { importActivitiesFromHealthKit } from '@/lib/healthkit';
-import {
-  getMockTokens,
-  isMockStravaEnabled,
-} from '@/lib/strava';
+import { getMockTokens, isMockStravaEnabled } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
+
+const PACEFRAME_LOGO = require('../assets/logo/paceframe-blue.png');
 
 export default function LoginScreen() {
   const colors = useThemeColors();
@@ -93,9 +99,13 @@ export default function LoginScreen() {
         setError('No HealthKit workouts found.');
         return;
       }
-      // Keep auth flow consistent for guarded routes.
-      await login(getMockTokens());
       setActivities(activities, 'healthkit');
+      // HealthKit flow should not be blocked by optional mock auth setup.
+      try {
+        await login(getMockTokens());
+      } catch {
+        // Non-blocking: Activities screen allows healthkit source without Strava token.
+      }
       router.replace('/activities');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'HealthKit import failed.');
@@ -116,10 +126,10 @@ export default function LoginScreen() {
       <View style={styles.glowBottom} />
       <View style={styles.card}>
         <View style={styles.brandMark}>
-          <MaterialCommunityIcons
-            name="run-fast"
-            size={26}
-            color={colors.primaryText}
+          <Image
+            source={PACEFRAME_LOGO}
+            style={styles.logo}
+            resizeMode="contain"
           />
         </View>
         <Text style={styles.title}>PaceFrame</Text>
@@ -249,6 +259,10 @@ function createStyles(colors: ThemeColors) {
       height: 260,
       borderRadius: 999,
       backgroundColor: `${colors.accent}1F`,
+    },
+    logo: {
+      width: 26,
+      height: 26,
     },
     card: {
       borderRadius: 24,
