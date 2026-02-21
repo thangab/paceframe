@@ -443,8 +443,7 @@ function sanitizeTemplateMediaAsset(
         : null,
     fileSize: typeof source.fileSize === 'number' ? source.fileSize : undefined,
     mimeType: typeof source.mimeType === 'string' ? source.mimeType : undefined,
-    duration:
-      typeof source.duration === 'number' ? source.duration : undefined,
+    duration: typeof source.duration === 'number' ? source.duration : undefined,
     assetId: typeof source.assetId === 'string' ? source.assetId : undefined,
     base64:
       typeof source.base64 === 'string' || source.base64 === null
@@ -526,7 +525,8 @@ function resolveTemplateText(
 ) {
   const resolvedDate =
     options?.formatDate && vars.dateIso
-      ? formatDateWithPattern(vars.dateIso, options.formatDate) ?? vars.dateText
+      ? (formatDateWithPattern(vars.dateIso, options.formatDate) ??
+        vars.dateText)
       : vars.dateText;
   return value
     .replaceAll('{activityName}', vars.activityName)
@@ -777,7 +777,6 @@ export default function PreviewScreen() {
   const managedTempUrisRef = useRef<Set<string>>(new Set());
   const templatePresetAppliedRef = useRef<string | null>(null);
   const normalSnapshotRef = useRef<NormalPreviewSnapshot | null>(null);
-  const autoExtractAttemptRef = useRef<string | null>(null);
   const backgroundExtractionRequestRef = useRef(0);
 
   const selectedTemplateDefinition = useMemo(
@@ -917,6 +916,32 @@ export default function PreviewScreen() {
     if (city) return city;
     return resolvedLocationText;
   }, [activity, resolvedLocationText]);
+  useEffect(() => {
+    let cancelled = false;
+    async function resolveLocationFromLatLng() {
+      setResolvedLocationText('');
+      if (!activity?.start_latlng || activity.start_latlng.length < 2) return;
+
+      const [latitude, longitude] = activity.start_latlng;
+      try {
+        const [result] = await Location.reverseGeocodeAsync({
+          latitude,
+          longitude,
+        });
+        if (cancelled || !result) return;
+
+        const resolved = result.city?.trim() || '';
+        setResolvedLocationText(resolved);
+      } catch {
+        if (!cancelled) setResolvedLocationText('');
+      }
+    }
+
+    void resolveLocationFromLatLng();
+    return () => {
+      cancelled = true;
+    };
+  }, [activity]);
   const templateFixedTextElements = useMemo<
     PreviewTemplateRenderableTextElement[]
   >(() => {
@@ -1004,25 +1029,24 @@ export default function PreviewScreen() {
     hasCalories,
     hasAvgHeartRate,
   ]);
-  const templateFixedChartElements = useMemo<PreviewTemplateChartElement[]>(
-    () => {
-      if (!templateMode || !selectedTemplateDefinition) return [];
-      return (selectedTemplateDefinition.fixedChartElements ?? []).filter(
-        (item) =>
-          item.kind === 'pace'
-            ? hasLapPaceLayer
-            : item.kind === 'hr'
-              ? hasHeartRateLayer
-              : false,
-      );
-    },
-    [
-      hasHeartRateLayer,
-      hasLapPaceLayer,
-      selectedTemplateDefinition,
-      templateMode,
-    ],
-  );
+  const templateFixedChartElements = useMemo<
+    PreviewTemplateChartElement[]
+  >(() => {
+    if (!templateMode || !selectedTemplateDefinition) return [];
+    return (selectedTemplateDefinition.fixedChartElements ?? []).filter(
+      (item) =>
+        item.kind === 'pace'
+          ? hasLapPaceLayer
+          : item.kind === 'hr'
+            ? hasHeartRateLayer
+            : false,
+    );
+  }, [
+    hasHeartRateLayer,
+    hasLapPaceLayer,
+    selectedTemplateDefinition,
+    templateMode,
+  ]);
   const templateHiddenVisibleConfig: Record<FieldId, boolean> = {
     distance: false,
     time: false,
@@ -1693,15 +1717,6 @@ export default function PreviewScreen() {
         }
 
         resetDraftStateToDefaults();
-        if (activityPhotoUri) {
-          const asset: ImagePicker.ImagePickerAsset = {
-            uri: activityPhotoUri,
-            width: STORY_WIDTH,
-            height: STORY_HEIGHT,
-            type: 'image',
-          };
-          await applyImageBackground(asset, { silent: true });
-        }
       } catch {
         resetDraftStateToDefaults();
       } finally {
@@ -1777,11 +1792,11 @@ export default function PreviewScreen() {
     headerVisible,
     imageOverlays,
     isSquareFormat,
-      showChartAxes,
-      showChartGrid,
-      paceChartOrientation,
-      paceChartFill,
-      layerOrder,
+    showChartAxes,
+    showChartGrid,
+    paceChartOrientation,
+    paceChartFill,
+    layerOrder,
     media,
     routeMapVariant,
     routeMode,
@@ -1836,9 +1851,7 @@ export default function PreviewScreen() {
               Boolean(mediaUri) &&
               Boolean(draft.autoSubjectSourceUri) &&
               draft.autoSubjectSourceUri === mediaUri;
-            setAutoSubjectUri(
-              subjectMatchesMedia ? draft.autoSubjectUri : null,
-            );
+            setAutoSubjectUri(subjectMatchesMedia ? draft.autoSubjectUri : null);
             setAutoSubjectSourceUri(subjectMatchesMedia ? mediaUri : null);
           }
         }
@@ -2049,8 +2062,7 @@ export default function PreviewScreen() {
     visibleLayers,
   ]);
 
-  // Template presets can depend on activity photo, including subject extraction.
-  /* eslint-disable react-hooks/exhaustive-deps */
+  // Template preset default: transparent background when no saved draft.
   useEffect(() => {
     if (!templateMode || !selectedTemplateDefinition) {
       templatePresetAppliedRef.current = null;
@@ -2067,32 +2079,11 @@ export default function PreviewScreen() {
       return;
     }
 
-    const templateKey = `${activity?.id ?? 'none'}:${selectedTemplateDefinition.id}:${
-      activityPhotoUri ?? 'no-photo'
-    }`;
+    const templateKey = `${activity?.id ?? 'none'}:${selectedTemplateDefinition.id}`;
     if (templatePresetAppliedRef.current === templateKey) {
       return;
     }
     templatePresetAppliedRef.current = templateKey;
-
-    if (
-      selectedTemplateDefinition.defaultBackground === 'activity-photo' &&
-      activityPhotoUri
-    ) {
-      const asset: ImagePicker.ImagePickerAsset = {
-        uri: activityPhotoUri,
-        width: STORY_WIDTH,
-        height: STORY_HEIGHT,
-        type: 'image',
-      };
-      void applyImageBackground(asset, {
-        silent: true,
-        skipBackgroundRemoval: Boolean(
-          selectedTemplateDefinition.disableBackgroundRemoval,
-        ),
-      });
-      return;
-    }
 
     setMedia(null);
     setBackgroundGradient(null);
@@ -2108,81 +2099,6 @@ export default function PreviewScreen() {
     templateMediaHydration.loading,
     templateMode,
   ]);
-  /* eslint-enable react-hooks/exhaustive-deps */
-
-  // Guarded one-shot auto-heal effect. We intentionally avoid depending on
-  // applyImageBackground to prevent re-trigger loops.
-  /* eslint-disable react-hooks/exhaustive-deps */
-  useEffect(() => {
-    if (templateMode) {
-      autoExtractAttemptRef.current = null;
-      return;
-    }
-    if (!draftReady || isHydratingDraft || isExtracting) return;
-    if (!activity?.id || !activityPhotoUri || autoSubjectUri) return;
-
-    const mediaMatchesActivityPhoto =
-      media?.type === 'image' && media.uri === activityPhotoUri;
-    const shouldApplyActivityPhotoByDefault = !media && !backgroundGradient;
-    if (!mediaMatchesActivityPhoto && !shouldApplyActivityPhotoByDefault)
-      return;
-
-    const attemptKey = `${activity.id}:${activityPhotoUri}:${
-      mediaMatchesActivityPhoto ? 'current-media' : 'empty-background'
-    }`;
-    if (autoExtractAttemptRef.current === attemptKey) return;
-    autoExtractAttemptRef.current = attemptKey;
-
-    const asset: ImagePicker.ImagePickerAsset =
-      mediaMatchesActivityPhoto && media
-        ? media
-        : {
-            uri: activityPhotoUri,
-            width: STORY_WIDTH,
-            height: STORY_HEIGHT,
-            type: 'image',
-          };
-    void applyImageBackground(asset, { silent: true });
-  }, [
-    activity?.id,
-    activityPhotoUri,
-    autoSubjectUri,
-    backgroundGradient,
-    draftReady,
-    isExtracting,
-    isHydratingDraft,
-    media,
-    templateMode,
-  ]);
-  /* eslint-enable react-hooks/exhaustive-deps */
-
-  useEffect(() => {
-    let cancelled = false;
-    async function resolveLocationFromLatLng() {
-      setResolvedLocationText('');
-      if (!activity?.start_latlng || activity.start_latlng.length < 2) return;
-
-      const [latitude, longitude] = activity.start_latlng;
-      try {
-        const [result] = await Location.reverseGeocodeAsync({
-          latitude,
-          longitude,
-        });
-        if (cancelled || !result) return;
-
-        const resolved = result.city?.trim() || '';
-        setResolvedLocationText(resolved);
-      } catch {
-        if (!cancelled) setResolvedLocationText('');
-      }
-    }
-
-    void resolveLocationFromLatLng();
-    return () => {
-      cancelled = true;
-    };
-  }, [activity]);
-
   useEffect(() => {
     const allHeaderFieldsHidden =
       !headerVisible.title && !headerVisible.date && !headerVisible.location;
@@ -2409,11 +2325,17 @@ export default function PreviewScreen() {
     try {
       const cropWidth =
         templateMode && selectedTemplateDefinition?.imagePickerCropSize?.width
-          ? Math.max(1, Math.round(selectedTemplateDefinition.imagePickerCropSize.width))
+          ? Math.max(
+              1,
+              Math.round(selectedTemplateDefinition.imagePickerCropSize.width),
+            )
           : 1080;
       const cropHeight =
         templateMode && selectedTemplateDefinition?.imagePickerCropSize?.height
-          ? Math.max(1, Math.round(selectedTemplateDefinition.imagePickerCropSize.height))
+          ? Math.max(
+              1,
+              Math.round(selectedTemplateDefinition.imagePickerCropSize.height),
+            )
           : isSquareFormat
             ? 1080
             : 1920;
@@ -2980,16 +2902,6 @@ export default function PreviewScreen() {
         void cleanupTempUriIfOwned(uri);
       }
     });
-
-    if (activityPhotoUri) {
-      const asset: ImagePicker.ImagePickerAsset = {
-        uri: activityPhotoUri,
-        width: STORY_WIDTH,
-        height: STORY_HEIGHT,
-        type: 'image',
-      };
-      await applyImageBackground(asset, { silent: true });
-    }
 
     setMessage('Reset to default.');
   }

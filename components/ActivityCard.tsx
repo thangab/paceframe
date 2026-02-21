@@ -22,6 +22,7 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
   const timeText = formatDuration(activity.moving_time);
   const fallbackMetrics = getFallbackMetrics(activity, timeText);
   const whenText = formatWhen(activity.start_date);
+  const deviceName = activity.device_name?.trim() || null;
   const icon = activityTypeIcon(activity.type);
   const detailedMetrics = shouldShowDetailedMetrics(activity.type);
 
@@ -65,14 +66,23 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
               />
             </View>
           </View>
-          <View style={styles.dateRow}>
-            <MaterialCommunityIcons
-              name={icon}
-              size={14}
-              color={colors.primaryOnLight}
-              style={styles.dateIcon}
-            />
-            <Text style={styles.date}>{whenText}</Text>
+          <View style={styles.dateBlock}>
+            <View style={styles.dateMetaRow}>
+              <MaterialCommunityIcons
+                name={icon}
+                size={14}
+                color={colors.primaryOnLight}
+                style={styles.dateIcon}
+              />
+              <View style={styles.dateTextBlock}>
+                <Text style={styles.date}>{whenText}</Text>
+                {deviceName ? (
+                  <Text style={styles.deviceName} numberOfLines={1}>
+                    {deviceName}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
           </View>
           {detailedMetrics ? (
             <View style={styles.metrics}>
@@ -235,9 +245,9 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: {
       backgroundColor: colors.surface,
-      borderRadius: radius.lg + 4,
+      borderRadius: radius.md,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: 'transparent',
       padding: spacing.sm + 4,
       marginBottom: spacing.sm + 4,
       shadowColor: colors.text,
@@ -266,7 +276,7 @@ function createStyles(colors: ThemeColors) {
     thumbnail: {
       width: 88,
       height: 88,
-      borderRadius: radius.md + 4,
+      borderRadius: radius.sm,
       backgroundColor: colors.surfaceAlt,
     },
     thumbnailPlaceholder: {
@@ -289,19 +299,31 @@ function createStyles(colors: ThemeColors) {
     },
     date: {
       color: colors.textMuted,
-      fontSize: 12,
+      fontSize: 11,
       lineHeight: 14,
       fontWeight: '400',
     },
-    dateRow: {
+    dateMetaRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
       marginTop: 2,
+    },
+    dateBlock: {
       marginBottom: 8,
     },
     dateIcon: {
-      marginTop: 2,
+      marginTop: 0,
+    },
+    dateTextBlock: {
+      flex: 1,
+      gap: 1,
+    },
+    deviceName: {
+      color: colors.textSubtle,
+      fontSize: 11,
+      lineHeight: 13,
+      fontWeight: '400',
     },
     metricLabel: {
       color: colors.textSubtle,

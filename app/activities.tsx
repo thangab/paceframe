@@ -42,9 +42,6 @@ export default function ActivitiesScreen() {
   const selectActivity = useActivityStore((s) => s.selectActivity);
   const isHealthKitSource = source === 'healthkit';
   const refreshColor = themeMode === 'dark' ? colors.primary : colors.textMuted;
-  const firstName = tokens?.athleteFirstName?.trim();
-  const welcomeTitle = firstName ? `Welcome ${firstName} !` : 'Welcome !';
-
   const [loading, setLoading] = useState(false);
   const [isPreparingPreview, setIsPreparingPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +107,9 @@ export default function ActivitiesScreen() {
     router.replace('/login');
   }
 
-  async function handleOpenPreview(target: '/preview' | '/preview?mode=templates') {
+  async function handleOpenPreview(
+    target: '/preview' | '/preview?mode=templates',
+  ) {
     if (!selectedActivityId) return;
     if (isHealthKitSource) {
       router.push(target);
@@ -126,12 +125,13 @@ export default function ActivitiesScreen() {
         return;
       }
 
-      const selected = activities.find((item) => item.id === selectedActivityId);
+      const selected = activities.find(
+        (item) => item.id === selectedActivityId,
+      );
       const hasLoadedStreams =
         selected?.laps !== undefined && selected?.heartRateStream !== undefined;
       const hasHighResPhoto = Boolean(
-        selected?.photoUrl &&
-          /\/(1024|2048)(?:\?|$)/.test(selected.photoUrl),
+        selected?.photoUrl && /\/(1024|2048)(?:\?|$)/.test(selected.photoUrl),
       );
 
       if (!hasLoadedStreams || !hasHighResPhoto) {
@@ -141,7 +141,10 @@ export default function ActivitiesScreen() {
                 laps: selected?.laps ?? [],
                 heartRateStream: selected?.heartRateStream ?? [],
               })
-            : fetchActivityStreams(activeTokens.accessToken, selectedActivityId),
+            : fetchActivityStreams(
+                activeTokens.accessToken,
+                selectedActivityId,
+              ),
           hasHighResPhoto
             ? Promise.resolve(selected?.photoUrl ?? null)
             : fetchActivityPhotoHighRes(
@@ -272,27 +275,6 @@ export default function ActivitiesScreen() {
         <View style={styles.bgOrbTop} />
         <View style={styles.bgOrbBottom} />
 
-        <View style={styles.heroCard}>
-          <View style={styles.headerRow}>
-            <View style={styles.headerCopy}>
-              <Text style={styles.title}>{welcomeTitle}</Text>
-              <Text style={styles.subtitle}>
-                Pick one activity to start your design
-              </Text>
-            </View>
-            <View style={styles.sourcePill}>
-              <MaterialCommunityIcons
-                name={isHealthKitSource ? 'heart-pulse' : 'fire'}
-                size={13}
-                color={colors.text}
-              />
-              <Text style={styles.sourcePillText}>
-                {isHealthKitSource ? 'Health' : 'Strava'}
-              </Text>
-            </View>
-          </View>
-        </View>
-
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         {loading && activities.length === 0 ? (
@@ -341,11 +323,11 @@ export default function ActivitiesScreen() {
           >
             <View style={styles.generateBtnContent}>
               <MaterialCommunityIcons
-                name="view-grid-outline"
+                name="view-dashboard-outline"
                 size={17}
                 color="#111500"
               />
-              <Text style={styles.templatesBtnText}>Choose Template</Text>
+              <Text style={styles.templatesBtnText}>Pick a Style</Text>
             </View>
           </Pressable>
           <Pressable
@@ -361,12 +343,12 @@ export default function ActivitiesScreen() {
             disabled={!selectedActivityId || isPreparingPreview}
           >
             <View style={styles.generateBtnContent}>
-              <Text style={styles.generateBtnText}>Make it pop</Text>
               <MaterialCommunityIcons
-                name="star-four-points-outline"
+                name="brush-variant"
                 size={18}
                 color="#E6EDF8"
               />
+              <Text style={styles.generateBtnText}>Build Your Own</Text>
             </View>
           </Pressable>
         </View>

@@ -48,6 +48,7 @@ export type StravaActivity = {
   location_city?: string | null;
   location_state?: string | null;
   location_country?: string | null;
+  device_name?: string | null;
   map: StravaPolylineMap;
   photos?: StravaActivityPhotos;
   photoUrl?: string | null;

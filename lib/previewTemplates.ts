@@ -4,7 +4,7 @@ export const PREVIEW_TEMPLATES: PreviewTemplateDefinition[] = [
   {
     id: 'template-cover',
     name: 'Cover',
-    defaultBackground: 'activity-photo',
+    defaultBackground: 'none',
     defaultBlurEffectId: 'background-blur',
     showRoute: true,
     routeTransform: {
@@ -168,7 +168,7 @@ export const PREVIEW_TEMPLATES: PreviewTemplateDefinition[] = [
       width: 650,
       height: 735,
     },
-    defaultBackground: 'activity-photo',
+    defaultBackground: 'none',
     backgroundMediaFrame: {
       x: 32,
       y: 44,
@@ -506,6 +506,7 @@ export const PREVIEW_TEMPLATES: PreviewTemplateDefinition[] = [
   {
     id: 'template-ticket',
     name: 'Ticket',
+    premium: true,
     showBackgroundTab: false,
     defaultBackground: 'none',
     showRoute: true,
@@ -636,7 +637,7 @@ export const PREVIEW_TEMPLATES: PreviewTemplateDefinition[] = [
   {
     id: 'template-easy',
     name: 'Easy',
-    defaultBackground: 'activity-photo',
+    defaultBackground: 'none',
     defaultBlurEffectId: 'background-blur',
     defaultFilterEffectId: 'black-and-white',
     showRoute: false,
