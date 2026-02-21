@@ -48,6 +48,8 @@ export default function RootLayout() {
         <Stack.Screen name="activities" options={{ title: 'Activities' }} />
         <Stack.Screen name="preview" options={{ title: 'Preview' }} />
         <Stack.Screen name="paywall" options={{ title: 'PaceFrame Premium' }} />
+        <Stack.Screen name="oauth" options={{ headerShown: false }} />
+        <Stack.Screen name="app/oauth" options={{ headerShown: false }} />
       </Stack>
     </GestureHandlerRootView>
   );

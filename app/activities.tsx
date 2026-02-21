@@ -95,6 +95,8 @@ export default function ActivitiesScreen() {
     <>
       <Stack.Screen
         options={{
+          headerBackVisible: false,
+          gestureEnabled: false,
           headerTitle: () => (
             <View style={styles.navTitleWrap}>
               {isHealthKitSource ? (

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,14 +9,11 @@ import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { importActivitiesFromHealthKit } from '@/lib/healthkit';
 import {
-  exchangeCodeWithSupabase,
   getMockTokens,
   isMockStravaEnabled,
 } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
-
-WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const colors = useThemeColors();
@@ -33,8 +30,8 @@ export default function LoginScreen() {
     );
 
   // Strava validates redirect host against "Authorization Callback Domain".
-  // Keep host as localhost for native deep link compatibility.
-  const redirectUri = 'paceframe://localhost/oauth';
+  // Keep host as "app" for native deep link compatibility.
+  const redirectUri = 'paceframe://app/oauth';
 
   async function handleLogin() {
     if (isMockStravaEnabled()) {
@@ -64,30 +61,7 @@ export default function LoginScreen() {
         `&response_type=code` +
         `&approval_prompt=auto` +
         `&scope=read,activity:read_all`;
-
-      const result = await WebBrowser.openAuthSessionAsync(
-        authUrl,
-        redirectUri,
-      );
-
-      if (result.type !== 'success') {
-        setIsBusy(false);
-        return;
-      }
-
-      const callbackUrl = new URL(result.url);
-      const code = callbackUrl.searchParams.get('code');
-      if (!code) {
-        throw new Error('Missing authorization code from Strava.');
-      }
-
-      const tokens = await exchangeCodeWithSupabase({
-        code,
-        redirectUri,
-      });
-
-      await login(tokens);
-      router.replace('/activities');
+      await Linking.openURL(authUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed.');
     } finally {

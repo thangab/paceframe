@@ -131,10 +131,11 @@ EXPO_PUBLIC_USE_MOCK_STRAVA=true
 4. Current app redirect URI used in code:
 
 ```txt
-paceframe://localhost/oauth
+paceframe://app/oauth
 ```
 
 Notes:
+
 - Keep Strava client secret only in backend secrets.
 - Never put client secret in mobile `.env`.
 
