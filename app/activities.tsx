@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router, Stack } from 'expo-router';
 import {
   ActivityIndicator,
@@ -25,6 +25,9 @@ import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 
+let initialStravaLoadDone = false;
+let initialStravaLoadInFlight: Promise<void> | null = null;
+
 export default function ActivitiesScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -42,7 +45,9 @@ export default function ActivitiesScreen() {
   const selectActivity = useActivityStore((s) => s.selectActivity);
   const isHealthKitSource = source === 'healthkit';
   const refreshColor = themeMode === 'dark' ? colors.primary : colors.textMuted;
+  const hasLoadedInitialStravaRef = useRef(false);
   const [loading, setLoading] = useState(false);
+  const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(false);
   const [isPreparingPreview, setIsPreparingPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,9 +72,20 @@ export default function ActivitiesScreen() {
     return activeTokens;
   }, [login, tokens]);
 
-  const loadActivities = useCallback(async () => {
+  const loadActivities = useCallback(async (force = false) => {
+    if (loading && !force) return;
+
     if (source === 'healthkit' && activities.length > 0) {
       return;
+    }
+    if (!force && source === 'strava') {
+      if (activities.length > 0 || hasLoadedInitialStravaRef.current || initialStravaLoadDone) {
+        return;
+      }
+      if (initialStravaLoadInFlight) {
+        await initialStravaLoadInFlight;
+        return;
+      }
     }
 
     if (!tokens?.accessToken) {
@@ -77,32 +93,52 @@ export default function ActivitiesScreen() {
       return;
     }
 
-    try {
-      setLoading(true);
-      setError(null);
-      const activeTokens = await getValidTokens();
-      if (!activeTokens?.accessToken) {
-        router.replace('/login');
-        return;
-      }
+    const runLoad = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const activeTokens = await getValidTokens();
+        if (!activeTokens?.accessToken) {
+          router.replace('/login');
+          return;
+        }
 
-      const rows = await fetchActivities(activeTokens.accessToken);
-      setActivities(rows, 'strava');
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Could not load activities.',
-      );
-    } finally {
-      setLoading(false);
+        const rows = await fetchActivities(activeTokens.accessToken);
+        setActivities(rows, 'strava');
+        hasLoadedInitialStravaRef.current = true;
+        initialStravaLoadDone = true;
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Could not load activities.',
+        );
+      } finally {
+        setHasFinishedInitialLoad(true);
+        setLoading(false);
+      }
+    };
+
+    if (!force && source === 'strava') {
+      initialStravaLoadInFlight = runLoad();
+      try {
+        await initialStravaLoadInFlight;
+      } finally {
+        initialStravaLoadInFlight = null;
+      }
+      return;
     }
-  }, [source, activities.length, tokens, setActivities, getValidTokens]);
+
+    await runLoad();
+  }, [source, activities.length, tokens, setActivities, getValidTokens, loading]);
 
   useEffect(() => {
-    loadActivities();
+    void loadActivities();
   }, [loadActivities]);
 
   async function handleLogout() {
     await logout();
+    initialStravaLoadDone = false;
+    initialStravaLoadInFlight = null;
+    hasLoadedInitialStravaRef.current = false;
     clearActivities();
     router.replace('/login');
   }
@@ -277,7 +313,7 @@ export default function ActivitiesScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        {loading && activities.length === 0 ? (
+        {(loading || !hasFinishedInitialLoad) && activities.length === 0 ? (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
@@ -289,7 +325,9 @@ export default function ActivitiesScreen() {
             refreshControl={
               <RefreshControl
                 refreshing={loading}
-                onRefresh={loadActivities}
+                onRefresh={() => {
+                  void loadActivities(true);
+                }}
                 tintColor={refreshColor}
                 colors={[refreshColor]}
                 progressBackgroundColor={colors.surface}
@@ -303,7 +341,9 @@ export default function ActivitiesScreen() {
               />
             )}
             ListEmptyComponent={
-              <Text style={styles.empty}>No activities found.</Text>
+              hasFinishedInitialLoad && !loading ? (
+                <Text style={styles.empty}>No activities found.</Text>
+              ) : null
             }
           />
         )}

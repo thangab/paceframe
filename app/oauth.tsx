@@ -7,11 +7,18 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { exchangeCodeWithSupabase } from '@/lib/strava';
 import { useAuthStore } from '@/store/authStore';
 
+function isStaleOAuthCodeError(message: string) {
+  return /(invalid_grant|authorization code|invalid code|expired code|bad request)/i.test(
+    message,
+  );
+}
+
 export default function OAuthCallbackScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const login = useAuthStore((s) => s.login);
   const tokens = useAuthStore((s) => s.tokens);
+  const isHydrated = useAuthStore((s) => s.isHydrated);
   const { code: rawCode } = useLocalSearchParams<{
     code?: string | string[];
   }>();
@@ -23,13 +30,15 @@ export default function OAuthCallbackScreen() {
   const redirectUri = 'paceframe://app/oauth';
 
   useEffect(() => {
+    if (!isHydrated) return;
+
     if (tokens?.accessToken) {
       router.replace('/activities');
       return;
     }
 
     if (!code || typeof code !== 'string') {
-      setError('Missing authorization code from Strava.');
+      router.replace('/login');
       return;
     }
     if (handledCodeRef.current === code) return;
@@ -44,14 +53,19 @@ export default function OAuthCallbackScreen() {
         router.replace('/activities');
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Login failed.');
+        const message = err instanceof Error ? err.message : 'Login failed.';
+        if (isStaleOAuthCodeError(message)) {
+          router.replace('/login');
+          return;
+        }
+        setError(message);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [code, login, tokens?.accessToken]);
+  }, [code, isHydrated, login, tokens?.accessToken]);
 
   if (!error) {
     return (
@@ -61,16 +75,19 @@ export default function OAuthCallbackScreen() {
           color={colors.primary}
           style={styles.loader}
         />
-        <Text style={styles.title}>Connexion Strava...</Text>
+        <Text style={styles.title}>Loading...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.errorTitle}>Connexion impossible</Text>
+      <Text style={styles.errorTitle}>Connection failed</Text>
       <Text style={styles.errorText}>{error}</Text>
-      <PrimaryButton label="Retour au login" onPress={() => router.replace('/login')} />
+      <PrimaryButton
+        label="Back to login"
+        onPress={() => router.replace('/login')}
+      />
     </View>
   );
 }

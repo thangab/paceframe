@@ -166,6 +166,7 @@ type Props = {
   paceChartOrientation: ChartOrientation;
   paceChartFill: ChartFillStyle;
   distanceUnit: DistanceUnit;
+  onSubjectCoverageComputed?: (coveragePercent: number) => void;
 };
 
 const RADIAL_BLUR_EFFECT = Skia.RuntimeEffect.Make(`
@@ -276,6 +277,7 @@ export function PreviewEditorCanvas({
   paceChartOrientation,
   paceChartFill,
   distanceUnit,
+  onSubjectCoverageComputed,
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -459,7 +461,7 @@ export function PreviewEditorCanvas({
     useBackgroundSkiaShader ? (media?.uri ?? null) : null,
   );
   const skiaSubjectImage = useImage(
-    useRadialBlurShader && autoSubjectUri ? autoSubjectUri : null,
+    autoSubjectUri ?? null,
   );
   const fallbackRadialCenter = useMemo(
     () => ({
@@ -469,6 +471,41 @@ export function PreviewEditorCanvas({
     [canvasDisplayWidth, canvasDisplayHeight],
   );
   const resolvedRadialCenter = subjectRadialCenter ?? fallbackRadialCenter;
+
+  useEffect(() => {
+    if (!skiaSubjectImage || !autoSubjectUri) return;
+
+    const rasterImage = skiaSubjectImage.makeNonTextureImage();
+    const imageWidth = rasterImage.width();
+    const imageHeight = rasterImage.height();
+    if (imageWidth <= 0 || imageHeight <= 0) return;
+
+    const pixels = rasterImage.readPixels(0, 0, {
+      width: imageWidth,
+      height: imageHeight,
+      alphaType: AlphaType.Unpremul,
+      colorType: ColorType.RGBA_8888,
+    });
+    if (!pixels || pixels.length < imageWidth * imageHeight * 4) return;
+
+    const stride = Math.max(
+      1,
+      Math.floor(Math.max(imageWidth, imageHeight) / 720),
+    );
+    let sampled = 0;
+    let opaque = 0;
+    for (let y = 0; y < imageHeight; y += stride) {
+      for (let x = 0; x < imageWidth; x += stride) {
+        const alpha = pixels[(y * imageWidth + x) * 4 + 3];
+        sampled += 1;
+        if (alpha > 10) opaque += 1;
+      }
+    }
+    if (!sampled) return;
+
+    const coveragePercent = (opaque / sampled) * 100;
+    onSubjectCoverageComputed?.(coveragePercent);
+  }, [autoSubjectUri, onSubjectCoverageComputed, skiaSubjectImage]);
 
   useEffect(() => {
     if (!useRadialBlurShader || !skiaSubjectImage) {

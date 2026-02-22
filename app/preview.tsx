@@ -118,6 +118,8 @@ const DEFAULT_VISIBLE_LAYERS: Partial<Record<LayerId, boolean>> = {
 };
 const PREVIEW_DRAFT_KEY_PREFIX = 'paceframe.preview.draft.';
 const PREVIEW_TEMPLATE_MEDIA_KEY_PREFIX = 'paceframe.preview.template-media.';
+const SUBJECT_COVERAGE_MIN_PERCENT = 1;
+const SUBJECT_COVERAGE_MAX_PERCENT = 93;
 const BACKGROUND_GRADIENT_PRESETS: BackgroundGradient[] = [
   { colors: ['#0F172A', '#1D4ED8', '#38BDF8'], direction: 'vertical' },
   { colors: ['#111827', '#7C3AED', '#F97316'], direction: 'horizontal' },
@@ -723,6 +725,9 @@ export default function PreviewScreen() {
     useState<ChartOrientation>('vertical');
   const [paceChartFill, setPaceChartFill] =
     useState<ChartFillStyle>('gradient');
+  const [subjectRejectedMediaUri, setSubjectRejectedMediaUri] = useState<
+    string | null
+  >(null);
   const [resolvedLocationText, setResolvedLocationText] = useState('');
   const [draftReady, setDraftReady] = useState(false);
   const [isHydratingDraft, setIsHydratingDraft] = useState(false);
@@ -779,6 +784,54 @@ export default function PreviewScreen() {
   const templatePresetAppliedRef = useRef<string | null>(null);
   const normalSnapshotRef = useRef<NormalPreviewSnapshot | null>(null);
   const backgroundExtractionRequestRef = useRef(0);
+  const backgroundExtractionActiveRequestRef = useRef<number | null>(null);
+  const postHydrationReextractKeyRef = useRef<string | null>(null);
+  const lastSubjectCoverageProcessedUriRef = useRef<string | null>(null);
+
+  function beginBackgroundExtraction(requestId: number) {
+    backgroundExtractionActiveRequestRef.current = requestId;
+    setIsExtracting(true);
+  }
+
+  function endBackgroundExtraction(requestId: number) {
+    if (backgroundExtractionActiveRequestRef.current !== requestId) return;
+    backgroundExtractionActiveRequestRef.current = null;
+    setIsExtracting(false);
+  }
+
+  const handleSubjectCoverageComputed = useCallback(
+    (coveragePercent: number) => {
+      if (!autoSubjectUri) return;
+      if (lastSubjectCoverageProcessedUriRef.current === autoSubjectUri) return;
+      lastSubjectCoverageProcessedUriRef.current = autoSubjectUri;
+
+      const roundedCoverage = Number(coveragePercent.toFixed(1));
+      const isBadQuality =
+        roundedCoverage < SUBJECT_COVERAGE_MIN_PERCENT ||
+        roundedCoverage > SUBJECT_COVERAGE_MAX_PERCENT;
+      if (!isBadQuality) return;
+
+      const staleCutoutUri = autoSubjectUri;
+      setSubjectRejectedMediaUri(media?.uri ?? null);
+      setAutoSubjectUri(null);
+      setAutoSubjectSourceUri(null);
+      void cleanupTempUriIfOwned(staleCutoutUri);
+      setMessage(
+        `Subject extraction quality too low (${roundedCoverage}%).`,
+      );
+    },
+    [autoSubjectUri, media?.uri],
+  );
+
+  useEffect(() => {
+    if (!media?.uri) {
+      setSubjectRejectedMediaUri(null);
+      return;
+    }
+    if (subjectRejectedMediaUri && subjectRejectedMediaUri !== media.uri) {
+      setSubjectRejectedMediaUri(null);
+    }
+  }, [media?.uri, subjectRejectedMediaUri]);
 
   const selectedTemplateDefinition = useMemo(
     () =>
@@ -805,19 +858,31 @@ export default function PreviewScreen() {
   const hasFilterableBackground = Boolean(
     media?.uri && (media.type === 'image' || media.type === 'video'),
   );
-  const hasSubjectFree = Boolean(autoSubjectUri);
+  const isSubjectRejectedForCurrentMedia = Boolean(
+    media?.uri && subjectRejectedMediaUri === media.uri,
+  );
+  const hasSubjectFree = Boolean(
+    autoSubjectUri &&
+      autoSubjectSourceUri &&
+      media?.uri &&
+      autoSubjectSourceUri === media.uri &&
+      !isSubjectRejectedForCurrentMedia,
+  );
   const activeFilterEffectId: FilterEffectId = templateMode
     ? selectedTemplateDefinition?.defaultFilterEffectId &&
       isFilterEffectId(selectedTemplateDefinition.defaultFilterEffectId)
       ? selectedTemplateDefinition.defaultFilterEffectId
       : 'none'
     : selectedFilterEffectId;
-  const activeBlurEffectId: BlurEffectId = templateMode
-    ? selectedTemplateDefinition?.defaultBlurEffectId &&
-      isBlurEffectId(selectedTemplateDefinition.defaultBlurEffectId)
-      ? selectedTemplateDefinition.defaultBlurEffectId
-      : 'none'
-    : selectedBlurEffectId;
+  const activeBlurEffectId: BlurEffectId =
+    !hasSubjectFree || isExtracting || isSubjectRejectedForCurrentMedia
+    ? 'none'
+    : templateMode
+      ? selectedTemplateDefinition?.defaultBlurEffectId &&
+        isBlurEffectId(selectedTemplateDefinition.defaultBlurEffectId)
+        ? selectedTemplateDefinition.defaultBlurEffectId
+        : 'none'
+      : selectedBlurEffectId;
   const selectedFilterEffect = useMemo(
     () =>
       VISUAL_EFFECT_PRESETS.find((item) => item.id === activeFilterEffectId) ??
@@ -2132,6 +2197,69 @@ export default function PreviewScreen() {
   }, [hasSubjectFree, selectedBlurEffectId]);
 
   useEffect(() => {
+    if (!autoSubjectUri || !autoSubjectUri.startsWith('file://')) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const info = await FileSystem.getInfoAsync(autoSubjectUri);
+        if (cancelled || info.exists) return;
+        setAutoSubjectUri(null);
+        setAutoSubjectSourceUri(null);
+      } catch {
+        if (cancelled) return;
+        setAutoSubjectUri(null);
+        setAutoSubjectSourceUri(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [autoSubjectUri]);
+
+  useEffect(() => {
+    const mediaUri = media?.uri ?? null;
+    const isDraftHydrationPending = templateMode
+      ? templateMediaHydration.loading
+      : isHydratingDraft || !draftReady;
+
+    if (isDraftHydrationPending) return;
+    if (!mediaUri || media?.type !== 'image') return;
+    if (autoSubjectUri || isExtracting) return;
+
+    const reextractKey = templateMode
+      ? `${activity?.id ?? 'none'}:${selectedTemplateId}:${mediaUri}`
+      : `${activity?.id ?? 'none'}:${mediaUri}`;
+    if (postHydrationReextractKeyRef.current === reextractKey) return;
+    postHydrationReextractKeyRef.current = reextractKey;
+
+    void applyImageBackground(
+      {
+        uri: mediaUri,
+        width: media?.width ?? STORY_WIDTH,
+        height: media?.height ?? STORY_HEIGHT,
+        type: 'image',
+      },
+      {
+        silent: false,
+        skipBackgroundRemoval: false,
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    activity?.id,
+    autoSubjectUri,
+    draftReady,
+    isExtracting,
+    isHydratingDraft,
+    media,
+    selectedTemplateId,
+    templateMediaHydration.loading,
+    templateMode,
+  ]);
+
+  useEffect(() => {
     if (hasFilterableBackground) return;
     if (selectedFilterEffectId !== 'none') {
       setSelectedFilterEffectId('none');
@@ -2293,7 +2421,7 @@ export default function PreviewScreen() {
     }
 
     try {
-      setIsExtracting(true);
+      beginBackgroundExtraction(requestId);
       if (!options.silent) {
         setMessage('Extracting subject...');
       }
@@ -2314,15 +2442,13 @@ export default function PreviewScreen() {
       if (backgroundExtractionRequestRef.current !== requestId) {
         return;
       }
+      const details = err instanceof Error ? ` (${err.message})` : '';
       if (!options.silent) {
-        const details = err instanceof Error ? ` (${err.message})` : '';
         const prefix = options.failurePrefix ?? 'Image loaded.';
         setMessage(`${prefix} Subject extraction unavailable${details}.`);
       }
     } finally {
-      if (backgroundExtractionRequestRef.current === requestId) {
-        setIsExtracting(false);
-      }
+      endBackgroundExtraction(requestId);
     }
   }
 
@@ -2871,6 +2997,7 @@ export default function PreviewScreen() {
       successMessage:
         'Activity photo applied. Subject extracted automatically.',
       failurePrefix: 'Activity photo applied.',
+      skipBackgroundRemoval: false,
     });
   }
 
@@ -3148,6 +3275,7 @@ export default function PreviewScreen() {
           paceChartOrientation={paceChartOrientation}
           paceChartFill={paceChartFill}
           distanceUnit={distanceUnit}
+          onSubjectCoverageComputed={handleSubjectCoverageComputed}
         />
 
         <PreviewEditorPanel

@@ -674,7 +674,7 @@ export function PreviewEditorPanel({
                 <View style={styles.backgroundActionsRow}>
                   <View style={styles.backgroundActionCell}>
                     <PrimaryButton
-                      label={isExtracting ? 'Extract' : 'Image'}
+                      label={isExtracting ? 'Extracting...' : 'Image'}
                       icon="image-outline"
                       onPress={onPickImage}
                       variant="secondary"
