@@ -18,12 +18,16 @@ import { importActivitiesFromHealthKit } from '@/lib/healthkit';
 import { getMockTokens, isMockStravaEnabled } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
+import { useThemeStore } from '@/store/themeStore';
 
 const PACEFRAME_LOGO = require('../assets/logo/paceframe-blue.png');
+const STRAVA_BUTTON_ORANGE = require('../assets/strava/btn-strava-orange.png');
+const STRAVA_BUTTON_WHITE = require('../assets/strava/btn-strava-white.png');
 
 export default function LoginScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const themeMode = useThemeStore((s) => s.mode);
   const clientId = process.env.EXPO_PUBLIC_STRAVA_CLIENT_ID?.trim();
   const login = useAuthStore((s) => s.login);
   const [error, setError] = useState<string | null>(null);
@@ -38,11 +42,15 @@ export default function LoginScreen() {
   // Strava validates redirect host against "Authorization Callback Domain".
   // Keep host as "app" for native deep link compatibility.
   const redirectUri = 'paceframe://app/oauth';
+  function resetAndReplace(path: '/activities' | '/login') {
+    router.dismissAll();
+    router.replace(path);
+  }
 
   async function handleLogin() {
     if (isMockStravaEnabled()) {
       await login(getMockTokens());
-      router.replace('/activities');
+      resetAndReplace('/activities');
       return;
     }
 
@@ -80,7 +88,7 @@ export default function LoginScreen() {
       setIsBusy(true);
       setError(null);
       await login(getMockTokens());
-      router.replace('/activities');
+      resetAndReplace('/activities');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Mock login failed.');
     } finally {
@@ -106,7 +114,7 @@ export default function LoginScreen() {
       } catch {
         // Non-blocking: Activities screen allows healthkit source without Strava token.
       }
-      router.replace('/activities');
+      resetAndReplace('/activities');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'HealthKit import failed.');
     } finally {
@@ -149,24 +157,42 @@ export default function LoginScreen() {
         ) : null}
 
         <View style={styles.actions}>
-          <PrimaryButton
-            label={
-              isBusy
-                ? 'Connecting...'
-                : isMockStravaEnabled()
-                  ? 'Continue (Mock Mode)'
-                  : 'Connect Strava'
-            }
-            iconElement={
-              <FontAwesome6
-                name="strava"
-                size={16}
-                color={colors.primaryText}
+          {isMockStravaEnabled() ? (
+            <PrimaryButton
+              label={isBusy ? 'Connecting...' : 'Continue (Mock Mode)'}
+              iconElement={
+                <FontAwesome6
+                  name="strava"
+                  size={16}
+                  color={colors.primaryText}
+                />
+              }
+              onPress={handleLogin}
+              disabled={isBusy}
+            />
+          ) : (
+            <Pressable
+              onPress={handleLogin}
+              disabled={isBusy}
+              accessibilityRole="button"
+              accessibilityLabel="Connect with Strava"
+              style={({ pressed }) => [
+                styles.stravaButton,
+                pressed && !isBusy ? styles.stravaButtonPressed : null,
+                isBusy ? styles.stravaButtonDisabled : null,
+              ]}
+            >
+              <Image
+                source={
+                  themeMode === 'dark'
+                    ? STRAVA_BUTTON_WHITE
+                    : STRAVA_BUTTON_ORANGE
+                }
+                resizeMode="contain"
+                style={styles.stravaButtonImage}
               />
-            }
-            onPress={handleLogin}
-            disabled={isBusy}
-          />
+            </Pressable>
+          )}
 
           {!isMockStravaEnabled() ? (
             <Pressable
@@ -299,6 +325,20 @@ function createStyles(colors: ThemeColors) {
     },
     actions: {
       gap: spacing.sm,
+    },
+    stravaButton: {
+      borderRadius: 12,
+      overflow: 'hidden',
+    },
+    stravaButtonPressed: {
+      opacity: 0.92,
+    },
+    stravaButtonDisabled: {
+      opacity: 0.6,
+    },
+    stravaButtonImage: {
+      width: '100%',
+      height: 48,
     },
     demoCard: {
       borderRadius: 16,

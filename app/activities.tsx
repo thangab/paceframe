@@ -50,6 +50,10 @@ export default function ActivitiesScreen() {
   const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(false);
   const [isPreparingPreview, setIsPreparingPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const resetAndReplace = useCallback((path: '/login' | '/activities') => {
+    router.dismissAll();
+    router.replace(path);
+  }, []);
 
   const getValidTokens = useCallback(async () => {
     if (!tokens?.accessToken) return null;
@@ -89,7 +93,7 @@ export default function ActivitiesScreen() {
     }
 
     if (!tokens?.accessToken) {
-      router.replace('/login');
+      resetAndReplace('/login');
       return;
     }
 
@@ -99,7 +103,7 @@ export default function ActivitiesScreen() {
         setError(null);
         const activeTokens = await getValidTokens();
         if (!activeTokens?.accessToken) {
-          router.replace('/login');
+          resetAndReplace('/login');
           return;
         }
 
@@ -128,7 +132,15 @@ export default function ActivitiesScreen() {
     }
 
     await runLoad();
-  }, [source, activities.length, tokens, setActivities, getValidTokens, loading]);
+  }, [
+    source,
+    activities.length,
+    tokens,
+    setActivities,
+    getValidTokens,
+    loading,
+    resetAndReplace,
+  ]);
 
   useEffect(() => {
     void loadActivities();
@@ -140,7 +152,7 @@ export default function ActivitiesScreen() {
     initialStravaLoadInFlight = null;
     hasLoadedInitialStravaRef.current = false;
     clearActivities();
-    router.replace('/login');
+    resetAndReplace('/login');
   }
 
   async function handleOpenPreview(
@@ -157,7 +169,7 @@ export default function ActivitiesScreen() {
       setError(null);
       const activeTokens = await getValidTokens();
       if (!activeTokens?.accessToken) {
-        router.replace('/login');
+        resetAndReplace('/login');
         return;
       }
 

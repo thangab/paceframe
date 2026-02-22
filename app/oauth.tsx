@@ -28,17 +28,21 @@ export default function OAuthCallbackScreen() {
 
   // Must stay aligned with redirect_uri sent to Strava in login.tsx.
   const redirectUri = 'paceframe://app/oauth';
+  function resetAndReplace(path: '/activities' | '/login') {
+    router.dismissAll();
+    router.replace(path);
+  }
 
   useEffect(() => {
     if (!isHydrated) return;
 
     if (tokens?.accessToken) {
-      router.replace('/activities');
+      resetAndReplace('/activities');
       return;
     }
 
     if (!code || typeof code !== 'string') {
-      router.replace('/login');
+      resetAndReplace('/login');
       return;
     }
     if (handledCodeRef.current === code) return;
@@ -50,12 +54,12 @@ export default function OAuthCallbackScreen() {
         const tokens = await exchangeCodeWithSupabase({ code, redirectUri });
         if (cancelled) return;
         await login(tokens);
-        router.replace('/activities');
+        resetAndReplace('/activities');
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : 'Login failed.';
         if (isStaleOAuthCodeError(message)) {
-          router.replace('/login');
+          resetAndReplace('/login');
           return;
         }
         setError(message);
@@ -86,7 +90,7 @@ export default function OAuthCallbackScreen() {
       <Text style={styles.errorText}>{error}</Text>
       <PrimaryButton
         label="Back to login"
-        onPress={() => router.replace('/login')}
+        onPress={() => resetAndReplace('/login')}
       />
     </View>
   );
