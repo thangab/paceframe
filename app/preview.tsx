@@ -1894,11 +1894,18 @@ export default function PreviewScreen() {
         return;
       }
 
+      const templateDisablesBackgroundRemoval = Boolean(
+        selectedTemplateDefinition?.disableBackgroundRemoval,
+      );
+
       setTemplateMediaHydration({
         key: templateMediaDraftKey,
         loading: true,
         hasStoredDraft: false,
       });
+      // Prevent showing stale cutout from previous template while draft loads.
+      setAutoSubjectUri(null);
+      setAutoSubjectSourceUri(null);
 
       let hasStoredDraft = false;
       try {
@@ -1913,6 +1920,7 @@ export default function PreviewScreen() {
             setBackgroundGradient(draft.backgroundGradient);
             const mediaUri = draft.media?.uri ?? null;
             const subjectMatchesMedia =
+              !templateDisablesBackgroundRemoval &&
               Boolean(draft.autoSubjectUri) &&
               Boolean(mediaUri) &&
               Boolean(draft.autoSubjectSourceUri) &&
@@ -1938,7 +1946,11 @@ export default function PreviewScreen() {
     return () => {
       cancelled = true;
     };
-  }, [templateMediaDraftKey, templateMode]);
+  }, [
+    selectedTemplateDefinition?.disableBackgroundRemoval,
+    templateMediaDraftKey,
+    templateMode,
+  ]);
 
   useEffect(() => {
     if (!templateMode || !templateMediaDraftKey) return;
@@ -1948,13 +1960,18 @@ export default function PreviewScreen() {
     ) {
       return;
     }
+    const templateDisablesBackgroundRemoval = Boolean(
+      selectedTemplateDefinition?.disableBackgroundRemoval,
+    );
 
     const draft: TemplateMediaDraft = {
       v: 2,
       media,
       backgroundGradient,
-      autoSubjectUri,
-      autoSubjectSourceUri,
+      autoSubjectUri: templateDisablesBackgroundRemoval ? null : autoSubjectUri,
+      autoSubjectSourceUri: templateDisablesBackgroundRemoval
+        ? null
+        : autoSubjectSourceUri,
     };
 
     const timeout = setTimeout(() => {
@@ -1970,6 +1987,7 @@ export default function PreviewScreen() {
     autoSubjectSourceUri,
     backgroundGradient,
     media,
+    selectedTemplateDefinition?.disableBackgroundRemoval,
     templateMediaDraftKey,
     templateMediaHydration.key,
     templateMediaHydration.loading,
@@ -2223,6 +2241,10 @@ export default function PreviewScreen() {
     const isDraftHydrationPending = templateMode
       ? templateMediaHydration.loading
       : isHydratingDraft || !draftReady;
+    const shouldRespectTemplateDisable = Boolean(
+      templateMode &&
+        getPreviewTemplateById(selectedTemplateId)?.disableBackgroundRemoval,
+    );
 
     if (isDraftHydrationPending) return;
     if (!mediaUri || media?.type !== 'image') return;
@@ -2243,7 +2265,7 @@ export default function PreviewScreen() {
       },
       {
         silent: false,
-        skipBackgroundRemoval: false,
+        skipBackgroundRemoval: shouldRespectTemplateDisable,
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2987,6 +3009,10 @@ export default function PreviewScreen() {
       setMessage('This activity has no photo.');
       return;
     }
+    const skipBackgroundRemoval = Boolean(
+      templateMode &&
+        getPreviewTemplateById(selectedTemplateId)?.disableBackgroundRemoval,
+    );
     const asset: ImagePicker.ImagePickerAsset = {
       uri: activityPhotoUri,
       width: STORY_WIDTH,
@@ -2994,10 +3020,11 @@ export default function PreviewScreen() {
       type: 'image',
     };
     await applyImageBackground(asset, {
-      successMessage:
-        'Activity photo applied. Subject extracted automatically.',
+      successMessage: skipBackgroundRemoval
+        ? 'Activity photo applied.'
+        : 'Activity photo applied. Subject extracted automatically.',
       failurePrefix: 'Activity photo applied.',
-      skipBackgroundRemoval: false,
+      skipBackgroundRemoval,
     });
   }
 
@@ -3213,7 +3240,7 @@ export default function PreviewScreen() {
           showRotationGuide={showRotationGuide}
           media={media}
           backgroundGradient={backgroundGradient}
-          autoSubjectUri={autoSubjectUri}
+          autoSubjectUri={hasSubjectFree ? autoSubjectUri : null}
           visibleLayers={activeVisibleLayers}
           selectedLayer={outlinedLayer}
           activeLayer={activeLayer}

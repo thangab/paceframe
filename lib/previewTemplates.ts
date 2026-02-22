@@ -506,7 +506,6 @@ export const PREVIEW_TEMPLATES: PreviewTemplateDefinition[] = [
   {
     id: 'template-ticket',
     name: 'Ticket',
-    premium: true,
     showBackgroundTab: false,
     defaultBackground: 'none',
     showRoute: true,
