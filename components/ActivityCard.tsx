@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef } from 'react';
+import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StravaActivity } from '@/types/strava';
 import { radius, spacing, type ThemeColors } from '@/constants/theme';
@@ -17,6 +17,22 @@ const PACEFRAME_LOGO_GREY = require('../assets/logo/paceframe-grey.png');
 export function ActivityCard({ activity, selected, onPress }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const overlayOpacity = useRef(new Animated.Value(selected ? 0 : 1)).current;
+  const logoOpacity = useRef(new Animated.Value(selected ? 0 : 0.5)).current;
+
+  useEffect(() => {
+    Animated.timing(overlayOpacity, {
+      toValue: selected ? 0 : 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+    Animated.timing(logoOpacity, {
+      toValue: selected ? 0 : 0.5,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [logoOpacity, overlayOpacity, selected]);
+
   const distanceText = normalizeDistance(
     formatDistanceMeters(activity.distance),
   );
@@ -39,9 +55,24 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
     >
       <View style={styles.row}>
         {activity.photoUrl ? (
-          <Image source={{ uri: activity.photoUrl }} style={styles.thumbnail} />
+          <View style={styles.thumbnailWrap}>
+            <Image
+              source={{ uri: activity.photoUrl }}
+              style={styles.thumbnail}
+              resizeMode="cover"
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.thumbnailOverlay, { opacity: overlayOpacity }]}
+            />
+            <Animated.Image
+              source={PACEFRAME_LOGO_GREY}
+              style={[styles.thumbnailWatermark, { opacity: logoOpacity }]}
+              resizeMode="contain"
+            />
+          </View>
         ) : (
-          <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
+          <View style={[styles.thumbnailWrap, styles.thumbnailPlaceholder]}>
             <Image
               source={PACEFRAME_LOGO_GREY}
               style={styles.thumbnailLogo}
@@ -275,19 +306,37 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.sm + 2,
       alignItems: 'center',
     },
-    thumbnail: {
+    thumbnailWrap: {
       width: 88,
       height: 88,
       borderRadius: radius.sm,
+      overflow: 'hidden',
+      position: 'relative',
+      alignItems: 'center',
+      justifyContent: 'center',
       backgroundColor: colors.surfaceAlt,
+    },
+    thumbnail: {
+      width: '100%',
+      height: '100%',
     },
     thumbnailPlaceholder: {
       alignItems: 'center',
       justifyContent: 'center',
     },
+    thumbnailOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0, 0, 0, 0.42)',
+    },
+    thumbnailWatermark: {
+      position: 'absolute',
+      width: 34,
+      height: 34,
+    },
     thumbnailLogo: {
       width: 30,
       height: 30,
+      opacity: 0.4,
     },
     content: {
       flex: 1,
