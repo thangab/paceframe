@@ -55,7 +55,7 @@ export const mockActivities: StravaActivity[] = [
       { seconds: 3000, bpm: 146 },
     ],
     photoUrl:
-      'https://images.unsplash.com/photo-1571008887538-b36bb32f4571?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1729275146090-65232947011b?auto=format&fit=crop&w=600&q=100',
   },
   {
     id: 900002,
@@ -89,7 +89,7 @@ export const mockActivities: StravaActivity[] = [
       { seconds: 1680, bpm: 134 },
     ],
     photoUrl:
-      'https://images.unsplash.com/photo-1517963879433-6ad2b056d712?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1758506971986-b0d0edebd8d5?auto=format&fit=crop&w=600&q=100',
   },
   {
     id: 900003,
@@ -127,6 +127,6 @@ export const mockActivities: StravaActivity[] = [
       { seconds: 6600, bpm: 137 },
     ],
     photoUrl:
-      'https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1755764712308-f2b35315d626?auto=format&fit=crop&crop=bottom&h=800&w=600&q=100',
   },
 ];

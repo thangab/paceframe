@@ -303,7 +303,7 @@ export default function ActivitiesScreen() {
               />
             )}
             ListEmptyComponent={
-              <Text style={styles.empty}>No run activities found.</Text>
+              <Text style={styles.empty}>No activities found.</Text>
             }
           />
         )}
