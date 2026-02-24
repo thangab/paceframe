@@ -816,9 +816,7 @@ export default function PreviewScreen() {
       setAutoSubjectUri(null);
       setAutoSubjectSourceUri(null);
       void cleanupTempUriIfOwned(staleCutoutUri);
-      setMessage(
-        `Subject extraction quality too low (${roundedCoverage}%).`,
-      );
+      setMessage(`Subject extraction quality too low (${roundedCoverage}%).`);
     },
     [autoSubjectUri, media?.uri],
   );
@@ -863,10 +861,10 @@ export default function PreviewScreen() {
   );
   const hasSubjectFree = Boolean(
     autoSubjectUri &&
-      autoSubjectSourceUri &&
-      media?.uri &&
-      autoSubjectSourceUri === media.uri &&
-      !isSubjectRejectedForCurrentMedia,
+    autoSubjectSourceUri &&
+    media?.uri &&
+    autoSubjectSourceUri === media.uri &&
+    !isSubjectRejectedForCurrentMedia,
   );
   const activeFilterEffectId: FilterEffectId = templateMode
     ? selectedTemplateDefinition?.defaultFilterEffectId &&
@@ -876,13 +874,13 @@ export default function PreviewScreen() {
     : selectedFilterEffectId;
   const activeBlurEffectId: BlurEffectId =
     !hasSubjectFree || isExtracting || isSubjectRejectedForCurrentMedia
-    ? 'none'
-    : templateMode
-      ? selectedTemplateDefinition?.defaultBlurEffectId &&
-        isBlurEffectId(selectedTemplateDefinition.defaultBlurEffectId)
-        ? selectedTemplateDefinition.defaultBlurEffectId
-        : 'none'
-      : selectedBlurEffectId;
+      ? 'none'
+      : templateMode
+        ? selectedTemplateDefinition?.defaultBlurEffectId &&
+          isBlurEffectId(selectedTemplateDefinition.defaultBlurEffectId)
+          ? selectedTemplateDefinition.defaultBlurEffectId
+          : 'none'
+        : selectedBlurEffectId;
   const selectedFilterEffect = useMemo(
     () =>
       VISUAL_EFFECT_PRESETS.find((item) => item.id === activeFilterEffectId) ??
@@ -1485,12 +1483,13 @@ export default function PreviewScreen() {
     hasRouteLayer,
     supportsPrimaryLayer,
   ]);
+  const isCompactViewport = screenHeight < 740 || screenWidth < 390;
   const canvasDisplaySize = useMemo(() => {
     // Keep exact target ratio while fitting visible space above the bottom overlay.
     const targetHeight = isSquareFormat ? STORY_WIDTH : STORY_HEIGHT;
     const ratio = STORY_WIDTH / targetHeight;
-    const canvasShrinkFactor = 0.94;
-    const reservedBottom = 120;
+    const canvasShrinkFactor = isCompactViewport ? 0.98 : 0.94;
+    const reservedBottom = isCompactViewport ? 84 : 120;
     const maxWidth = Math.max(220, screenWidth);
     const maxHeight = Math.max(220, screenHeight - reservedBottom);
 
@@ -1506,7 +1505,7 @@ export default function PreviewScreen() {
       width: Math.round(width * canvasShrinkFactor),
       height: Math.round(height * canvasShrinkFactor),
     };
-  }, [isSquareFormat, screenHeight, screenWidth]);
+  }, [isCompactViewport, isSquareFormat, screenHeight, screenWidth]);
   const canvasDisplayWidth = canvasDisplaySize.width;
   const canvasDisplayHeight = canvasDisplaySize.height;
   const canvasScaleX = useMemo(
@@ -1925,7 +1924,9 @@ export default function PreviewScreen() {
               Boolean(mediaUri) &&
               Boolean(draft.autoSubjectSourceUri) &&
               draft.autoSubjectSourceUri === mediaUri;
-            setAutoSubjectUri(subjectMatchesMedia ? draft.autoSubjectUri : null);
+            setAutoSubjectUri(
+              subjectMatchesMedia ? draft.autoSubjectUri : null,
+            );
             setAutoSubjectSourceUri(subjectMatchesMedia ? mediaUri : null);
           }
         }
@@ -2243,7 +2244,7 @@ export default function PreviewScreen() {
       : isHydratingDraft || !draftReady;
     const shouldRespectTemplateDisable = Boolean(
       templateMode &&
-        getPreviewTemplateById(selectedTemplateId)?.disableBackgroundRemoval,
+      getPreviewTemplateById(selectedTemplateId)?.disableBackgroundRemoval,
     );
 
     if (isDraftHydrationPending) return;
@@ -3011,7 +3012,7 @@ export default function PreviewScreen() {
     }
     const skipBackgroundRemoval = Boolean(
       templateMode &&
-        getPreviewTemplateById(selectedTemplateId)?.disableBackgroundRemoval,
+      getPreviewTemplateById(selectedTemplateId)?.disableBackgroundRemoval,
     );
     const asset: ImagePicker.ImagePickerAsset = {
       uri: activityPhotoUri,
@@ -3225,6 +3226,7 @@ export default function PreviewScreen() {
           exportRef={exportRef}
           isSquareFormat={isSquareFormat}
           panelOpen={panelOpen}
+          isCompactViewport={isCompactViewport}
           onCanvasTouch={() => {
             if (panelOpen) setPanelOpen(false);
             if (helpPopoverOpen) setHelpPopoverOpen(false);

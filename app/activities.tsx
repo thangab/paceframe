@@ -8,6 +8,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { MaterialCommunityIcons, FontAwesome6 } from '@expo/vector-icons';
@@ -31,6 +32,11 @@ let initialStravaLoadInFlight: Promise<void> | null = null;
 export default function ActivitiesScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const isCompactViewport = screenHeight < 740 || screenWidth < 390;
+  const floatingBottomOffset = isCompactViewport
+    ? 5
+    : layout.floatingBottomOffset;
   const themeMode = useThemeStore((s) => s.mode);
   const setThemeMode = useThemeStore((s) => s.setMode);
   const tokens = useAuthStore((s) => s.tokens);
@@ -78,71 +84,78 @@ export default function ActivitiesScreen() {
     return activeTokens;
   }, [login, tokens]);
 
-  const loadActivities = useCallback(async (force = false) => {
-    if (loading && !force) return;
+  const loadActivities = useCallback(
+    async (force = false) => {
+      if (loading && !force) return;
 
-    if (source === 'healthkit' && activities.length > 0) {
-      return;
-    }
-    if (!force && source === 'strava') {
-      if (activities.length > 0 || hasLoadedInitialStravaRef.current || initialStravaLoadDone) {
+      if (source === 'healthkit' && activities.length > 0) {
         return;
       }
-      if (initialStravaLoadInFlight) {
-        await initialStravaLoadInFlight;
-        return;
-      }
-    }
-
-    if (!tokens?.accessToken) {
-      resetAndReplace('/login');
-      return;
-    }
-
-    const runLoad = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const activeTokens = await getValidTokens();
-        if (!activeTokens?.accessToken) {
-          resetAndReplace('/login');
+      if (!force && source === 'strava') {
+        if (
+          activities.length > 0 ||
+          hasLoadedInitialStravaRef.current ||
+          initialStravaLoadDone
+        ) {
           return;
         }
-
-        const rows = await fetchActivities(activeTokens.accessToken);
-        setActivities(rows, 'strava');
-        hasLoadedInitialStravaRef.current = true;
-        initialStravaLoadDone = true;
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : 'Could not load activities.',
-        );
-      } finally {
-        setHasFinishedInitialLoad(true);
-        setLoading(false);
+        if (initialStravaLoadInFlight) {
+          await initialStravaLoadInFlight;
+          return;
+        }
       }
-    };
 
-    if (!force && source === 'strava') {
-      initialStravaLoadInFlight = runLoad();
-      try {
-        await initialStravaLoadInFlight;
-      } finally {
-        initialStravaLoadInFlight = null;
+      if (!tokens?.accessToken) {
+        resetAndReplace('/login');
+        return;
       }
-      return;
-    }
 
-    await runLoad();
-  }, [
-    source,
-    activities.length,
-    tokens,
-    setActivities,
-    getValidTokens,
-    loading,
-    resetAndReplace,
-  ]);
+      const runLoad = async () => {
+        try {
+          setLoading(true);
+          setError(null);
+          const activeTokens = await getValidTokens();
+          if (!activeTokens?.accessToken) {
+            resetAndReplace('/login');
+            return;
+          }
+
+          const rows = await fetchActivities(activeTokens.accessToken);
+          setActivities(rows, 'strava');
+          hasLoadedInitialStravaRef.current = true;
+          initialStravaLoadDone = true;
+        } catch (err) {
+          setError(
+            err instanceof Error ? err.message : 'Could not load activities.',
+          );
+        } finally {
+          setHasFinishedInitialLoad(true);
+          setLoading(false);
+        }
+      };
+
+      if (!force && source === 'strava') {
+        initialStravaLoadInFlight = runLoad();
+        try {
+          await initialStravaLoadInFlight;
+        } finally {
+          initialStravaLoadInFlight = null;
+        }
+        return;
+      }
+
+      await runLoad();
+    },
+    [
+      source,
+      activities.length,
+      tokens,
+      setActivities,
+      getValidTokens,
+      loading,
+      resetAndReplace,
+    ],
+  );
 
   useEffect(() => {
     void loadActivities();
@@ -362,7 +375,7 @@ export default function ActivitiesScreen() {
           />
         )}
 
-        <View style={styles.bottomBar}>
+        <View style={[styles.bottomBar, { bottom: floatingBottomOffset }]}>
           <Pressable
             style={[
               styles.templatesBtn,

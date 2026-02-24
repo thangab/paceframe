@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -111,14 +112,8 @@ type Props = {
   elevationUnit: ElevationUnit;
   onSetElevationUnit: (unit: ElevationUnit) => void;
   layerStyleMap: Record<StyleLayerId, { color: string; opacity: number }>;
-  onSetLayerStyleColor: (
-    layerId: StyleLayerId,
-    color: string,
-  ) => void;
-  onSetLayerStyleOpacity: (
-    layerId: StyleLayerId,
-    opacity: number,
-  ) => void;
+  onSetLayerStyleColor: (layerId: StyleLayerId, color: string) => void;
+  onSetLayerStyleOpacity: (layerId: StyleLayerId, opacity: number) => void;
   sunsetPrimaryGradient: [string, string, string];
   sunsetPrimaryGradientPresets: [string, string, string][];
   onSetSunsetPrimaryGradient: (gradient: [string, string, string]) => void;
@@ -242,6 +237,11 @@ export function PreviewEditorPanel({
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const isCompactViewport = screenHeight < 740 || screenWidth < 390;
+  const floatingBottomOffset = isCompactViewport
+    ? 5
+    : layout.floatingBottomOffset;
   const themeMode = useThemeStore((s) => s.mode);
   const setThemeMode = useThemeStore((s) => s.setMode);
   const [selectedStyleLayer, setSelectedStyleLayer] =
@@ -251,8 +251,12 @@ export function PreviewEditorPanel({
     { id: 'meta', label: 'Header' },
     { id: 'stats', label: 'Stats' },
     { id: 'route', label: 'Route' },
-    ...(hasLapPaceLayer ? [{ id: 'chartPace' as const, label: 'Pace Chart' }] : []),
-    ...(hasHeartRateLayer ? [{ id: 'chartHr' as const, label: 'HR Chart' }] : []),
+    ...(hasLapPaceLayer
+      ? [{ id: 'chartPace' as const, label: 'Pace Chart' }]
+      : []),
+    ...(hasHeartRateLayer
+      ? [{ id: 'chartHr' as const, label: 'HR Chart' }]
+      : []),
     ...(supportsPrimaryLayer && visibleLayers.primary
       ? [{ id: 'primary' as const, label: 'Primary' }]
       : []),
@@ -361,7 +365,9 @@ export function PreviewEditorPanel({
   );
   const blurEffects = [
     noBlurEffect,
-    ...visualEffectPresets.filter((effect) => blurEffectIds.includes(effect.id)),
+    ...visualEffectPresets.filter((effect) =>
+      blurEffectIds.includes(effect.id),
+    ),
   ];
 
   function handleOpacityTrackLayout(event: LayoutChangeEvent) {
@@ -540,7 +546,7 @@ export function PreviewEditorPanel({
   }
 
   return (
-    <View style={styles.panelShell}>
+    <View style={[styles.panelShell, { bottom: floatingBottomOffset }]}>
       {renderPanelBody ? (
         <Animated.View
           pointerEvents="none"
@@ -935,7 +941,9 @@ export function PreviewEditorPanel({
                                 </Text>
                               ) : null}
                             </View>
-                            <Text style={styles.templateCardName}>{item.name}</Text>
+                            <Text style={styles.templateCardName}>
+                              {item.name}
+                            </Text>
                           </Pressable>
                         );
                       })
@@ -955,21 +963,27 @@ export function PreviewEditorPanel({
                                 selected && styles.templateCardSelected,
                               ]}
                             >
-                              <LayoutLayoutPreview template={item} styles={styles} />
+                              <LayoutLayoutPreview
+                                template={item}
+                                styles={styles}
+                              />
                               {isLocked ? (
                                 <Text style={styles.templatePremiumBadge}>
                                   Premium
                                 </Text>
                               ) : null}
                             </View>
-                            <Text style={styles.templateCardName}>{item.name}</Text>
+                            <Text style={styles.templateCardName}>
+                              {item.name}
+                            </Text>
                           </Pressable>
                         );
                       })}
                 </ScrollView>
                 {quickTemplateMode ? (
                   <Text style={styles.stylePickerHint}>
-                    Template mode: only template + background image are editable.
+                    Template mode: only template + background image are
+                    editable.
                   </Text>
                 ) : null}
 
@@ -977,75 +991,85 @@ export function PreviewEditorPanel({
                   <>
                     <Text style={styles.sectionTitle}>Stats Infos</Text>
                     <View style={styles.statsPillsWrap}>
-                  {(
-                    [
-                      ['distance', 'Distance'],
-                      ['time', 'Time'],
-                      ['pace', 'Pace'],
-                      ['elev', 'Elev'],
-                      ['cadence', 'Cadence'],
-                      ['calories', 'Calories'],
-                      ['avgHr', 'Avg HR'],
-                    ] as [FieldId, string][]
-                  ).map(([id, label]) => {
-                    const selected = effectiveVisible[id];
-                    const disabled =
-                      !statsFieldAvailability[id] || !supportsFullStatsPreview;
-                    const primaryDisabled = disabled || !selected;
-                    const isPrimary = supportsPrimaryLayer && id === primaryField;
-                    return (
-                      <View key={id} style={styles.statsControlRow}>
-                        <Pressable
-                          disabled={disabled}
-                          onPress={() => onToggleField(id, !selected)}
-                          style={[
-                            styles.statsPill,
-                            styles.statsPillMain,
-                            selected && styles.statsPillSelected,
-                            disabled && styles.statsPillDisabled,
-                          ]}
-                        >
-                          <MaterialCommunityIcons
-                            name="check"
-                            size={14}
-                            color={selected ? colors.primaryText : colors.textSubtle}
-                          />
-                          <Text
-                            numberOfLines={1}
-                            ellipsizeMode="tail"
-                            style={[
-                              styles.statsPillText,
-                              selected && styles.statsPillTextSelected,
-                            ]}
-                          >
-                            {label}
-                          </Text>
-                        </Pressable>
-                        {supportsPrimaryLayer ? (
-                          <Pressable
-                            disabled={primaryDisabled}
-                            onPress={() => onSetPrimaryField(id)}
-                            style={[
-                              styles.statsPrimaryBtn,
-                              isPrimary && styles.statsPrimaryBtnSelected,
-                              primaryDisabled && styles.statsPillDisabled,
-                            ]}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Set ${label} as primary`}
-                          >
-                            <MaterialCommunityIcons
-                              name={isPrimary ? 'star' : 'star-outline'}
-                              size={13}
-                              color={isPrimary ? colors.primaryText : colors.textSubtle}
-                            />
-                          </Pressable>
-                        ) : null}
-                      </View>
-                    );
-                  })}
+                      {(
+                        [
+                          ['distance', 'Distance'],
+                          ['time', 'Time'],
+                          ['pace', 'Pace'],
+                          ['elev', 'Elev'],
+                          ['cadence', 'Cadence'],
+                          ['calories', 'Calories'],
+                          ['avgHr', 'Avg HR'],
+                        ] as [FieldId, string][]
+                      ).map(([id, label]) => {
+                        const selected = effectiveVisible[id];
+                        const disabled =
+                          !statsFieldAvailability[id] ||
+                          !supportsFullStatsPreview;
+                        const primaryDisabled = disabled || !selected;
+                        const isPrimary =
+                          supportsPrimaryLayer && id === primaryField;
+                        return (
+                          <View key={id} style={styles.statsControlRow}>
+                            <Pressable
+                              disabled={disabled}
+                              onPress={() => onToggleField(id, !selected)}
+                              style={[
+                                styles.statsPill,
+                                styles.statsPillMain,
+                                selected && styles.statsPillSelected,
+                                disabled && styles.statsPillDisabled,
+                              ]}
+                            >
+                              <MaterialCommunityIcons
+                                name="check"
+                                size={14}
+                                color={
+                                  selected
+                                    ? colors.primaryText
+                                    : colors.textSubtle
+                                }
+                              />
+                              <Text
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                                style={[
+                                  styles.statsPillText,
+                                  selected && styles.statsPillTextSelected,
+                                ]}
+                              >
+                                {label}
+                              </Text>
+                            </Pressable>
+                            {supportsPrimaryLayer ? (
+                              <Pressable
+                                disabled={primaryDisabled}
+                                onPress={() => onSetPrimaryField(id)}
+                                style={[
+                                  styles.statsPrimaryBtn,
+                                  isPrimary && styles.statsPrimaryBtnSelected,
+                                  primaryDisabled && styles.statsPillDisabled,
+                                ]}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Set ${label} as primary`}
+                              >
+                                <MaterialCommunityIcons
+                                  name={isPrimary ? 'star' : 'star-outline'}
+                                  size={13}
+                                  color={
+                                    isPrimary
+                                      ? colors.primaryText
+                                      : colors.textSubtle
+                                  }
+                                />
+                              </Pressable>
+                            ) : null}
+                          </View>
+                        );
+                      })}
                     </View>
 
-                    {(hasLapPaceLayer || hasHeartRateLayer) ? (
+                    {hasLapPaceLayer || hasHeartRateLayer ? (
                       <>
                         <Text style={styles.sectionTitle}>Chart Axes</Text>
                         <View style={styles.mediaPickRow}>
@@ -1160,215 +1184,234 @@ export function PreviewEditorPanel({
 
                     <Text style={styles.sectionTitle}>Header infos</Text>
                     <View style={styles.statsPillsWrap}>
-                  {(
-                    [
-                      ['title', 'Title'],
-                      ['date', 'Date'],
-                      ['location', 'Location'],
-                    ] as [HeaderFieldId, string][]
-                  ).map(([id, label]) => {
-                    const selected = headerVisible[id];
-                    return (
-                      <Pressable
-                        key={id}
-                        onPress={() => onToggleHeaderField(id, !selected)}
-                        style={[
-                          styles.statsPill,
-                          selected && styles.statsPillSelected,
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="check"
-                          size={14}
-                          color={selected ? colors.primaryText : colors.textSubtle}
-                        />
-                        <Text
-                          style={[
-                            styles.statsPillText,
-                            selected && styles.statsPillTextSelected,
-                          ]}
-                        >
-                          {label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                      {(
+                        [
+                          ['title', 'Title'],
+                          ['date', 'Date'],
+                          ['location', 'Location'],
+                        ] as [HeaderFieldId, string][]
+                      ).map(([id, label]) => {
+                        const selected = headerVisible[id];
+                        return (
+                          <Pressable
+                            key={id}
+                            onPress={() => onToggleHeaderField(id, !selected)}
+                            style={[
+                              styles.statsPill,
+                              selected && styles.statsPillSelected,
+                            ]}
+                          >
+                            <MaterialCommunityIcons
+                              name="check"
+                              size={14}
+                              color={
+                                selected
+                                  ? colors.primaryText
+                                  : colors.textSubtle
+                              }
+                            />
+                            <Text
+                              style={[
+                                styles.statsPillText,
+                                selected && styles.statsPillTextSelected,
+                              ]}
+                            >
+                              {label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
                     </View>
 
                     <Text style={styles.sectionTitle}>Font</Text>
                     <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.chipRow}
-                >
-                  {FONT_PRESETS.map((item) => {
-                    const selected = item.id === selectedFontId;
-                    return (
-                      <Pressable
-                        key={item.id}
-                        style={[styles.chip, selected && styles.chipSelected]}
-                        onPress={() => onSelectFont(item.id)}
-                      >
-                        <Text
-                          style={[styles.chipText, { fontFamily: item.family }]}
-                        >
-                          {item.name}
-                        </Text>
-                      </Pressable>
-                      );
-                    })}
-                    </ScrollView>
-
-                    <Text style={styles.sectionTitle}>Colors</Text>
-                    <View style={styles.styleLayerButtonsRow}>
-                  {styleLayerButtons.map((item) => {
-                    const selected = item.id === selectedStyleLayer;
-                    return (
-                      <Pressable
-                        key={item.id}
-                        style={[
-                          styles.styleLayerButton,
-                          selected && styles.styleLayerButtonSelected,
-                        ]}
-                        onPress={() => setSelectedStyleLayer(item.id)}
-                      >
-                        <View
-                          style={[
-                            styles.styleLayerButtonDot,
-                            {
-                              backgroundColor: layerStyleMap[item.id].color,
-                              opacity: layerStyleMap[item.id].opacity,
-                            },
-                          ]}
-                        />
-                        <Text
-                          style={[
-                            styles.styleLayerButtonText,
-                            selected && styles.styleLayerButtonTextSelected,
-                          ]}
-                        >
-                          {item.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                    </View>
-                    <Text style={styles.stylePickerHint}>
-                  Choose a layer, then pick a default color or open the picker.
-                    </Text>
-                    <View style={styles.stylePickerMetaRow}>
-                  <View style={styles.stylePickerPreviewSwatch}>
-                    <View style={styles.stylePickerPreviewSwatchChecker}>
-                      {Array.from({ length: 2 }).map((_, row) => (
-                        <View
-                          key={`preview-row-${row}`}
-                          style={styles.opacityCheckerRow}
-                        >
-                          {Array.from({ length: 4 }).map((__, col) => (
-                            <View
-                              key={`preview-cell-${row}-${col}`}
-                              style={[
-                                styles.opacityCheckerCell,
-                                (row + col) % 2 === 0
-                                  ? styles.opacityCheckerCellDark
-                                  : styles.opacityCheckerCellLight,
-                              ]}
-                            />
-                          ))}
-                        </View>
-                      ))}
-                    </View>
-                    <View
-                      style={[
-                        styles.stylePickerPreviewSwatchTint,
-                        {
-                          backgroundColor:
-                            selectedLayerStyle?.color ?? colors.solidWhite,
-                          opacity: selectedLayerStyle?.opacity ?? 1,
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.stylePickerMetaText}>
-                    {(selectedLayerStyle?.color ?? colors.solidWhite).toUpperCase()} •{' '}
-                    {Math.round((selectedLayerStyle?.opacity ?? 1) * 100)}%
-                  </Text>
-                    </View>
-                    {isSunsetPrimaryStyleSelected ? (
-                  <>
-                    <Text style={styles.sectionTitle}>Primary Gradient</Text>
-                    <Text style={styles.stylePickerHint}>
-                      Sunset primary can stay gradient. Tap a preset.
-                    </Text>
-                    <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.sunsetGradientPresetRow}
+                      contentContainerStyle={styles.chipRow}
                     >
-                      {sunsetPrimaryGradientPresets.map((preset, index) => {
-                        const isSelected = isSameSunsetPrimaryGradient(
-                          sunsetPrimaryGradient,
-                          preset,
-                        );
+                      {FONT_PRESETS.map((item) => {
+                        const selected = item.id === selectedFontId;
                         return (
                           <Pressable
-                            key={`sunset-primary-gradient-${index}`}
-                            onPress={() => onSetSunsetPrimaryGradient(preset)}
+                            key={item.id}
                             style={[
-                              styles.sunsetGradientPresetCard,
-                              isSelected &&
-                                styles.sunsetGradientPresetCardSelected,
+                              styles.chip,
+                              selected && styles.chipSelected,
                             ]}
+                            onPress={() => onSelectFont(item.id)}
                           >
-                            <LinearGradient
-                              colors={preset}
-                              start={{ x: 0.5, y: 0 }}
-                              end={{ x: 0.5, y: 1 }}
-                              style={styles.sunsetGradientPresetFill}
-                            />
+                            <Text
+                              style={[
+                                styles.chipText,
+                                { fontFamily: item.family },
+                              ]}
+                            >
+                              {item.name}
+                            </Text>
                           </Pressable>
                         );
                       })}
                     </ScrollView>
-                  </>
+
+                    <Text style={styles.sectionTitle}>Colors</Text>
+                    <View style={styles.styleLayerButtonsRow}>
+                      {styleLayerButtons.map((item) => {
+                        const selected = item.id === selectedStyleLayer;
+                        return (
+                          <Pressable
+                            key={item.id}
+                            style={[
+                              styles.styleLayerButton,
+                              selected && styles.styleLayerButtonSelected,
+                            ]}
+                            onPress={() => setSelectedStyleLayer(item.id)}
+                          >
+                            <View
+                              style={[
+                                styles.styleLayerButtonDot,
+                                {
+                                  backgroundColor: layerStyleMap[item.id].color,
+                                  opacity: layerStyleMap[item.id].opacity,
+                                },
+                              ]}
+                            />
+                            <Text
+                              style={[
+                                styles.styleLayerButtonText,
+                                selected && styles.styleLayerButtonTextSelected,
+                              ]}
+                            >
+                              {item.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    <Text style={styles.stylePickerHint}>
+                      Choose a layer, then pick a default color or open the
+                      picker.
+                    </Text>
+                    <View style={styles.stylePickerMetaRow}>
+                      <View style={styles.stylePickerPreviewSwatch}>
+                        <View style={styles.stylePickerPreviewSwatchChecker}>
+                          {Array.from({ length: 2 }).map((_, row) => (
+                            <View
+                              key={`preview-row-${row}`}
+                              style={styles.opacityCheckerRow}
+                            >
+                              {Array.from({ length: 4 }).map((__, col) => (
+                                <View
+                                  key={`preview-cell-${row}-${col}`}
+                                  style={[
+                                    styles.opacityCheckerCell,
+                                    (row + col) % 2 === 0
+                                      ? styles.opacityCheckerCellDark
+                                      : styles.opacityCheckerCellLight,
+                                  ]}
+                                />
+                              ))}
+                            </View>
+                          ))}
+                        </View>
+                        <View
+                          style={[
+                            styles.stylePickerPreviewSwatchTint,
+                            {
+                              backgroundColor:
+                                selectedLayerStyle?.color ?? colors.solidWhite,
+                              opacity: selectedLayerStyle?.opacity ?? 1,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.stylePickerMetaText}>
+                        {(
+                          selectedLayerStyle?.color ?? colors.solidWhite
+                        ).toUpperCase()}{' '}
+                        • {Math.round((selectedLayerStyle?.opacity ?? 1) * 100)}
+                        %
+                      </Text>
+                    </View>
+                    {isSunsetPrimaryStyleSelected ? (
+                      <>
+                        <Text style={styles.sectionTitle}>
+                          Primary Gradient
+                        </Text>
+                        <Text style={styles.stylePickerHint}>
+                          Sunset primary can stay gradient. Tap a preset.
+                        </Text>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.sunsetGradientPresetRow}
+                        >
+                          {sunsetPrimaryGradientPresets.map((preset, index) => {
+                            const isSelected = isSameSunsetPrimaryGradient(
+                              sunsetPrimaryGradient,
+                              preset,
+                            );
+                            return (
+                              <Pressable
+                                key={`sunset-primary-gradient-${index}`}
+                                onPress={() =>
+                                  onSetSunsetPrimaryGradient(preset)
+                                }
+                                style={[
+                                  styles.sunsetGradientPresetCard,
+                                  isSelected &&
+                                    styles.sunsetGradientPresetCardSelected,
+                                ]}
+                              >
+                                <LinearGradient
+                                  colors={preset}
+                                  start={{ x: 0.5, y: 0 }}
+                                  end={{ x: 0.5, y: 1 }}
+                                  style={styles.sunsetGradientPresetFill}
+                                />
+                              </Pressable>
+                            );
+                          })}
+                        </ScrollView>
+                      </>
                     ) : null}
                     <View style={styles.quickColorRow}>
-                  <Pressable
-                    onPress={() => setStylePickerOpen(true)}
-                    style={({ pressed }) => [
-                      styles.openPickerButton,
-                      pressed && styles.openPickerButtonPressed,
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name="palette-outline"
-                      size={14}
-                      color={colors.text}
-                    />
-                    <Text style={styles.openPickerButtonText}>Color Picker</Text>
-                  </Pressable>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.styleControlsRow}
-                  >
-                    {colorPresets.map((color) => (
                       <Pressable
-                        key={color}
-                        style={[
-                          styles.colorSwatch,
-                          { backgroundColor: color },
-                          selectedLayerStyle?.color === color &&
-                            styles.colorSwatchSelected,
+                        onPress={() => setStylePickerOpen(true)}
+                        style={({ pressed }) => [
+                          styles.openPickerButton,
+                          pressed && styles.openPickerButtonPressed,
                         ]}
-                        onPress={() =>
-                          onSetLayerStyleColor(selectedStyleLayer, color)
-                        }
-                      />
-                      ))}
-                  </ScrollView>
+                      >
+                        <MaterialCommunityIcons
+                          name="palette-outline"
+                          size={14}
+                          color={colors.text}
+                        />
+                        <Text style={styles.openPickerButtonText}>
+                          Color Picker
+                        </Text>
+                      </Pressable>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.styleControlsRow}
+                      >
+                        {colorPresets.map((color) => (
+                          <Pressable
+                            key={color}
+                            style={[
+                              styles.colorSwatch,
+                              { backgroundColor: color },
+                              selectedLayerStyle?.color === color &&
+                                styles.colorSwatchSelected,
+                            ]}
+                            onPress={() =>
+                              onSetLayerStyleColor(selectedStyleLayer, color)
+                            }
+                          />
+                        ))}
+                      </ScrollView>
                     </View>
-
                   </>
                 ) : null}
               </View>
@@ -1566,7 +1609,11 @@ export function PreviewEditorPanel({
                 ]}
                 hitSlop={8}
               >
-                <MaterialCommunityIcons name="close" size={18} color={colors.textMuted} />
+                <MaterialCommunityIcons
+                  name="close"
+                  size={18}
+                  color={colors.textMuted}
+                />
               </Pressable>
             </View>
 
@@ -1605,7 +1652,10 @@ export function PreviewEditorPanel({
                 {...opacityResponder.panHandlers}
               >
                 {Array.from({ length: 2 }).map((_, row) => (
-                  <View key={`chip-row-${row}`} style={styles.opacityCheckerRow}>
+                  <View
+                    key={`chip-row-${row}`}
+                    style={styles.opacityCheckerRow}
+                  >
                     {Array.from({ length: 22 }).map((__, col) => (
                       <View
                         key={`chip-${row}-${col}`}
@@ -1700,9 +1750,7 @@ export function PreviewEditorPanel({
               <View style={styles.stylePickerHeaderRow}>
                 <View style={styles.stylePickerTitleWrap}>
                   <Text style={styles.stylePickerTitle}>Settings</Text>
-                  <Text style={styles.stylePickerSubtitle}>
-                    Quick settings
-                  </Text>
+                  <Text style={styles.stylePickerSubtitle}>Quick settings</Text>
                 </View>
                 <Pressable
                   onPress={() => {
@@ -2094,13 +2142,13 @@ function createStyles(colors: ThemeColors) {
       color: colors.text,
       fontWeight: '700',
     },
-  chipSub: {
-    color: colors.primaryText,
-    fontSize: 12,
-    marginTop: 2,
-    textAlign: 'center',
-    alignSelf: 'center',
-  },
+    chipSub: {
+      color: colors.primaryText,
+      fontSize: 12,
+      marginTop: 2,
+      textAlign: 'center',
+      alignSelf: 'center',
+    },
     templateCard: {
       width: 108,
       borderRadius: 14,
@@ -2123,129 +2171,129 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'center',
       backgroundColor: colors.surfaceAlt,
     },
-  templateItem: {
-    alignItems: 'center',
-  },
-  templateCardName: {
-    color: colors.text,
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
-    paddingHorizontal: 6,
-    paddingTop: 6,
-    paddingBottom: 4,
-  },
-  templatePremiumBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    color: colors.primaryText,
-    fontSize: 10,
-    fontWeight: '700',
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    overflow: 'hidden',
-  },
-  templateCardSelected: {
-    borderColor: colors.primaryBorderOnLight,
-    borderWidth: 2,
-  },
-  previewFrame: {
-    height: 54,
-    borderRadius: 10,
-    borderWidth: 0,
-    borderColor: 'transparent',
-    backgroundColor: colors.layoutPreviewFrameBg,
-    padding: 2,
-    overflow: 'hidden',
-  },
-  previewSurface: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.layoutPreviewSurfaceBg,
-  },
-  previewScaledWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  previewStatsCard: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  controls: {
-    gap: spacing.sm,
-  },
-  effectsSectionSpacing: {
-    marginTop: spacing.sm,
-  },
-  activityPhotoRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: 8,
-  },
-  activityPhotoCard: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    padding: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  activityPhotoCardPressed: {
-    opacity: 0.88,
-  },
-  activityPhotoThumb: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceAlt,
-  },
-  activityPhotoCopy: {
-    flex: 1,
-  },
-  activityPhotoTitle: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  activityPhotoSubtitle: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  premiumBtn: {
-    minWidth: 92,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-  },
-  premiumBtnFullWidth: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 68,
-  },
-  premiumBtnDisabled: {
-    opacity: 0.62,
-  },
-  premiumBtnIcon: {
-    marginBottom: 4,
-  },
-  premiumBtnText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
-  },
+    templateItem: {
+      alignItems: 'center',
+    },
+    templateCardName: {
+      color: colors.text,
+      fontSize: 11,
+      fontWeight: '600',
+      textAlign: 'center',
+      paddingHorizontal: 6,
+      paddingTop: 6,
+      paddingBottom: 4,
+    },
+    templatePremiumBadge: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      color: colors.primaryText,
+      fontSize: 10,
+      fontWeight: '700',
+      backgroundColor: colors.primary,
+      borderRadius: 8,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      overflow: 'hidden',
+    },
+    templateCardSelected: {
+      borderColor: colors.primaryBorderOnLight,
+      borderWidth: 2,
+    },
+    previewFrame: {
+      height: 54,
+      borderRadius: 10,
+      borderWidth: 0,
+      borderColor: 'transparent',
+      backgroundColor: colors.layoutPreviewFrameBg,
+      padding: 2,
+      overflow: 'hidden',
+    },
+    previewSurface: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.layoutPreviewSurfaceBg,
+    },
+    previewScaledWrap: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    previewStatsCard: {
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    controls: {
+      gap: spacing.sm,
+    },
+    effectsSectionSpacing: {
+      marginTop: spacing.sm,
+    },
+    activityPhotoRow: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      gap: 8,
+    },
+    activityPhotoCard: {
+      flex: 1,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      padding: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    activityPhotoCardPressed: {
+      opacity: 0.88,
+    },
+    activityPhotoThumb: {
+      width: 48,
+      height: 48,
+      borderRadius: 8,
+      backgroundColor: colors.surfaceAlt,
+    },
+    activityPhotoCopy: {
+      flex: 1,
+    },
+    activityPhotoTitle: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    activityPhotoSubtitle: {
+      color: colors.textMuted,
+      fontSize: 12,
+      fontWeight: '500',
+      marginTop: 2,
+    },
+    premiumBtn: {
+      minWidth: 92,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 10,
+    },
+    premiumBtnFullWidth: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 68,
+    },
+    premiumBtnDisabled: {
+      opacity: 0.62,
+    },
+    premiumBtnIcon: {
+      marginBottom: 4,
+    },
+    premiumBtnText: {
+      color: colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+    },
     panelShell: {
       position: 'absolute',
       left: 0,
@@ -2292,35 +2340,35 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.md,
       paddingTop: spacing.sm,
     },
-  panelScroll: {
-    flex: 1,
-  },
-  panelTabs: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    gap: 10,
-  },
-  mainTabsRow: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.glassStroke,
-    overflow: 'hidden',
-    paddingHorizontal: 5,
-    paddingVertical: 5,
-    position: 'relative',
-  },
-  mainTabsGlassBg: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  mainTabsGlassSheen: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.6,
-  },
+    panelScroll: {
+      flex: 1,
+    },
+    panelTabs: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.sm,
+      gap: 10,
+    },
+    mainTabsRow: {
+      flex: 1,
+      flexDirection: 'row',
+      gap: 6,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.glassStroke,
+      overflow: 'hidden',
+      paddingHorizontal: 5,
+      paddingVertical: 5,
+      position: 'relative',
+    },
+    mainTabsGlassBg: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    mainTabsGlassSheen: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.6,
+    },
     panelTab: {
       flex: 1,
       height: 50,
@@ -2332,12 +2380,12 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: 'transparent',
     },
-  panelTabContent: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-  },
+    panelTabContent: {
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 3,
+    },
     panelTabSelected: {
       backgroundColor: colors.surface,
       borderColor: colors.borderStrong,
@@ -2347,21 +2395,21 @@ function createStyles(colors: ThemeColors) {
       shadowOffset: { width: 0, height: 3 },
       elevation: 2,
     },
-  panelTabDisabled: {
-    opacity: 0.5,
-  },
-  panelTabText: {
-    color: colors.textMuted,
-    fontWeight: '500',
-    fontSize: 11,
-  },
-  panelTabTextSelected: {
-    color: colors.text,
-    fontWeight: '600',
-  },
-  panelTabTextDisabled: {
-    color: colors.textSubtle,
-  },
+    panelTabDisabled: {
+      opacity: 0.5,
+    },
+    panelTabText: {
+      color: colors.textMuted,
+      fontWeight: '500',
+      fontSize: 9,
+    },
+    panelTabTextSelected: {
+      color: colors.text,
+      fontWeight: '600',
+    },
+    panelTabTextDisabled: {
+      color: colors.textSubtle,
+    },
     helpFab: {
       width: 50,
       height: 50,
@@ -2391,187 +2439,187 @@ function createStyles(colors: ThemeColors) {
     helpFabDisabled: {
       opacity: 0.6,
     },
-  effectsList: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingBottom: 2,
-  },
-  effectCard: {
-    width: 116,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  effectCardSelected: {
-    borderColor: colors.primaryBorderOnLight,
-    borderWidth: 2,
-  },
-  effectCardPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.985 }],
-  },
-  effectPreview: {
-    width: '100%',
-    aspectRatio: 1.33,
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surfaceStrong,
-  },
-  effectPreviewBg: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  effectPreviewDepth: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  effectPreviewBgOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  effectPreviewSubject: {
-    position: 'absolute',
-    left: 18,
-    right: 18,
-    bottom: 10,
-    top: 18,
-    borderRadius: 9,
-  },
-  effectPreviewSubjectOverlay: {
-    position: 'absolute',
-    left: 18,
-    right: 18,
-    bottom: 10,
-    top: 18,
-    borderRadius: 9,
-  },
-  effectPreviewStats: {
-    position: 'absolute',
-    left: 8,
-    right: 8,
-    bottom: 6,
-    gap: 4,
-  },
-  effectPreviewStatRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  effectPreviewStatLineLg: {
-    alignSelf: 'center',
-    width: '62%',
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.82)',
-  },
-  effectPreviewStatLineSm: {
-    width: 18,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.8)',
-  },
-  effectTitle: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 15,
-    paddingHorizontal: 1,
-  },
-  mediaPickRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'stretch',
-  },
-  backgroundActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: spacing.sm,
-  },
-  gradientPresetRow: {
-    gap: 8,
-    paddingBottom: 2,
-  },
-  gradientPresetCard: {
-    width: 74,
-    height: 54,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  gradientPresetCardSelected: {
-    borderColor: colors.primaryBorderOnLight,
-    borderWidth: 2,
-  },
-  gradientPresetFill: {
-    flex: 1,
-  },
-  sunsetGradientPresetRow: {
-    gap: 8,
-    paddingBottom: 2,
-  },
-  sunsetGradientPresetCard: {
-    width: 58,
-    height: 46,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    backgroundColor: colors.surface,
-  },
-  sunsetGradientPresetCardSelected: {
-    borderColor: colors.primaryBorderOnLight,
-    borderWidth: 2,
-  },
-  sunsetGradientPresetFill: {
-    flex: 1,
-  },
-  backgroundActionCell: {
-    flex: 1,
-    minWidth: 0,
-  },
-  orderHint: {
-    color: colors.textMuted,
-    fontSize: 11,
-    marginTop: -2,
-  },
-  orderLegend: {
-    color: colors.textMuted,
-    fontSize: 10,
-    marginTop: -1,
-    marginBottom: 2,
-  },
-  blocksList: {
-    flex: 1,
-  },
-  blocksListContent: {
-    paddingBottom: 4,
-  },
-  blocksHeader: {
-    gap: 4,
-    marginBottom: 6,
-  },
-  blocksFooter: {
-    gap: 8,
-    marginTop: 10,
-  },
-  helpContent: {
-    paddingBottom: 8,
-  },
-  overlayActionsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'stretch',
-  },
-  overlayActionCell: {
-    flex: 1,
-    minWidth: 0,
-  },
-  layerRowSpacer: {
-    height: 6,
-  },
+    effectsList: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingBottom: 2,
+    },
+    effectCard: {
+      width: 116,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+      gap: 8,
+    },
+    effectCardSelected: {
+      borderColor: colors.primaryBorderOnLight,
+      borderWidth: 2,
+    },
+    effectCardPressed: {
+      opacity: 0.9,
+      transform: [{ scale: 0.985 }],
+    },
+    effectPreview: {
+      width: '100%',
+      aspectRatio: 1.33,
+      borderRadius: 10,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      backgroundColor: colors.surfaceStrong,
+    },
+    effectPreviewBg: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    effectPreviewDepth: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    effectPreviewBgOverlay: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    effectPreviewSubject: {
+      position: 'absolute',
+      left: 18,
+      right: 18,
+      bottom: 10,
+      top: 18,
+      borderRadius: 9,
+    },
+    effectPreviewSubjectOverlay: {
+      position: 'absolute',
+      left: 18,
+      right: 18,
+      bottom: 10,
+      top: 18,
+      borderRadius: 9,
+    },
+    effectPreviewStats: {
+      position: 'absolute',
+      left: 8,
+      right: 8,
+      bottom: 6,
+      gap: 4,
+    },
+    effectPreviewStatRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    effectPreviewStatLineLg: {
+      alignSelf: 'center',
+      width: '62%',
+      height: 5,
+      borderRadius: 999,
+      backgroundColor: 'rgba(255,255,255,0.82)',
+    },
+    effectPreviewStatLineSm: {
+      width: 18,
+      height: 4,
+      borderRadius: 999,
+      backgroundColor: 'rgba(255,255,255,0.8)',
+    },
+    effectTitle: {
+      color: colors.text,
+      fontSize: 12,
+      fontWeight: '600',
+      lineHeight: 15,
+      paddingHorizontal: 1,
+    },
+    mediaPickRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      alignItems: 'stretch',
+    },
+    backgroundActionsRow: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      gap: spacing.sm,
+    },
+    gradientPresetRow: {
+      gap: 8,
+      paddingBottom: 2,
+    },
+    gradientPresetCard: {
+      width: 74,
+      height: 54,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    gradientPresetCardSelected: {
+      borderColor: colors.primaryBorderOnLight,
+      borderWidth: 2,
+    },
+    gradientPresetFill: {
+      flex: 1,
+    },
+    sunsetGradientPresetRow: {
+      gap: 8,
+      paddingBottom: 2,
+    },
+    sunsetGradientPresetCard: {
+      width: 58,
+      height: 46,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+      backgroundColor: colors.surface,
+    },
+    sunsetGradientPresetCardSelected: {
+      borderColor: colors.primaryBorderOnLight,
+      borderWidth: 2,
+    },
+    sunsetGradientPresetFill: {
+      flex: 1,
+    },
+    backgroundActionCell: {
+      flex: 1,
+      minWidth: 0,
+    },
+    orderHint: {
+      color: colors.textMuted,
+      fontSize: 11,
+      marginTop: -2,
+    },
+    orderLegend: {
+      color: colors.textMuted,
+      fontSize: 10,
+      marginTop: -1,
+      marginBottom: 2,
+    },
+    blocksList: {
+      flex: 1,
+    },
+    blocksListContent: {
+      paddingBottom: 4,
+    },
+    blocksHeader: {
+      gap: 4,
+      marginBottom: 6,
+    },
+    blocksFooter: {
+      gap: 8,
+      marginTop: 10,
+    },
+    helpContent: {
+      paddingBottom: 8,
+    },
+    overlayActionsRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      alignItems: 'stretch',
+    },
+    overlayActionCell: {
+      flex: 1,
+      minWidth: 0,
+    },
+    layerRowSpacer: {
+      height: 6,
+    },
     layerRowCard: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -2587,76 +2635,76 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.primaryBorderOnLight,
       borderWidth: 2,
     },
-  layerRowCardDragging: {
-    opacity: 0.75,
-  },
-  layerVisibilityBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  layerMainBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    minHeight: 44,
-  },
-  layerMainTextWrap: {
-    flex: 1,
-  },
-  orderPositionText: {
-    color: colors.textMuted,
-    fontSize: 11,
-  },
-  behindToggleBtn: {
-    minWidth: 62,
-    height: 34,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  behindToggleBtnActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primaryBorderOnLight,
-  },
-  behindToggleText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  behindToggleTextActive: {
-    color: colors.primaryText,
-  },
-  layerHandleBtn: {
-    width: 46,
-    height: 36,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  layerDelete: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.dangerBorder,
-    borderRadius: 8,
-    backgroundColor: colors.dangerSurface,
-  },
+    layerRowCardDragging: {
+      opacity: 0.75,
+    },
+    layerVisibilityBtn: {
+      width: 30,
+      height: 30,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    layerMainBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      minHeight: 44,
+    },
+    layerMainTextWrap: {
+      flex: 1,
+    },
+    orderPositionText: {
+      color: colors.textMuted,
+      fontSize: 11,
+    },
+    behindToggleBtn: {
+      minWidth: 62,
+      height: 34,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 8,
+    },
+    behindToggleBtnActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primaryBorderOnLight,
+    },
+    behindToggleText: {
+      color: colors.text,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    behindToggleTextActive: {
+      color: colors.primaryText,
+    },
+    layerHandleBtn: {
+      width: 46,
+      height: 36,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    layerDelete: {
+      width: 32,
+      height: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.dangerBorder,
+      borderRadius: 8,
+      backgroundColor: colors.dangerSurface,
+    },
     statsPillsWrap: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -2683,245 +2731,245 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'center',
       gap: 6,
     },
-  statsPillMain: {
-    flex: 1,
-    minWidth: 0,
-  },
-  statsControlRow: {
-    width: '48%',
-    minWidth: 0,
-    flexGrow: 0,
-    flexBasis: '48%',
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: 6,
-  },
-  statsPrimaryBtn: {
-    width: 34,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statsPrimaryBtnSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primaryBorderOnLight,
-  },
-  statsPillSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primaryBorderOnLight,
-  },
-  statsPillDisabled: {
-    opacity: 0.45,
-  },
-  statsPillText: {
-    color: colors.text,
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  statsPillTextSelected: {
-    color: colors.primaryText,
-  },
-  chartCard: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    gap: 10,
-  },
-  chartHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  chartTitle: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  chartToggleRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  chartToggleBtn: {
-    minWidth: 26,
-    height: 24,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  chartToggleBtnSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primaryBorderOnLight,
-  },
-  chartToggleText: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  chartToggleTextSelected: {
-    color: colors.primaryText,
-  },
-  chartRows: {
-    gap: 6,
-  },
-  chartRowItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  chartRowLabel: {
-    width: 22,
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  chartRowTrack: {
-    flex: 1,
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: colors.surfaceAlt,
-    overflow: 'hidden',
-  },
-  chartRowFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: colors.primary,
-  },
-  chartRowValue: {
-    width: 56,
-    textAlign: 'right',
-    color: colors.text,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  verticalBarsWrap: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 6,
-    minHeight: 104,
-    paddingTop: 6,
-  },
-  verticalBarItem: {
-    flex: 1,
-    alignItems: 'center',
-    minWidth: 0,
-    gap: 4,
-  },
-  verticalBarTrack: {
-    width: '100%',
-    maxWidth: 28,
-    height: 90,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceAlt,
-    justifyContent: 'flex-end',
-    overflow: 'hidden',
-  },
-  verticalBarFill: {
-    width: '100%',
-    backgroundColor: colors.primary,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-  },
-  verticalBarLabel: {
-    color: colors.textMuted,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  chartFallbackText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  chartBadgeText: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  areaChartWrap: {
-    height: 106,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 1,
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    paddingHorizontal: 2,
-    paddingBottom: 2,
-  },
-  areaColumn: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  areaColumnFill: {
-    width: '100%',
-    borderTopLeftRadius: 3,
-    borderTopRightRadius: 3,
-  },
-  areaChartAxisRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  areaAxisLabel: {
-    color: colors.textMuted,
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  styleLayerButtonsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-    marginBottom: 4,
-  },
-  styleLayerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minWidth: 78,
-  },
-  styleLayerButtonSelected: {
-    borderColor: colors.primaryBorderOnLight,
-    backgroundColor: colors.primary,
-  },
-  styleLayerButtonDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.surface,
-  },
-  styleLayerButtonText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  styleLayerButtonTextSelected: {
-    color: colors.primaryText,
-  },
-  stylePickerPopover: {
-    position: 'absolute',
-    left: spacing.md,
-    right: spacing.md,
-    bottom: 76,
-    zIndex: 40,
-  },
+    statsPillMain: {
+      flex: 1,
+      minWidth: 0,
+    },
+    statsControlRow: {
+      width: '48%',
+      minWidth: 0,
+      flexGrow: 0,
+      flexBasis: '48%',
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      gap: 6,
+    },
+    statsPrimaryBtn: {
+      width: 34,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    statsPrimaryBtnSelected: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primaryBorderOnLight,
+    },
+    statsPillSelected: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primaryBorderOnLight,
+    },
+    statsPillDisabled: {
+      opacity: 0.45,
+    },
+    statsPillText: {
+      color: colors.text,
+      fontWeight: '600',
+      fontSize: 13,
+    },
+    statsPillTextSelected: {
+      color: colors.primaryText,
+    },
+    chartCard: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      backgroundColor: colors.surface,
+      paddingHorizontal: 10,
+      paddingVertical: 10,
+      gap: 10,
+    },
+    chartHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    chartTitle: {
+      color: colors.text,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    chartToggleRow: {
+      flexDirection: 'row',
+      gap: 6,
+    },
+    chartToggleBtn: {
+      minWidth: 26,
+      height: 24,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 8,
+    },
+    chartToggleBtnSelected: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primaryBorderOnLight,
+    },
+    chartToggleText: {
+      color: colors.textMuted,
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    chartToggleTextSelected: {
+      color: colors.primaryText,
+    },
+    chartRows: {
+      gap: 6,
+    },
+    chartRowItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    chartRowLabel: {
+      width: 22,
+      color: colors.textMuted,
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    chartRowTrack: {
+      flex: 1,
+      height: 10,
+      borderRadius: 999,
+      backgroundColor: colors.surfaceAlt,
+      overflow: 'hidden',
+    },
+    chartRowFill: {
+      height: '100%',
+      borderRadius: 999,
+      backgroundColor: colors.primary,
+    },
+    chartRowValue: {
+      width: 56,
+      textAlign: 'right',
+      color: colors.text,
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    verticalBarsWrap: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 6,
+      minHeight: 104,
+      paddingTop: 6,
+    },
+    verticalBarItem: {
+      flex: 1,
+      alignItems: 'center',
+      minWidth: 0,
+      gap: 4,
+    },
+    verticalBarTrack: {
+      width: '100%',
+      maxWidth: 28,
+      height: 90,
+      borderRadius: 8,
+      backgroundColor: colors.surfaceAlt,
+      justifyContent: 'flex-end',
+      overflow: 'hidden',
+    },
+    verticalBarFill: {
+      width: '100%',
+      backgroundColor: colors.primary,
+      borderTopLeftRadius: 8,
+      borderTopRightRadius: 8,
+    },
+    verticalBarLabel: {
+      color: colors.textMuted,
+      fontSize: 10,
+      fontWeight: '700',
+    },
+    chartFallbackText: {
+      color: colors.textMuted,
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    chartBadgeText: {
+      color: colors.textMuted,
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    areaChartWrap: {
+      height: 106,
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 1,
+      borderRadius: 10,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      paddingHorizontal: 2,
+      paddingBottom: 2,
+    },
+    areaColumn: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    areaColumnFill: {
+      width: '100%',
+      borderTopLeftRadius: 3,
+      borderTopRightRadius: 3,
+    },
+    areaChartAxisRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    areaAxisLabel: {
+      color: colors.textMuted,
+      fontSize: 10,
+      fontWeight: '600',
+    },
+    styleLayerButtonsRow: {
+      flexDirection: 'row',
+      gap: 8,
+      flexWrap: 'wrap',
+      marginBottom: 4,
+    },
+    styleLayerButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      minWidth: 78,
+    },
+    styleLayerButtonSelected: {
+      borderColor: colors.primaryBorderOnLight,
+      backgroundColor: colors.primary,
+    },
+    styleLayerButtonDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.surface,
+    },
+    styleLayerButtonText: {
+      color: colors.text,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    styleLayerButtonTextSelected: {
+      color: colors.primaryText,
+    },
+    stylePickerPopover: {
+      position: 'absolute',
+      left: spacing.md,
+      right: spacing.md,
+      bottom: 76,
+      zIndex: 40,
+    },
     helpModalRoot: {
       flex: 1,
       justifyContent: 'flex-start',
@@ -2953,249 +3001,249 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.panelSurfaceOverlay,
       borderColor: colors.glassStroke,
     },
-  stylePickerHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stylePickerTitleWrap: {
-    flex: 1,
-    gap: 1,
-  },
-  stylePickerTitle: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  stylePickerSubtitle: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  stylePickerCloseBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stylePickerCloseBtnPressed: {
-    opacity: 0.65,
-  },
-  stylePickerHint: {
-    color: colors.textMuted,
-    fontSize: 11,
-  },
-  colorGrid: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  colorGridRow: {
-    flexDirection: 'row',
-    marginBottom: -StyleSheet.hairlineWidth,
-  },
-  colorGridCell: {
-    flex: 1,
-    aspectRatio: 1,
-    position: 'relative',
-    marginRight: -StyleSheet.hairlineWidth,
-  },
-  colorGridCellSelectionRing: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    bottom: 2,
-    left: 2,
-    borderWidth: 2,
-    borderColor: colors.text,
-    borderRadius: 2,
-  },
-  colorGridCellPressed: {
-    opacity: 0.8,
-  },
-  opacityTitle: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  opacityControlRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  opacitySliderTrack: {
-    flex: 1,
-    height: 32,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceAlt,
-  },
-  opacitySliderTint: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 1,
-  },
-  opacitySliderGradient: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  opacityCheckerRow: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  opacityCheckerCell: {
-    flex: 1,
-  },
-  opacityCheckerCellDark: {
-    backgroundColor: colors.borderStrong,
-  },
-  opacityCheckerCellLight: {
-    backgroundColor: colors.surface,
-  },
-  opacityValueBadge: {
-    width: 52,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingVertical: 6,
-    textAlign: 'right',
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '600',
-    paddingRight: 8,
-  },
-  opacitySliderHandle: {
-    position: 'absolute',
-    top: 2,
-    width: 28,
-    height: 28,
-    borderRadius: 999,
-    borderWidth: 3,
-    borderColor: colors.surface,
-    backgroundColor: colors.text,
-    shadowColor: colors.text,
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-  opacityHelpText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: -2,
-  },
-  stylePickerMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  stylePickerPreviewSwatch: {
-    width: 20,
-    height: 20,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  stylePickerPreviewSwatchChecker: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  stylePickerPreviewSwatchTint: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  stylePickerMetaText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  styleControlsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-    paddingRight: 6,
-    minWidth: 0,
-  },
-  quickColorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  openPickerButton: {
-    minWidth: 108,
-    height: 34,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-  },
-  openPickerButtonPressed: {
-    opacity: 0.72,
-  },
-  openPickerButtonText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  colorSwatch: {
-    width: 20,
-    height: 20,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  colorSwatchSelected: {
-    borderWidth: 2,
-    borderColor: colors.surface,
-  },
-  controlLabel: {
-    color: colors.text,
-    fontWeight: '600',
-  },
-  note: {
-    color: colors.textMuted,
-  },
-  themeModeRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  themeModeChip: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-  },
-  themeModeChipSelected: {
-    borderColor: colors.primaryBorderOnLight,
-    backgroundColor: colors.primary,
-  },
-  themeModeChipText: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  themeModeChipTextSelected: {
-    color: colors.primaryText,
-  },
+    stylePickerHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    stylePickerTitleWrap: {
+      flex: 1,
+      gap: 1,
+    },
+    stylePickerTitle: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    stylePickerSubtitle: {
+      color: colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    stylePickerCloseBtn: {
+      width: 30,
+      height: 30,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stylePickerCloseBtnPressed: {
+      opacity: 0.65,
+    },
+    stylePickerHint: {
+      color: colors.textMuted,
+      fontSize: 11,
+    },
+    colorGrid: {
+      borderRadius: 16,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    colorGridRow: {
+      flexDirection: 'row',
+      marginBottom: -StyleSheet.hairlineWidth,
+    },
+    colorGridCell: {
+      flex: 1,
+      aspectRatio: 1,
+      position: 'relative',
+      marginRight: -StyleSheet.hairlineWidth,
+    },
+    colorGridCellSelectionRing: {
+      position: 'absolute',
+      top: 2,
+      right: 2,
+      bottom: 2,
+      left: 2,
+      borderWidth: 2,
+      borderColor: colors.text,
+      borderRadius: 2,
+    },
+    colorGridCellPressed: {
+      opacity: 0.8,
+    },
+    opacityTitle: {
+      color: colors.textMuted,
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
+    },
+    opacityControlRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    opacitySliderTrack: {
+      flex: 1,
+      height: 32,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceAlt,
+    },
+    opacitySliderTint: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 1,
+    },
+    opacitySliderGradient: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    opacityCheckerRow: {
+      flex: 1,
+      flexDirection: 'row',
+    },
+    opacityCheckerCell: {
+      flex: 1,
+    },
+    opacityCheckerCellDark: {
+      backgroundColor: colors.borderStrong,
+    },
+    opacityCheckerCellLight: {
+      backgroundColor: colors.surface,
+    },
+    opacityValueBadge: {
+      width: 52,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      paddingVertical: 6,
+      textAlign: 'right',
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '600',
+      paddingRight: 8,
+    },
+    opacitySliderHandle: {
+      position: 'absolute',
+      top: 2,
+      width: 28,
+      height: 28,
+      borderRadius: 999,
+      borderWidth: 3,
+      borderColor: colors.surface,
+      backgroundColor: colors.text,
+      shadowColor: colors.text,
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 4,
+    },
+    opacityHelpText: {
+      color: colors.textMuted,
+      fontSize: 12,
+      fontWeight: '500',
+      marginTop: -2,
+    },
+    stylePickerMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 8,
+    },
+    stylePickerPreviewSwatch: {
+      width: 20,
+      height: 20,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    stylePickerPreviewSwatchChecker: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    stylePickerPreviewSwatchTint: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    stylePickerMetaText: {
+      color: colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    styleControlsRow: {
+      flexDirection: 'row',
+      gap: 8,
+      alignItems: 'center',
+      paddingRight: 6,
+      minWidth: 0,
+    },
+    quickColorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 4,
+    },
+    openPickerButton: {
+      minWidth: 108,
+      height: 34,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+    },
+    openPickerButtonPressed: {
+      opacity: 0.72,
+    },
+    openPickerButtonText: {
+      color: colors.text,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    colorSwatch: {
+      width: 20,
+      height: 20,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    colorSwatchSelected: {
+      borderWidth: 2,
+      borderColor: colors.surface,
+    },
+    controlLabel: {
+      color: colors.text,
+      fontWeight: '600',
+    },
+    note: {
+      color: colors.textMuted,
+    },
+    themeModeRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    themeModeChip: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+    },
+    themeModeChipSelected: {
+      borderColor: colors.primaryBorderOnLight,
+      backgroundColor: colors.primary,
+    },
+    themeModeChipText: {
+      color: colors.text,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    themeModeChipTextSelected: {
+      color: colors.primaryText,
+    },
     unitChip: {
       flex: 1,
       minWidth: 0,

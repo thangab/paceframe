@@ -21,6 +21,7 @@ type VisibleFields = {
 
 type Props = {
   template: StatsLayout;
+  isCompactViewport?: boolean;
   fontPreset: FontPreset;
   visible: VisibleFields;
   layerTextColor?: string;
@@ -43,6 +44,7 @@ const TEXT_SHADOW_STYLE = {
 
 export function StatsLayerContent({
   template,
+  isCompactViewport = false,
   fontPreset,
   visible,
   layerTextColor,
@@ -110,13 +112,21 @@ export function StatsLayerContent({
                 <ValueWithUnit
                   value={metric.value}
                   fontPreset={fontPreset}
-                  valueStyle={styles.sunsetCardValue}
-                  unitStyle={styles.sunsetCardUnit}
+                  valueStyle={
+                    isCompactViewport
+                      ? styles.sunsetCardValueCompact
+                      : styles.sunsetCardValueDesktop
+                  }
+                  unitStyle={
+                    isCompactViewport
+                      ? styles.sunsetCardUnitCompact
+                      : styles.sunsetCardUnitDesktop
+                  }
                   textStyleOverride={textColorOverride}
                   unitStyleOverride={textColorOverride}
                   numberOfLines={1}
-                  autoFit={false}
-                  minimumFontScale={1}
+                  autoFit={isCompactViewport}
+                  minimumFontScale={isCompactViewport ? 0.74 : 0.96}
                 />
               </View>
             ))}
@@ -370,6 +380,7 @@ export function StatsLayerContent({
               value={metric.value}
               fontPreset={fontPreset}
               columnCount={metrics.length >= 3 ? 2 : 1}
+              isPanelGrid={template.layout === 'panel-grid'}
               labelStyleOverride={textColorOverride}
               valueStyleOverride={textColorOverride}
               unitStyleOverride={textColorOverride}
@@ -425,7 +436,7 @@ function InlineMetric({
 }) {
   const { main, unit } = splitMetricValue(value);
   return (
-    <View style={styles.inlineMetric}>
+    <View style={[styles.inlineMetric, styles.inlineMetricNoWrap]}>
       <MaterialCommunityIcons
         name={icon}
         size={iconSize}
@@ -433,8 +444,12 @@ function InlineMetric({
         style={styles.inlineMetricIcon}
       />
       <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.68}
         style={[
           styles.inlineText,
+          styles.inlineMetricValueText,
           textStyle,
           textStyleOverride,
           { fontFamily: fontPreset.family },
@@ -450,7 +465,7 @@ function InlineMetric({
               { fontFamily: fontPreset.family },
             ]}
           >
-            {' '}
+            {'\u00A0'}
             {unit}
           </Text>
         ) : null}
@@ -692,6 +707,9 @@ function ColumnMetric({
         unitStyle={styles.columnUnit}
         textStyleOverride={valueStyleOverride}
         unitStyleOverride={unitStyleOverride}
+        numberOfLines={1}
+        autoFit
+        minimumFontScale={0.68}
       />
     </View>
   );
@@ -702,6 +720,7 @@ function GridMetric({
   value,
   fontPreset,
   columnCount,
+  isPanelGrid = false,
   labelStyleOverride,
   valueStyleOverride,
   unitStyleOverride,
@@ -710,6 +729,7 @@ function GridMetric({
   value: string;
   fontPreset: FontPreset;
   columnCount: 1 | 2;
+  isPanelGrid?: boolean;
   labelStyleOverride?: any;
   valueStyleOverride?: any;
   unitStyleOverride?: any;
@@ -718,7 +738,7 @@ function GridMetric({
     <View style={[styles.gridItem, columnCount === 1 && styles.gridItemSingle]}>
       <Text
         style={[
-          styles.gridLabel,
+          isPanelGrid ? styles.panelGridLabel : styles.gridLabel,
           labelStyleOverride,
           { fontFamily: fontPreset.family },
         ]}
@@ -728,10 +748,13 @@ function GridMetric({
       <ValueWithUnit
         value={value}
         fontPreset={fontPreset}
-        valueStyle={styles.gridValue}
-        unitStyle={styles.gridUnit}
+        valueStyle={isPanelGrid ? styles.panelGridValue : styles.gridValue}
+        unitStyle={isPanelGrid ? styles.panelGridUnit : styles.gridUnit}
         textStyleOverride={valueStyleOverride}
         unitStyleOverride={unitStyleOverride}
+        numberOfLines={1}
+        autoFit
+        minimumFontScale={isPanelGrid ? 0.9 : 0.86}
       />
     </View>
   );
@@ -791,7 +814,7 @@ function ValueWithUnit({
             { fontFamily: fontPreset.family },
           ]}
         >
-          {' '}
+          {'\u00A0'}
           {unit}
         </Text>
       ) : null}
@@ -828,6 +851,9 @@ function SplitBoldPrimaryValue({
       {leftMainLines.map((line, index) => (
         <Text
           key={`${line}-${index}`}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.45}
           style={[
             styles.splitBoldLeftValue,
             textStyleOverride,
@@ -842,6 +868,9 @@ function SplitBoldPrimaryValue({
       ))}
       {leftUnit ? (
         <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.5}
           style={[
             styles.splitBoldLeftUnit,
             textStyleOverride,
@@ -936,7 +965,7 @@ function GradientValueWithUnit({
             { fontFamily: fontPreset.family },
           ]}
         >
-          {' '}
+          {'\u00A0'}
           {unit}
         </Text>
       ) : null}
@@ -983,34 +1012,49 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    flexWrap: 'wrap',
+    width: '100%',
   },
   inlineMetricWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   inlineMetric: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  inlineMetricNoWrap: { flexShrink: 1, minWidth: 0 },
   inlineMetricIcon: { marginTop: 1 },
+  inlineMetricValueText: { flexShrink: 1, minWidth: 0 },
   inlineText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   inlineUnit: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
   separator: { color: '#FFFFFF', fontSize: 20, marginHorizontal: 2 },
   columnsWrap: {
-    width: '100%',
+    width: 'auto',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    flexWrap: 'nowrap',
+    gap: 0,
   },
   metricCell: { flex: 1, alignItems: 'center' },
   metricLabel: { color: '#FFFFFF', fontSize: 13, marginBottom: 2 },
-  metricValue: { color: '#FFFFFF', fontSize: 20, lineHeight: 24 },
+  metricValue: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    lineHeight: 24,
+    width: '100%',
+    textAlign: 'center',
+  },
   metricUnit: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   columnItem: { flex: 1, alignItems: 'center' },
-  columnValue: { color: '#FFFFFF', fontSize: 16, lineHeight: 20 },
+  columnValue: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    lineHeight: 19,
+    width: '100%',
+    textAlign: 'center',
+  },
   columnUnit: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
   gridRows: {
     width: '100%',
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    rowGap: 14,
-    gap: 10,
+    rowGap: 0,
+    gap: 0,
     alignItems: 'flex-start',
   },
   gridItem: { width: '48%', alignItems: 'center' },
@@ -1029,6 +1073,20 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   gridUnit: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  panelGridLabel: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  panelGridValue: {
+    color: '#FFFFFF',
+    fontSize: 27,
+    lineHeight: 31,
+    textAlign: 'center',
+    width: '100%',
+  },
+  panelGridUnit: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   morningWrap: {
     width: '100%',
     alignItems: 'center',
@@ -1145,6 +1203,7 @@ const styles = StyleSheet.create({
   splitBoldPrimaryOnly: {
     width: '100%',
     justifyContent: 'center',
+    textAlign: 'left',
     paddingLeft: 2,
   },
   splitBoldMetric: {
@@ -1196,15 +1255,15 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     rowGap: 8,
-    columnGap: 8,
+    columnGap: 0,
   },
   sunsetCard: {
-    width: '48.5%',
+    width: '49%',
     borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: 'transparent',
     backgroundColor: 'rgba(10,8,18,0.42)',
     minHeight: 100,
     justifyContent: 'center',
@@ -1216,15 +1275,27 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     marginBottom: 4,
   },
-  sunsetCardValue: {
+  sunsetCardValueCompact: {
     color: '#FFFFFF',
-    fontSize: 32,
-    lineHeight: 36,
+    fontSize: 28,
+    lineHeight: 32,
     textAlign: 'center',
   },
-  sunsetCardUnit: {
+  sunsetCardUnitCompact: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
+    fontStyle: 'italic',
+    fontWeight: '700',
+  },
+  sunsetCardValueDesktop: {
+    color: '#FFFFFF',
+    fontSize: 35,
+    lineHeight: 39,
+    textAlign: 'center',
+  },
+  sunsetCardUnitDesktop: {
+    color: '#FFFFFF',
+    fontSize: 17,
     fontStyle: 'italic',
     fontWeight: '700',
   },

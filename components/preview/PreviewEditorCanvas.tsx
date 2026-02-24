@@ -84,6 +84,7 @@ type Props = {
   isSquareFormat: boolean;
   panelOpen: boolean;
   onCanvasTouch: () => void;
+  isCompactViewport: boolean;
   canvasDisplayWidth: number;
   canvasDisplayHeight: number;
   isCapturingOverlay: boolean;
@@ -169,13 +170,7 @@ type Props = {
   onSubjectCoverageComputed?: (coveragePercent: number) => void;
 };
 
-function LoopingVideo({
-  uri,
-  style,
-}: {
-  uri: string;
-  style?: any;
-}) {
+function LoopingVideo({ uri, style }: { uri: string; style?: any }) {
   const player = useVideoPlayer(uri, (nextPlayer) => {
     nextPlayer.loop = true;
     nextPlayer.muted = false;
@@ -230,6 +225,7 @@ export function PreviewEditorCanvas({
   isSquareFormat,
   panelOpen,
   onCanvasTouch,
+  isCompactViewport,
   canvasDisplayWidth,
   canvasDisplayHeight,
   isCapturingOverlay,
@@ -318,23 +314,37 @@ export function PreviewEditorCanvas({
   const interactionLocked = quickTemplateMode;
   const resolvedTemplateBackgroundFrame = useMemo(() => {
     if (!quickTemplateMode || !templateBackgroundMediaFrame) return null;
-    const width = Math.max(1, templateBackgroundMediaFrame.width);
-    const height = Math.max(1, templateBackgroundMediaFrame.height);
+    const width = Math.max(
+      1,
+      Math.round(templateBackgroundMediaFrame.width * canvasScaleX),
+    );
+    const height = Math.max(
+      1,
+      Math.round(templateBackgroundMediaFrame.height * canvasScaleY),
+    );
     return {
       width,
       height,
       left:
-        templateBackgroundMediaFrame.x ??
-        Math.round((canvasDisplayWidth - width) / 2),
+        templateBackgroundMediaFrame.x !== undefined
+          ? Math.round(templateBackgroundMediaFrame.x * canvasScaleX)
+          : Math.round((canvasDisplayWidth - width) / 2),
       top:
-        templateBackgroundMediaFrame.y ??
-        Math.round((canvasDisplayHeight - height) / 2),
+        templateBackgroundMediaFrame.y !== undefined
+          ? Math.round(templateBackgroundMediaFrame.y * canvasScaleY)
+          : Math.round((canvasDisplayHeight - height) / 2),
       fit: templateBackgroundMediaFrame.fit ?? 'cover',
       mediaScale: Math.max(0.1, templateBackgroundMediaFrame.mediaScale ?? 1),
-      mediaOffsetX: templateBackgroundMediaFrame.mediaOffsetX ?? 0,
-      mediaOffsetY: templateBackgroundMediaFrame.mediaOffsetY ?? 0,
+      mediaOffsetX: Math.round(
+        (templateBackgroundMediaFrame.mediaOffsetX ?? 0) * canvasScaleX,
+      ),
+      mediaOffsetY: Math.round(
+        (templateBackgroundMediaFrame.mediaOffsetY ?? 0) * canvasScaleY,
+      ),
     };
   }, [
+    canvasScaleX,
+    canvasScaleY,
     canvasDisplayHeight,
     canvasDisplayWidth,
     quickTemplateMode,
@@ -351,6 +361,10 @@ export function PreviewEditorCanvas({
   const backgroundMediaFit = resolvedTemplateBackgroundFrame?.fit ?? 'cover';
   const backgroundMediaResizeMode =
     backgroundMediaFit === 'contain' ? 'contain' : 'cover';
+  const resolveTemplateScaledX = (value: number) =>
+    quickTemplateMode ? Math.round(value * canvasScaleX) : value;
+  const resolveTemplateScaledY = (value: number) =>
+    quickTemplateMode ? Math.round(value * canvasScaleY) : value;
   const backgroundRenderWidth =
     resolvedTemplateBackgroundFrame?.width ?? canvasDisplayWidth;
   const backgroundRenderHeight =
@@ -485,9 +499,7 @@ export function PreviewEditorCanvas({
   const skiaBackgroundImage = useImage(
     useBackgroundSkiaShader ? (media?.uri ?? null) : null,
   );
-  const skiaSubjectImage = useImage(
-    autoSubjectUri ?? null,
-  );
+  const skiaSubjectImage = useImage(autoSubjectUri ?? null);
   const fallbackRadialCenter = useMemo(
     () => ({
       x: canvasDisplayWidth * 0.5,
@@ -776,6 +788,17 @@ export function PreviewEditorCanvas({
   const defaultChartPaceY = Math.round(300 * canvasScaleY);
   const defaultChartHrX = Math.round(18 * canvasScaleX);
   const defaultChartHrY = Math.round(430 * canvasScaleY);
+  const compactTextScale = isCompactViewport
+    ? canvasDisplayWidth < 330
+      ? 0.8
+      : canvasDisplayWidth < 350
+        ? 0.9
+        : 0.9
+    : 1;
+  const panelGridDesktopBoost =
+    template.layout === 'panel-grid' && canvasDisplayWidth >= 390 ? 1.16 : 1;
+  const statsTextScale =
+    template.layout === 'panel-grid' ? panelGridDesktopBoost : compactTextScale;
   const canRenderRouteLayer =
     routeMode !== 'off' &&
     Boolean(visibleLayers.route) &&
@@ -1165,6 +1188,9 @@ export function PreviewEditorCanvas({
                     {
                       fontFamily: fontPreset.family,
                       fontWeight: fontPreset.weightTitle,
+                      fontSize: Math.round(
+                        (usesLayoutHeader ? 24 : 18) * compactTextScale,
+                      ),
                     },
                   ]}
                 >
@@ -1187,6 +1213,7 @@ export function PreviewEditorCanvas({
                     {
                       fontFamily: fontPreset.family,
                       fontWeight: '400',
+                      fontSize: Math.round(12 * compactTextScale),
                     },
                   ]}
                 >
@@ -1202,6 +1229,7 @@ export function PreviewEditorCanvas({
                     {
                       fontFamily: fontPreset.family,
                       fontWeight: '400',
+                      fontSize: Math.round(13 * compactTextScale),
                     },
                   ]}
                 >
@@ -1249,21 +1277,32 @@ export function PreviewEditorCanvas({
                 },
               ]}
             >
-              <StatsLayerContent
-                template={template}
-                fontPreset={fontPreset}
-                visible={effectiveVisible}
-                layerTextColor={layerStyleSettings.stats.color}
-                sunsetPrimaryGradient={sunsetPrimaryGradient}
-                primaryInSeparateLayer={supportsPrimaryLayer && primaryVisible}
-                distanceText={distanceText}
-                durationText={durationText}
-                paceText={paceText}
-                elevText={elevText}
-                cadenceText={cadenceText}
-                caloriesText={caloriesText}
-                avgHeartRateText={avgHeartRateText}
-              />
+              <View
+                style={
+                  statsTextScale < 1
+                    ? { transform: [{ scale: statsTextScale }] }
+                    : undefined
+                }
+              >
+                <StatsLayerContent
+                  template={template}
+                  isCompactViewport={isCompactViewport}
+                  fontPreset={fontPreset}
+                  visible={effectiveVisible}
+                  layerTextColor={layerStyleSettings.stats.color}
+                  sunsetPrimaryGradient={sunsetPrimaryGradient}
+                  primaryInSeparateLayer={
+                    supportsPrimaryLayer && primaryVisible
+                  }
+                  distanceText={distanceText}
+                  durationText={durationText}
+                  paceText={paceText}
+                  elevText={elevText}
+                  cadenceText={cadenceText}
+                  caloriesText={caloriesText}
+                  avgHeartRateText={avgHeartRateText}
+                />
+              </View>
             </DraggableBlock>
           ) : null}
 
@@ -1306,22 +1345,38 @@ export function PreviewEditorCanvas({
                 },
               ]}
             >
-              <PrimaryStatLayerContent
-                template={template}
-                fontPreset={fontPreset}
-                primaryField={primaryField}
-                value={primaryValueText}
-                layerTextColor={layerStyleSettings.primary.color}
-                sunsetPrimaryGradient={sunsetPrimaryGradient}
-              />
+              <View
+                style={
+                  compactTextScale < 1
+                    ? { transform: [{ scale: compactTextScale }] }
+                    : undefined
+                }
+              >
+                <PrimaryStatLayerContent
+                  template={template}
+                  fontPreset={fontPreset}
+                  primaryField={primaryField}
+                  value={primaryValueText}
+                  layerTextColor={layerStyleSettings.primary.color}
+                  sunsetPrimaryGradient={sunsetPrimaryGradient}
+                />
+              </View>
             </DraggableBlock>
           ) : null}
 
           {canRenderRouteLayer ? (
             <DraggableBlock
               key="route-layer"
-              initialX={layerTransforms.route?.x ?? defaultRouteX}
-              initialY={layerTransforms.route?.y ?? defaultRouteY}
+              initialX={
+                layerTransforms.route
+                  ? resolveTemplateScaledX(layerTransforms.route.x)
+                  : defaultRouteX
+              }
+              initialY={
+                layerTransforms.route
+                  ? resolveTemplateScaledY(layerTransforms.route.y)
+                  : defaultRouteY
+              }
               initialScale={layerTransforms.route?.scale ?? 1}
               rotationDeg={layerTransforms.route?.rotationDeg ?? 0}
               selected={
@@ -1456,18 +1511,19 @@ export function PreviewEditorCanvas({
                     );
                     if (!pacePoints.length) return null;
 
-                    const step = pacePoints.length > 1
-                      ? Math.abs(
-                          (isMainPaceChartHorizontal
-                            ? (pacePoints[1]?.y ?? 0)
-                            : pacePoints[1]?.x) -
+                    const step =
+                      pacePoints.length > 1
+                        ? Math.abs(
                             (isMainPaceChartHorizontal
-                              ? (pacePoints[0]?.y ?? 0)
-                              : pacePoints[0]?.x),
-                        )
-                      : (isMainPaceChartHorizontal
-                          ? chartBounds.bottom - chartBounds.top
-                          : chartBounds.right - chartBounds.left) * 0.35;
+                              ? (pacePoints[1]?.y ?? 0)
+                              : pacePoints[1]?.x) -
+                              (isMainPaceChartHorizontal
+                                ? (pacePoints[0]?.y ?? 0)
+                                : pacePoints[0]?.x),
+                          )
+                        : (isMainPaceChartHorizontal
+                            ? chartBounds.bottom - chartBounds.top
+                            : chartBounds.right - chartBounds.left) * 0.35;
                     const slot = isMainPaceChartHorizontal
                       ? (chartBounds.bottom - chartBounds.top) /
                         Math.max(1, pacePoints.length)
@@ -1497,7 +1553,8 @@ export function PreviewEditorCanvas({
                             ? chartBounds.left
                             : point.x - thickness / 2;
                           const pointY = point.y ?? chartBounds.bottom;
-                          const slot = (chartBounds.bottom - chartBounds.top) /
+                          const slot =
+                            (chartBounds.bottom - chartBounds.top) /
                             Math.max(1, pacePoints.length);
                           const top = isMainPaceChartHorizontal
                             ? chartBounds.top +
@@ -1634,6 +1691,7 @@ export function PreviewEditorCanvas({
           {imageOverlays.map((overlay, index) => {
             const layerId: LayerId = `image:${overlay.id}`;
             if (!visibleLayers[layerId]) return null;
+            const layerTransform = layerTransforms[layerId];
             const overlaySource =
               typeof overlay.asset === 'number'
                 ? overlay.asset
@@ -1646,14 +1704,16 @@ export function PreviewEditorCanvas({
               <DraggableBlock
                 key={layerId}
                 initialX={
-                  layerTransforms[layerId]?.x ??
-                  Math.round((20 + index * 12) * canvasScaleX)
+                  layerTransform
+                    ? resolveTemplateScaledX(layerTransform.x)
+                    : Math.round((20 + index * 12) * canvasScaleX)
                 }
                 initialY={
-                  layerTransforms[layerId]?.y ??
-                  Math.round((80 + index * 12) * canvasScaleY)
+                  layerTransform
+                    ? resolveTemplateScaledY(layerTransform.y)
+                    : Math.round((80 + index * 12) * canvasScaleY)
                 }
-                initialScale={layerTransforms[layerId]?.scale ?? 1}
+                initialScale={layerTransform?.scale ?? 1}
                 selected={
                   showSelectionOutline &&
                   !interactionLocked &&
@@ -1665,9 +1725,7 @@ export function PreviewEditorCanvas({
                 canvasHeight={canvasDisplayHeight}
                 onDragGuideChange={onDragGuideChange}
                 onRotationGuideChange={onRotationGuideChange}
-                rotationDeg={
-                  layerTransforms[layerId]?.rotationDeg ?? overlay.rotationDeg
-                }
+                rotationDeg={layerTransform?.rotationDeg ?? overlay.rotationDeg}
                 onSelect={() => setSelectedLayer(layerId)}
                 onInteractionChange={(active) =>
                   setActiveLayer(active ? layerId : null)
@@ -1701,7 +1759,10 @@ export function PreviewEditorCanvas({
             ? templateFixedChartElements.map((item) => {
                 const left = Math.round(item.x * canvasScaleX);
                 const top = Math.round(item.y * canvasScaleY);
-                const width = Math.max(1, Math.round(item.width * canvasScaleX));
+                const width = Math.max(
+                  1,
+                  Math.round(item.width * canvasScaleX),
+                );
                 const height = Math.max(
                   1,
                   Math.round(item.height * canvasScaleY),
@@ -1801,18 +1862,20 @@ export function PreviewEditorCanvas({
                           );
                           if (!pacePoints.length) return null;
 
-                          const step = pacePoints.length > 1
-                            ? Math.abs(
-                                (isPaceHorizontalForItem
-                                  ? (pacePoints[1]?.y ?? 0)
-                                  : pacePoints[1]?.x) -
+                          const step =
+                            pacePoints.length > 1
+                              ? Math.abs(
                                   (isPaceHorizontalForItem
-                                    ? (pacePoints[0]?.y ?? 0)
-                                    : pacePoints[0]?.x),
-                              )
-                            : (isPaceHorizontalForItem
-                                ? chartBounds.bottom - chartBounds.top
-                                : chartBounds.right - chartBounds.left) * 0.35;
+                                    ? (pacePoints[1]?.y ?? 0)
+                                    : pacePoints[1]?.x) -
+                                    (isPaceHorizontalForItem
+                                      ? (pacePoints[0]?.y ?? 0)
+                                      : pacePoints[0]?.x),
+                                )
+                              : (isPaceHorizontalForItem
+                                  ? chartBounds.bottom - chartBounds.top
+                                  : chartBounds.right - chartBounds.left) *
+                                0.35;
                           const slot = isPaceHorizontalForItem
                             ? (chartBounds.bottom - chartBounds.top) /
                               Math.max(1, pacePoints.length)
@@ -1987,8 +2050,12 @@ export function PreviewEditorCanvas({
                     .map((token) => token.text)
                     .join('');
                   const fontSize =
-                    item.fontSize !== undefined
-                      ? Math.round(item.fontSize * canvasScaleX)
+                    Math.min(canvasScaleX, canvasScaleY) > 0
+                      ? Math.round(
+                          (item.fontSize !== undefined ? item.fontSize : 14) *
+                            Math.min(canvasScaleX, canvasScaleY) *
+                            compactTextScale,
+                        )
                       : 14;
                   const lineHeight =
                     item.lineHeight !== undefined
@@ -2183,7 +2250,12 @@ export function PreviewEditorCanvas({
                                 token.accent
                                   ? {
                                       fontFamily: token.fontFamily,
-                                      fontSize: token.fontSize,
+                                      fontSize:
+                                        token.fontSize !== undefined
+                                          ? Math.round(
+                                              token.fontSize * compactTextScale,
+                                            )
+                                          : undefined,
                                       fontWeight: token.fontWeight,
                                       letterSpacing: token.letterSpacing,
                                       color: normalizeTemplateColor(
