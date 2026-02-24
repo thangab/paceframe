@@ -18,16 +18,13 @@ import { importActivitiesFromHealthKit } from '@/lib/healthkit';
 import { getMockTokens, isMockStravaEnabled } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
-import { useThemeStore } from '@/store/themeStore';
 
 const PACEFRAME_LOGO = require('../assets/logo/paceframe-blue.png');
 const STRAVA_BUTTON_ORANGE = require('../assets/strava/btn-strava-orange.png');
-const STRAVA_BUTTON_WHITE = require('../assets/strava/btn-strava-white.png');
 
 export default function LoginScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const themeMode = useThemeStore((s) => s.mode);
   const clientId = process.env.EXPO_PUBLIC_STRAVA_CLIENT_ID?.trim();
   const login = useAuthStore((s) => s.login);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +40,9 @@ export default function LoginScreen() {
   // Keep host as "app" for native deep link compatibility.
   const redirectUri = 'paceframe://app/oauth';
   function resetAndReplace(path: '/activities' | '/login') {
-    router.dismissAll();
+    if (router.canGoBack()) {
+      router.dismissAll();
+    }
     router.replace(path);
   }
 
@@ -183,11 +182,7 @@ export default function LoginScreen() {
               ]}
             >
               <Image
-                source={
-                  themeMode === 'dark'
-                    ? STRAVA_BUTTON_WHITE
-                    : STRAVA_BUTTON_ORANGE
-                }
+                source={STRAVA_BUTTON_ORANGE}
                 resizeMode="contain"
                 style={styles.stravaButtonImage}
               />
@@ -263,7 +258,7 @@ function createStyles(colors: ThemeColors) {
       flex: 1,
       padding: spacing.lg,
       justifyContent: 'center',
-      backgroundColor: colors.background,
+      backgroundColor: colors.surface,
     },
     backdrop: {
       ...StyleSheet.absoluteFillObject,
@@ -291,17 +286,17 @@ function createStyles(colors: ThemeColors) {
       height: 26,
     },
     card: {
-      borderRadius: 24,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
+      // borderRadius: 24,
+      // borderWidth: 1,
+      // borderColor: colors.border,
+      // backgroundColor: colors.surface,
       padding: spacing.lg + 2,
-      gap: spacing.md,
-      shadowColor: colors.text,
-      shadowOpacity: 0.12,
-      shadowRadius: 20,
-      shadowOffset: { width: 0, height: 10 },
-      elevation: 6,
+      // gap: spacing.md,
+      // shadowColor: colors.text,
+      // shadowOpacity: 0.12,
+      // shadowRadius: 20,
+      // shadowOffset: { width: 0, height: 10 },
+      // elevation: 6,
     },
     brandMark: {
       width: 54,

@@ -20,7 +20,9 @@ export default function RootLayout() {
   const isHydrated = useAuthStore((s) => s.isHydrated);
   const isThemeHydrated = useThemeStore((s) => s.isHydrated);
   const styles = createStyles(colors);
-  const statusBarStyle = useThemeStore((s) => (s.mode === 'dark' ? 'light' : 'dark'));
+  const statusBarStyle = useThemeStore((s) =>
+    s.mode === 'dark' ? 'light' : 'dark',
+  );
 
   if (!isHydrated || !isThemeHydrated || !fontsLoaded) {
     return (
@@ -44,7 +46,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="login" options={{ title: 'PaceFrame' }} />
+        <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="activities" options={{ title: 'Activities' }} />
         <Stack.Screen name="preview" options={{ title: 'Preview' }} />
         <Stack.Screen name="paywall" options={{ title: 'PaceFrame Premium' }} />

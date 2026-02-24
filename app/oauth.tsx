@@ -29,7 +29,9 @@ export default function OAuthCallbackScreen() {
   // Must stay aligned with redirect_uri sent to Strava in login.tsx.
   const redirectUri = 'paceframe://app/oauth';
   function resetAndReplace(path: '/activities' | '/login') {
-    router.dismissAll();
+    if (router.canGoBack()) {
+      router.dismissAll();
+    }
     router.replace(path);
   }
 

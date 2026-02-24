@@ -51,7 +51,9 @@ export default function ActivitiesScreen() {
   const [isPreparingPreview, setIsPreparingPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const resetAndReplace = useCallback((path: '/login' | '/activities') => {
-    router.dismissAll();
+    if (router.canGoBack()) {
+      router.dismissAll();
+    }
     router.replace(path);
   }, []);
 
