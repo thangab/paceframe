@@ -12,11 +12,10 @@
       "resizeMode": "contain",
       "backgroundColor": "#111827"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": false,
+      "buildNumber": "3",
       "bundleIdentifier": "com.paceframe.app",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "PaceFrame needs access to your photos so you can select images and videos.",
@@ -27,7 +26,17 @@
       }
     },
     "android": {
-      "package": "com.paceframe.app"
+      "package": "com.paceframe.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "bundler": "metro"
@@ -55,9 +64,11 @@
       "typedRoutes": true
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+        "projectId": "fa3e785e-99f5-442d-ad57-c20c5eac477d"
       }
-    }
+    },
+    "owner": "thangab"
   }
 }
