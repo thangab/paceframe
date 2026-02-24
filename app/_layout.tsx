@@ -1,7 +1,7 @@
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { Stack } from 'expo-router';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, LogBox, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { Monoton_400Regular } from '@expo-google-fonts/monoton';
@@ -10,6 +10,12 @@ import { useAppBootstrap } from '@/hooks/useAppBootstrap';
 import { ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useThemeStore } from '@/store/themeStore';
+
+if (__DEV__) {
+  LogBox.ignoreLogs([
+    'Sending `onAnimatedValueUpdate` with no listeners registered.',
+  ]);
+}
 
 export default function RootLayout() {
   useAppBootstrap();
