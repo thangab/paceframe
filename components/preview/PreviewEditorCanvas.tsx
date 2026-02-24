@@ -1,7 +1,7 @@
 import { RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
 import type * as ImagePicker from 'expo-image-picker';
-import { ResizeMode, Video } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   AlphaType,
@@ -168,6 +168,31 @@ type Props = {
   distanceUnit: DistanceUnit;
   onSubjectCoverageComputed?: (coveragePercent: number) => void;
 };
+
+function LoopingVideo({
+  uri,
+  style,
+}: {
+  uri: string;
+  style?: any;
+}) {
+  const player = useVideoPlayer(uri, (nextPlayer) => {
+    nextPlayer.loop = true;
+    nextPlayer.muted = false;
+    nextPlayer.play();
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={style}
+      contentFit="cover"
+      nativeControls={false}
+      allowsFullscreen={false}
+      allowsPictureInPicture={false}
+    />
+  );
+}
 
 const RADIAL_BLUR_EFFECT = Skia.RuntimeEffect.Make(`
 uniform shader image;
@@ -859,8 +884,8 @@ export function PreviewEditorCanvas({
                     styles.hiddenForCapture,
                 ]}
               >
-                <Video
-                  source={{ uri: media.uri }}
+                <LoopingVideo
+                  uri={media.uri}
                   style={[
                     styles.mediaFrameContent,
                     framedBackgroundContentStyle,
@@ -868,15 +893,11 @@ export function PreviewEditorCanvas({
                       ? ({ filter: mergedBackgroundFilter } as any)
                       : null,
                   ]}
-                  shouldPlay
-                  isLooping
-                  isMuted={false}
-                  resizeMode={ResizeMode.COVER}
                 />
               </View>
             ) : (
-              <Video
-                source={{ uri: media.uri }}
+              <LoopingVideo
+                uri={media.uri}
                 style={[
                   styles.media,
                   mergedBackgroundFilter.length > 0
@@ -886,10 +907,6 @@ export function PreviewEditorCanvas({
                     (isExportingPng && pngTransparentOnly)) &&
                     styles.hiddenForCapture,
                 ]}
-                shouldPlay
-                isLooping
-                isMuted={false}
-                resizeMode={ResizeMode.COVER}
               />
             )
           ) : media?.uri ? (
