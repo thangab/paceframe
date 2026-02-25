@@ -9,13 +9,14 @@ import {
   View,
   Image,
 } from 'react-native';
-import { FontAwesome6, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { importActivitiesFromHealthKit } from '@/lib/healthkit';
 import { getMockTokens } from '@/lib/strava';
+import { buildStravaMobileAuthorizeUrl } from '@/lib/stravaOAuth';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
 
@@ -36,9 +37,6 @@ export default function LoginScreen() {
       error && /(healthkit|authorization|denied|permission)/i.test(error),
     );
 
-  // Strava validates redirect host against "Authorization Callback Domain".
-  // Keep host as "app" for native deep link compatibility.
-  const redirectUri = 'paceframe://app/oauth';
   function resetAndReplace(path: '/activities' | '/login') {
     if (router.canGoBack()) {
       router.dismissAll();
@@ -47,9 +45,6 @@ export default function LoginScreen() {
   }
 
   async function handleLogin() {
-    await login(getMockTokens());
-    resetAndReplace('/activities');
-
     if (!clientId) {
       setError('Missing EXPO_PUBLIC_STRAVA_CLIENT_ID in .env');
       return;
@@ -65,12 +60,7 @@ export default function LoginScreen() {
       setIsBusy(true);
       setError(null);
 
-      const authUrl =
-        `https://www.strava.com/oauth/mobile/authorize?client_id=${encodeURIComponent(clientId)}` +
-        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-        `&response_type=code` +
-        `&approval_prompt=auto` +
-        `&scope=read,activity:read_all`;
+      const authUrl = buildStravaMobileAuthorizeUrl({ clientId });
       await Linking.openURL(authUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed.');

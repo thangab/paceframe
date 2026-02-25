@@ -5,6 +5,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { exchangeCodeWithSupabase } from '@/lib/strava';
+import { STRAVA_REDIRECT_URI } from '@/lib/stravaOAuth';
 import { useAuthStore } from '@/store/authStore';
 
 function isStaleOAuthCodeError(message: string) {
@@ -26,8 +27,6 @@ export default function OAuthCallbackScreen() {
   const handledCodeRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Must stay aligned with redirect_uri sent to Strava in login.tsx.
-  const redirectUri = 'paceframe://app/oauth';
   function resetAndReplace(path: '/activities' | '/login') {
     if (router.canGoBack()) {
       router.dismissAll();
@@ -53,7 +52,10 @@ export default function OAuthCallbackScreen() {
     let cancelled = false;
     void (async () => {
       try {
-        const tokens = await exchangeCodeWithSupabase({ code, redirectUri });
+        const tokens = await exchangeCodeWithSupabase({
+          code,
+          redirectUri: STRAVA_REDIRECT_URI,
+        });
         if (cancelled) return;
         await login(tokens);
         resetAndReplace('/activities');
