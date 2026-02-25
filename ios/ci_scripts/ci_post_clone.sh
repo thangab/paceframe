@@ -2,12 +2,8 @@
 set -e
 set -x
 
-echo "📦 Setup Node"
-if command -v node >/dev/null 2>&1; then
-  echo "Node exists"
-else
-  brew install node
-fi
+echo "📦 Go to repo root"
+cd "$(git rev-parse --show-toplevel)"
 
 echo "📦 Install JS deps"
 npm install
