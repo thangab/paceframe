@@ -78,259 +78,49 @@ import {
   StatsLayout,
   StatsLayoutKind,
 } from '@/types/preview';
-
-const ROUTE_LAYER_WIDTH = 280;
-const ROUTE_LAYER_HEIGHT = 180;
-const ROUTE_DEFAULT_Y_RAISE = 130;
-const IMAGE_OVERLAY_MAX_INITIAL = 180;
-const IMAGE_OVERLAY_MIN_INITIAL = 90;
-const EXPORT_PNG_WIDTH = 1080;
-const DEFAULT_VISIBLE_FIELDS: Record<FieldId, boolean> = {
-  distance: true,
-  time: true,
-  pace: true,
-  elev: true,
-  cadence: false,
-  calories: false,
-  avgHr: false,
-};
-const SUNSET_HERO_DEFAULT_VISIBLE_FIELDS: Record<FieldId, boolean> = {
-  distance: true,
-  time: true,
-  pace: true,
-  elev: true,
-  cadence: false,
-  calories: false,
-  avgHr: true,
-};
-const DEFAULT_HEADER_VISIBLE = {
-  title: true,
-  date: true,
-  location: true,
-};
-const DEFAULT_VISIBLE_LAYERS: Partial<Record<LayerId, boolean>> = {
-  meta: true,
-  stats: true,
-  primary: true,
-  route: false,
-  chartPace: false,
-  chartHr: false,
-};
-const PREVIEW_DRAFT_KEY_PREFIX = 'paceframe.preview.draft.';
-const PREVIEW_TEMPLATE_MEDIA_KEY_PREFIX = 'paceframe.preview.template-media.';
-const SUBJECT_COVERAGE_MIN_PERCENT = 1;
-const SUBJECT_COVERAGE_MAX_PERCENT = 93;
-const BACKGROUND_GRADIENT_PRESETS: BackgroundGradient[] = [
-  { colors: ['#0F172A', '#1D4ED8', '#38BDF8'], direction: 'vertical' },
-  { colors: ['#111827', '#7C3AED', '#F97316'], direction: 'horizontal' },
-  { colors: ['#052E16', '#16A34A', '#86EFAC'], direction: 'vertical' },
-  { colors: ['#3F1D2E', '#DB2777', '#FBCFE8'], direction: 'horizontal' },
-  { colors: ['#1C1917', '#EA580C', '#FACC15'], direction: 'vertical' },
-  { colors: ['#0B132B', '#1C2541', '#5BC0BE'], direction: 'horizontal' },
-  { colors: ['#1F2937', '#374151', '#9CA3AF'], direction: 'vertical' },
-  { colors: ['#164E63', '#0E7490', '#67E8F9'], direction: 'horizontal' },
-  { colors: ['#0A0A0A', '#3B0764', '#C4B5FD'], direction: 'vertical' },
-  { colors: ['#312E81', '#4F46E5', '#A5B4FC'], direction: 'horizontal' },
-];
-type SunsetPrimaryGradient = [string, string, string];
-const DEFAULT_SUNSET_PRIMARY_GRADIENT: SunsetPrimaryGradient = [
-  '#FFF4B5',
-  '#FFC84A',
-  '#FF8A00',
-];
-const SPLIT_BOLD_DEFAULT_TEXT_OPACITY = 0.6;
-const SUNSET_PRIMARY_GRADIENT_PRESETS: SunsetPrimaryGradient[] = [
+import {
+  BACKGROUND_GRADIENT_PRESETS,
+  BlurEffectId,
+  DEFAULT_HEADER_VISIBLE,
   DEFAULT_SUNSET_PRIMARY_GRADIENT,
-  ['#FFE8CC', '#FF9F43', '#FF6B00'],
-  ['#FDF2F8', '#FB7185', '#E11D48'],
-  ['#FEF9C3', '#FACC15', '#EAB308'],
-  ['#ECFEFF', '#22D3EE', '#0EA5E9'],
-  ['#EEF2FF', '#818CF8', '#4F46E5'],
-  ['#F3E8FF', '#C084FC', '#7E22CE'],
-  ['#DCFCE7', '#4ADE80', '#16A34A'],
-  ['#E0F2FE', '#38BDF8', '#2563EB'],
-  ['#E2E8F0', '#94A3B8', '#334155'],
-];
-type VisualEffectId =
-  | 'none'
-  | 'black-and-white'
-  | 'bw-soft'
-  | 'warm-sunset'
-  | 'cool-night'
-  | 'background-blur'
-  | 'background-radial-blur'
-  | 'background-motion-blur';
-type FilterEffectId =
-  | 'none'
-  | 'black-and-white'
-  | 'bw-soft'
-  | 'warm-sunset'
-  | 'cool-night';
-type BlurEffectId =
-  | 'none'
-  | 'background-blur'
-  | 'background-radial-blur'
-  | 'background-motion-blur';
-type VisualFilterStep =
-  | { brightness: number }
-  | { contrast: number }
-  | { grayscale: number }
-  | { hueRotate: string }
-  | { opacity: number }
-  | { saturate: number }
-  | { sepia: number };
-type VisualEffectPreset = {
-  id: VisualEffectId;
-  label: string;
-  description: string;
-  backgroundBlurRadius?: number;
-  backgroundRadialFocus?: boolean;
-  backgroundFilter?: VisualFilterStep[];
-  subjectFilter?: VisualFilterStep[];
-  backgroundOverlayColor: string;
-  backgroundOverlayOpacity: number;
-  subjectOverlayColor: string;
-  subjectOverlayOpacity: number;
-};
-const VISUAL_EFFECT_PRESETS: VisualEffectPreset[] = [
-  {
-    id: 'none',
-    label: 'No Filter',
-    description: 'Original look',
-    backgroundOverlayColor: '#000000',
-    backgroundOverlayOpacity: 0,
-    subjectOverlayColor: '#000000',
-    subjectOverlayOpacity: 0,
-  },
-  {
-    id: 'black-and-white',
-    label: 'Black & White',
-    description: 'Black and white',
-    backgroundOverlayColor: '#000000',
-    backgroundOverlayOpacity: 0,
-    subjectOverlayColor: '#000000',
-    subjectOverlayOpacity: 0,
-  },
-  {
-    id: 'bw-soft',
-    label: 'B&W Soft',
-    description: 'Soft editorial black and white',
-    backgroundOverlayColor: '#F3F3F3',
-    backgroundOverlayOpacity: 0.08,
-    subjectOverlayColor: '#E9E9E9',
-    subjectOverlayOpacity: 0.06,
-  },
-  {
-    id: 'warm-sunset',
-    label: 'Warm Sunset',
-    description: 'Warm golden tone',
-    backgroundOverlayColor: '#FF8A3D',
-    backgroundOverlayOpacity: 0.16,
-    subjectOverlayColor: '#FFC67D',
-    subjectOverlayOpacity: 0.12,
-  },
-  {
-    id: 'cool-night',
-    label: 'Cool Night',
-    description: 'Cool blue night tone',
-    backgroundOverlayColor: '#1F4D8A',
-    backgroundOverlayOpacity: 0.16,
-    subjectOverlayColor: '#5D9CE8',
-    subjectOverlayOpacity: 0.1,
-  },
-  {
-    id: 'background-blur',
-    label: 'Background Blur',
-    description: 'Blur only on background',
-    backgroundBlurRadius: 3,
-    backgroundOverlayColor: '#000000',
-    backgroundOverlayOpacity: 0.06,
-    subjectOverlayColor: '#000000',
-    subjectOverlayOpacity: 0,
-  },
-  {
-    id: 'background-radial-blur',
-    label: 'Background Radial Blur',
-    description: 'Radial blur on background',
-    backgroundBlurRadius: 18,
-    backgroundRadialFocus: true,
-    backgroundOverlayColor: '#111111',
-    backgroundOverlayOpacity: 0.14,
-    subjectOverlayColor: '#000000',
-    subjectOverlayOpacity: 0,
-  },
-  {
-    id: 'background-motion-blur',
-    label: 'Background Motion Blur',
-    description: 'Directional blur on background',
-    backgroundOverlayColor: '#111111',
-    backgroundOverlayOpacity: 0.1,
-    subjectOverlayColor: '#000000',
-    subjectOverlayOpacity: 0,
-  },
-];
-const FILTER_EFFECT_IDS: FilterEffectId[] = [
-  'none',
-  'black-and-white',
-  'bw-soft',
-  'warm-sunset',
-  'cool-night',
-];
-const BLUR_EFFECT_IDS: BlurEffectId[] = [
-  'none',
-  'background-blur',
-  'background-radial-blur',
-  'background-motion-blur',
-];
-
-function isFilterEffectId(value: string): value is FilterEffectId {
-  return FILTER_EFFECT_IDS.includes(value as FilterEffectId);
-}
-
-function isBlurEffectId(value: string): value is BlurEffectId {
-  return BLUR_EFFECT_IDS.includes(value as BlurEffectId);
-}
-type StyleLayerId =
-  | 'meta'
-  | 'stats'
-  | 'route'
-  | 'primary'
-  | 'chartPace'
-  | 'chartHr';
-type StyleLayerSettings = {
-  color: string;
-  opacity: number;
-};
-type LayerStyleMap = Record<StyleLayerId, StyleLayerSettings>;
-type LayerStyleMapByLayout = Partial<Record<StatsLayoutKind, LayerStyleMap>>;
-type NormalPreviewSnapshot = {
-  media: ImagePicker.ImagePickerAsset | null;
-  backgroundGradient: BackgroundGradient | null;
-  autoSubjectUri: string | null;
-  autoSubjectSourceUri: string | null;
-  imageOverlays: ImageOverlay[];
-  selectedLayoutId: string;
-  routeMode: RouteMode;
-  routeMapVariant: RouteMapVariant;
-  visible: Record<FieldId, boolean>;
-  headerVisible: typeof DEFAULT_HEADER_VISIBLE;
-  primaryField: FieldId;
-  visibleLayers: Partial<Record<LayerId, boolean>>;
-  layerOrder: LayerId[];
-  layerTransforms: Partial<
-    Record<
-      LayerId,
-      { x: number; y: number; scale: number; rotationDeg: number }
-    >
-  >;
-  behindSubjectLayers: Partial<Record<LayerId, boolean>>;
-  layerStyleMapByLayout: LayerStyleMapByLayout;
-  showChartAxes: boolean;
-  showChartGrid: boolean;
-  paceChartOrientation: ChartOrientation;
-  paceChartFill: ChartFillStyle;
-  isSquareFormat: boolean;
-};
+  DEFAULT_VISIBLE_FIELDS,
+  DEFAULT_VISIBLE_LAYERS,
+  EXPORT_PNG_WIDTH,
+  FilterEffectId,
+  getDefaultLayerStyleMapForLayout,
+  getDefaultVisibleLayersForLayout,
+  IMAGE_OVERLAY_MAX_INITIAL,
+  isBlurEffectId,
+  isFilterEffectId,
+  LayerStyleMapByLayout,
+  NormalPreviewSnapshot,
+  PREVIEW_DRAFT_KEY_PREFIX,
+  PREVIEW_TEMPLATE_MEDIA_KEY_PREFIX,
+  ROUTE_DEFAULT_Y_RAISE,
+  ROUTE_LAYER_HEIGHT,
+  ROUTE_LAYER_WIDTH,
+  SUBJECT_COVERAGE_MAX_PERCENT,
+  SUBJECT_COVERAGE_MIN_PERCENT,
+  SUNSET_HERO_DEFAULT_VISIBLE_FIELDS,
+  SUNSET_PRIMARY_GRADIENT_PRESETS,
+  StyleLayerId,
+  SunsetPrimaryGradient,
+  VISUAL_EFFECT_PRESETS,
+} from '@/features/preview/config';
+import {
+  formatCadence,
+  formatDateWithPattern,
+  formatPreviewDate,
+  getDynamicStatsWidth,
+  getLayoutMetricLimit,
+  splitMetricValueUnit,
+} from '@/features/preview/formatters';
+import {
+  createRandomGradient,
+  getInitialOverlaySize,
+  isAppOwnedCacheFile,
+  normalizeLocalUri,
+} from '@/features/preview/layoutMath';
 type TemplateMediaDraft = {
   v: 2;
   media: ImagePicker.ImagePickerAsset | null;
@@ -344,44 +134,6 @@ type TemplateMediaHydrationState = {
   loading: boolean;
   hasStoredDraft: boolean;
 };
-const DEFAULT_LAYER_STYLE_MAP: LayerStyleMap = {
-  meta: { color: '#FFFFFF', opacity: 1 },
-  stats: { color: '#FFFFFF', opacity: 1 },
-  route: { color: '#D4FF54', opacity: 1 },
-  primary: { color: '#FFFFFF', opacity: 1 },
-  chartPace: { color: '#FFFFFF', opacity: 1 },
-  chartHr: { color: '#FFFFFF', opacity: 1 },
-};
-
-function getDefaultLayerStyleMapForLayout(
-  layout: StatsLayoutKind,
-): LayerStyleMap {
-  if (layout !== 'split-bold') {
-    return {
-      meta: { ...DEFAULT_LAYER_STYLE_MAP.meta },
-      stats: { ...DEFAULT_LAYER_STYLE_MAP.stats },
-      route: { ...DEFAULT_LAYER_STYLE_MAP.route },
-      primary: { ...DEFAULT_LAYER_STYLE_MAP.primary },
-      chartPace: { ...DEFAULT_LAYER_STYLE_MAP.chartPace },
-      chartHr: { ...DEFAULT_LAYER_STYLE_MAP.chartHr },
-    };
-  }
-
-  return {
-    meta: { ...DEFAULT_LAYER_STYLE_MAP.meta },
-    stats: {
-      ...DEFAULT_LAYER_STYLE_MAP.stats,
-      opacity: SPLIT_BOLD_DEFAULT_TEXT_OPACITY,
-    },
-    route: { ...DEFAULT_LAYER_STYLE_MAP.route },
-    primary: {
-      ...DEFAULT_LAYER_STYLE_MAP.primary,
-      opacity: SPLIT_BOLD_DEFAULT_TEXT_OPACITY,
-    },
-    chartPace: { ...DEFAULT_LAYER_STYLE_MAP.chartPace },
-    chartHr: { ...DEFAULT_LAYER_STYLE_MAP.chartHr },
-  };
-}
 
 type ApplyImageBackgroundOptions = {
   silent?: boolean;
@@ -389,44 +141,6 @@ type ApplyImageBackgroundOptions = {
   failurePrefix?: string;
   skipBackgroundRemoval?: boolean;
 };
-
-function normalizeLocalUri(path: string) {
-  if (
-    path.startsWith('https://') ||
-    path.startsWith('http://') ||
-    path.startsWith('file://') ||
-    path.startsWith('content://') ||
-    path.startsWith('ph://') ||
-    path.startsWith('assets-library://')
-  ) {
-    return path;
-  }
-  return `file://${path}`;
-}
-
-function splitMetricValueUnit(text: string): { value: string; unit: string } {
-  const trimmed = text.trim();
-  if (!trimmed) return { value: '', unit: '' };
-
-  const lastSpace = trimmed.lastIndexOf(' ');
-  if (lastSpace > 0) {
-    const value = trimmed.slice(0, lastSpace).trim();
-    const unit = trimmed.slice(lastSpace + 1).trim();
-    if (unit) {
-      return { value, unit };
-    }
-  }
-
-  const compactMatch = trimmed.match(/^(.*?)(\/[A-Za-z]+|[A-Za-z%]+)$/);
-  if (compactMatch) {
-    return {
-      value: compactMatch[1].trim(),
-      unit: compactMatch[2].trim(),
-    };
-  }
-
-  return { value: trimmed, unit: '' };
-}
 
 function sanitizeTemplateMediaAsset(
   input: unknown,
@@ -581,65 +295,6 @@ function tokenizeTemplateText(
   return tokens.length ? tokens : [{ text }];
 }
 
-function formatDateWithPattern(isoDate: string, pattern: string) {
-  const date = new Date(isoDate);
-  if (Number.isNaN(date.getTime())) return null;
-
-  const day = `${date.getDate()}`.padStart(2, '0');
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const monthShort = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ][date.getMonth()];
-  const monthLong = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ][date.getMonth()];
-  const year = `${date.getFullYear()}`;
-  const yearShort = year.slice(-2);
-
-  return pattern
-    .replaceAll('dd', day)
-    .replaceAll('MMMM', monthLong)
-    .replaceAll('MMM', monthShort)
-    .replaceAll('mm', month)
-    .replaceAll('YYYY', year)
-    .replaceAll('YY', yearShort);
-}
-
-function isAppOwnedCacheFile(uri: string) {
-  if (!uri.startsWith('file://')) return false;
-  const cacheDir = FileSystem.cacheDirectory;
-  if (!cacheDir) return false;
-  return uri.startsWith(cacheDir) || uri.includes('/Library/Caches/');
-}
-
-function getDefaultVisibleLayersForLayout(
-  _layout: StatsLayoutKind,
-): Partial<Record<LayerId, boolean>> {
-  return { ...DEFAULT_VISIBLE_LAYERS };
-}
-
 export default function PreviewScreen() {
   const searchParams = useLocalSearchParams<{
     mode?: string | string[];
@@ -714,7 +369,7 @@ export default function PreviewScreen() {
   >({});
   const [selectedLayer, setSelectedLayer] = useState<LayerId | null>(null);
   const [outlinedLayer, setOutlinedLayer] = useState<LayerId | null>(null);
-  const [activeLayer, setActiveLayer] = useState<LayerId | null>(null);
+  const [, setActiveLayer] = useState<LayerId | null>(null);
   const [activePanel, setActivePanel] = useState<PreviewPanelTab>('background');
   const [panelOpen, setPanelOpen] = useState(false);
   const [helpPopoverOpen, setHelpPopoverOpen] = useState(false);
@@ -3225,7 +2880,6 @@ export default function PreviewScreen() {
         <PreviewEditorCanvas
           exportRef={exportRef}
           isSquareFormat={isSquareFormat}
-          panelOpen={panelOpen}
           isCompactViewport={isCompactViewport}
           onCanvasTouch={() => {
             if (panelOpen) setPanelOpen(false);
@@ -3245,7 +2899,6 @@ export default function PreviewScreen() {
           autoSubjectUri={hasSubjectFree ? autoSubjectUri : null}
           visibleLayers={activeVisibleLayers}
           selectedLayer={outlinedLayer}
-          activeLayer={activeLayer}
           setActiveLayer={setActiveLayer}
           setSelectedLayer={selectLayer}
           baseLayerZ={baseLayerZ}
@@ -3409,186 +3062,6 @@ export default function PreviewScreen() {
       </View>
     </>
   );
-}
-
-function getInitialOverlaySize(
-  assetWidth?: number,
-  assetHeight?: number,
-): { width: number; height: number } {
-  if (!assetWidth || !assetHeight) {
-    return {
-      width: IMAGE_OVERLAY_MAX_INITIAL,
-      height: IMAGE_OVERLAY_MAX_INITIAL,
-    };
-  }
-
-  const maxSide = IMAGE_OVERLAY_MAX_INITIAL;
-  const ratio = assetWidth / assetHeight;
-  let width = maxSide;
-  let height = maxSide;
-
-  if (ratio >= 1) {
-    width = maxSide;
-    height = width / ratio;
-  } else {
-    height = maxSide;
-    width = height * ratio;
-  }
-
-  return {
-    width: Math.max(IMAGE_OVERLAY_MIN_INITIAL, Math.round(width)),
-    height: Math.max(IMAGE_OVERLAY_MIN_INITIAL, Math.round(height)),
-  };
-}
-
-function formatPreviewDate(isoDate: string) {
-  const date = new Date(isoDate);
-  if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'short',
-  }).format(date);
-}
-
-function formatCadence(
-  activity: {
-    average_cadence?: number | null;
-    type?: string | null;
-  } | null,
-) {
-  const raw = activity?.average_cadence;
-  if (!raw || raw <= 0) return '-- spm';
-
-  const type = (activity?.type ?? '').toLowerCase();
-  const isRunLike = type === 'run' || type === 'walk' || type === 'hike';
-
-  // Strava cadence for run-like sports can come as strides/min; display as steps/min.
-  if (isRunLike) {
-    const spm = raw < 130 ? raw * 2 : raw;
-    return `${Math.round(spm)} spm`;
-  }
-
-  return `${Math.round(raw)} rpm`;
-}
-
-function getDynamicStatsWidth(template: StatsLayout, visibleCount: number) {
-  const count = Math.max(1, visibleCount);
-  const compactCount = Math.min(4, count);
-
-  switch (template.layout) {
-    case 'hero':
-    case 'glass-row': {
-      if (compactCount >= 4) return template.width;
-      if (compactCount === 3) return Math.max(220, template.width - 24);
-      if (compactCount === 2) return Math.max(170, template.width - 78);
-      return Math.max(220, template.width - 52);
-    }
-    case 'sunset-hero':
-      // Keep cards readable even with only 1-2 metrics visible.
-      return template.width;
-    case 'morning-glass':
-      return template.width;
-    case 'split-bold': {
-      // Keep split-bold compact: this layer should stay as a narrow right column.
-      if (count >= 5) return 208;
-      if (count === 4) return 202;
-      if (count === 3) return 194;
-      if (count === 2) return 184;
-      return 170;
-    }
-    case 'compact':
-    case 'pill-inline':
-      return Math.max(
-        150,
-        Math.round(template.width * (0.45 + compactCount * 0.14)),
-      );
-    case 'columns':
-    case 'card-columns':
-      return Math.max(
-        160,
-        Math.round(template.width * (0.42 + compactCount * 0.145)),
-      );
-    case 'grid-2x2':
-    case 'panel-grid':
-      if (compactCount >= 4) return template.width;
-      if (compactCount === 3) return Math.max(220, template.width - 28);
-      if (compactCount === 2) return Math.max(160, template.width - 110);
-      return 130;
-    case 'vertical':
-    case 'soft-stack':
-    default:
-      return Math.max(
-        130,
-        Math.round(template.width * (0.42 + compactCount * 0.145)),
-      );
-  }
-}
-
-function getLayoutMetricLimit(template: StatsLayout) {
-  switch (template.layout) {
-    case 'sunset-hero':
-      return 5;
-    case 'morning-glass':
-      return 6;
-    case 'split-bold':
-      return 6;
-    default:
-      return 4;
-  }
-}
-
-function createRandomGradient(): BackgroundGradient {
-  const baseHue = Math.round(Math.random() * 359);
-  const hueStep = 38 + Math.round(Math.random() * 46);
-  const direction = Math.random() > 0.5 ? 'vertical' : 'horizontal';
-
-  const colorA = hslToHex(baseHue, 76, 54);
-  const colorB = hslToHex((baseHue + hueStep) % 360, 70, 50);
-  const colorC = hslToHex((baseHue + hueStep * 2) % 360, 74, 58);
-
-  return {
-    colors: [colorA, colorB, colorC],
-    direction,
-  };
-}
-
-function hslToHex(hue: number, saturation: number, lightness: number): string {
-  const s = saturation / 100;
-  const l = lightness / 100;
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
-  const m = l - c / 2;
-
-  let r = 0;
-  let g = 0;
-  let b = 0;
-
-  if (hue >= 0 && hue < 60) {
-    r = c;
-    g = x;
-  } else if (hue < 120) {
-    r = x;
-    g = c;
-  } else if (hue < 180) {
-    g = c;
-    b = x;
-  } else if (hue < 240) {
-    g = x;
-    b = c;
-  } else if (hue < 300) {
-    r = x;
-    b = c;
-  } else {
-    r = c;
-    b = x;
-  }
-
-  const toHex = (channel: number) =>
-    Math.round((channel + m) * 255)
-      .toString(16)
-      .padStart(2, '0');
-
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
 function createStyles(colors: ThemeColors) {
