@@ -5,18 +5,17 @@ set -x
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-export PATH="/opt/homebrew/bin:$PATH"
+echo "📦 Load asdf Node"
+. /Users/local/.asdf/asdf.sh
 
-echo "📦 Node"
 node -v
 npm -v
 
 echo "📦 Install JS deps"
 npm ci
 
-echo "📦 CocoaPods"
+echo "📦 Install CocoaPods"
 cd ios
-
 if [ -d "Pods" ]; then
   echo "Pods cache hit"
 else
