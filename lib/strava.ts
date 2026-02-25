@@ -7,7 +7,6 @@ import {
 import { mockActivities } from '@/lib/mockData';
 
 const STRAVA_BASE = 'https://www.strava.com/api/v3';
-const USE_MOCK_STRAVA = process.env.EXPO_PUBLIC_USE_MOCK_STRAVA === 'true';
 
 export type ExchangeCodeParams = {
   code: string;
@@ -103,7 +102,7 @@ export async function refreshTokensWithSupabase({
 export async function fetchActivities(
   accessToken: string,
 ): Promise<StravaActivity[]> {
-  if (USE_MOCK_STRAVA || accessToken.startsWith('mock-')) {
+  if (accessToken.startsWith('mock-')) {
     await new Promise((resolve) => setTimeout(resolve, 350));
     return mockActivities;
   }
@@ -241,10 +240,6 @@ export function buildHeartRateAreaChartData(
   }));
 }
 
-export function isMockStravaEnabled() {
-  return USE_MOCK_STRAVA;
-}
-
 export function getMockTokens(): AuthTokens {
   return {
     accessToken: 'mock-access-token',
@@ -288,8 +283,7 @@ async function fetchActivityDetails(
     if (!response.ok) return { calories: null, photoUrl: null };
     const details = (await response.json()) as StravaActivity;
     return {
-      calories:
-        typeof details.calories === 'number' ? details.calories : null,
+      calories: typeof details.calories === 'number' ? details.calories : null,
       photoUrl: extractActivityPhotoUrl(details),
     };
   } catch {

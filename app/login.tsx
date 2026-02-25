@@ -15,7 +15,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { importActivitiesFromHealthKit } from '@/lib/healthkit';
-import { getMockTokens, isMockStravaEnabled } from '@/lib/strava';
+import { getMockTokens } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
 
@@ -47,11 +47,8 @@ export default function LoginScreen() {
   }
 
   async function handleLogin() {
-    if (isMockStravaEnabled()) {
-      await login(getMockTokens());
-      resetAndReplace('/activities');
-      return;
-    }
+    await login(getMockTokens());
+    resetAndReplace('/activities');
 
     if (!clientId) {
       setError('Missing EXPO_PUBLIC_STRAVA_CLIENT_ID in .env');
@@ -156,69 +153,52 @@ export default function LoginScreen() {
         ) : null}
 
         <View style={styles.actions}>
-          {isMockStravaEnabled() ? (
-            <PrimaryButton
-              label={isBusy ? 'Connecting...' : 'Continue (Mock Mode)'}
-              iconElement={
-                <FontAwesome6
-                  name="strava"
-                  size={16}
-                  color={colors.primaryText}
-                />
-              }
-              onPress={handleLogin}
-              disabled={isBusy}
+          <Pressable
+            onPress={handleLogin}
+            disabled={isBusy}
+            accessibilityRole="button"
+            accessibilityLabel="Connect with Strava"
+            style={({ pressed }) => [
+              styles.stravaButton,
+              pressed && !isBusy ? styles.stravaButtonPressed : null,
+              isBusy ? styles.stravaButtonDisabled : null,
+            ]}
+          >
+            <Image
+              source={STRAVA_BUTTON_ORANGE}
+              resizeMode="contain"
+              style={styles.stravaButtonImage}
             />
-          ) : (
-            <Pressable
-              onPress={handleLogin}
-              disabled={isBusy}
-              accessibilityRole="button"
-              accessibilityLabel="Connect with Strava"
-              style={({ pressed }) => [
-                styles.stravaButton,
-                pressed && !isBusy ? styles.stravaButtonPressed : null,
-                isBusy ? styles.stravaButtonDisabled : null,
-              ]}
-            >
-              <Image
-                source={STRAVA_BUTTON_ORANGE}
-                resizeMode="contain"
-                style={styles.stravaButtonImage}
-              />
-            </Pressable>
-          )}
+          </Pressable>
 
-          {!isMockStravaEnabled() ? (
-            <Pressable
-              onPress={handleMockLogin}
-              disabled={isBusy}
-              style={({ pressed }) => [
-                styles.demoCard,
-                pressed && !isBusy ? styles.demoCardPressed : null,
-                isBusy ? styles.demoCardDisabled : null,
-              ]}
-            >
-              <View style={styles.demoIconWrap}>
-                <MaterialCommunityIcons
-                  name="flask-outline"
-                  size={18}
-                  color={colors.primaryText}
-                />
-              </View>
-              <View style={styles.demoCopy}>
-                <Text style={styles.demoTitle}>Use Demo Activity</Text>
-                <Text style={styles.demoSubtitle}>
-                  No Strava account? Try the app with sample data.
-                </Text>
-              </View>
+          <Pressable
+            onPress={handleMockLogin}
+            disabled={isBusy}
+            style={({ pressed }) => [
+              styles.demoCard,
+              pressed && !isBusy ? styles.demoCardPressed : null,
+              isBusy ? styles.demoCardDisabled : null,
+            ]}
+          >
+            <View style={styles.demoIconWrap}>
               <MaterialCommunityIcons
-                name="chevron-right"
+                name="flask-outline"
                 size={18}
-                color={colors.textMuted}
+                color={colors.primaryText}
               />
-            </Pressable>
-          ) : null}
+            </View>
+            <View style={styles.demoCopy}>
+              <Text style={styles.demoTitle}>Use Demo Activity</Text>
+              <Text style={styles.demoSubtitle}>
+                No Strava account? Try the app with sample data.
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={18}
+              color={colors.textMuted}
+            />
+          </Pressable>
 
           {Platform.OS === 'ios' ? (
             <PrimaryButton

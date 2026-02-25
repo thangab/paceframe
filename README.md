@@ -120,7 +120,6 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=appl_xxxxxxxxxxxxxxxxxxxx
 EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY=goog_xxxxxxxxxxxxxxxxxxxx
 EXPO_PUBLIC_MAPBOX_TOKEN=pk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-EXPO_PUBLIC_USE_MOCK_STRAVA=true
 ```
 
 ## Strava Setup
@@ -227,10 +226,6 @@ Configure offerings/entitlement in RevenueCat and set public SDK keys in `.env`.
 ## Mock Mode
 
 For local UI development without live Strava:
-
-```env
-EXPO_PUBLIC_USE_MOCK_STRAVA=true
-```
 
 ## Troubleshooting
 

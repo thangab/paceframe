@@ -82,7 +82,6 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     id: 'soft-stack',
     name: 'Soft Stack',
     layout: 'soft-stack',
-    premium: true,
     x: 36,
     y: 300,
     width: 288,
