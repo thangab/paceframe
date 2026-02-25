@@ -171,7 +171,7 @@ export const PREVIEW_TEMPLATES: PreviewTemplateDefinition[] = [
     defaultBackground: 'none',
     backgroundMediaFrame: {
       x: 24,
-      y: 40,
+      y: 35,
       width: 312,
       height: 360,
       mediaScale: 1,

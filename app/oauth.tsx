@@ -14,16 +14,57 @@ function isStaleOAuthCodeError(message: string) {
   );
 }
 
+function normalizeScopeSet(rawScope: string | undefined) {
+  if (!rawScope) return null;
+  return new Set(
+    rawScope
+      .split(/[,\s]+/)
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('Authorization timed out. Please try again.'));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
 export default function OAuthCallbackScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const login = useAuthStore((s) => s.login);
   const tokens = useAuthStore((s) => s.tokens);
   const isHydrated = useAuthStore((s) => s.isHydrated);
-  const { code: rawCode } = useLocalSearchParams<{
+  const {
+    code: rawCode,
+    error: rawError,
+    error_description: rawErrorDescription,
+    scope: rawScope,
+  } = useLocalSearchParams<{
     code?: string | string[];
+    error?: string | string[];
+    error_description?: string | string[];
+    scope?: string | string[];
   }>();
   const code = Array.isArray(rawCode) ? rawCode[0] : rawCode;
+  const oauthError = Array.isArray(rawError) ? rawError[0] : rawError;
+  const oauthErrorDescription = Array.isArray(rawErrorDescription)
+    ? rawErrorDescription[0]
+    : rawErrorDescription;
+  const scope = Array.isArray(rawScope) ? rawScope[0] : rawScope;
   const handledCodeRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +83,34 @@ export default function OAuthCallbackScreen() {
       return;
     }
 
+    if (oauthError) {
+      if (/access_denied/i.test(oauthError)) {
+        setError(
+          'Strava authorization was cancelled. Please allow activity access to continue.',
+        );
+        return;
+      }
+      setError(
+        oauthErrorDescription
+          ? `${oauthError}: ${oauthErrorDescription}`
+          : oauthError,
+      );
+      return;
+    }
+
+    const grantedScopes = normalizeScopeSet(scope);
+    if (grantedScopes) {
+      const hasActivityScope =
+        grantedScopes.has('activity:read') ||
+        grantedScopes.has('activity:read_all');
+      if (!hasActivityScope) {
+        setError(
+          'Strava connected, but activity permission is missing. Please authorize activity access and try again.',
+        );
+        return;
+      }
+    }
+
     if (!code || typeof code !== 'string') {
       resetAndReplace('/login');
       return;
@@ -52,10 +121,13 @@ export default function OAuthCallbackScreen() {
     let cancelled = false;
     void (async () => {
       try {
-        const tokens = await exchangeCodeWithSupabase({
-          code,
-          redirectUri: STRAVA_REDIRECT_URI,
-        });
+        const tokens = await withTimeout(
+          exchangeCodeWithSupabase({
+            code,
+            redirectUri: STRAVA_REDIRECT_URI,
+          }),
+          12000,
+        );
         if (cancelled) return;
         await login(tokens);
         resetAndReplace('/activities');
@@ -73,7 +145,15 @@ export default function OAuthCallbackScreen() {
     return () => {
       cancelled = true;
     };
-  }, [code, isHydrated, login, tokens?.accessToken]);
+  }, [
+    code,
+    isHydrated,
+    login,
+    oauthError,
+    oauthErrorDescription,
+    scope,
+    tokens?.accessToken,
+  ]);
 
   if (!error) {
     return (
