@@ -2,11 +2,12 @@
 set -e
 set -x
 
+# repo root
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-echo "📦 Load asdf Node"
-. /Users/local/.asdf/asdf.sh
+echo "📦 Install Node via Homebrew"
+brew install node
 
 node -v
 npm -v
