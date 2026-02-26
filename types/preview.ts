@@ -10,6 +10,7 @@ export type RouteMode = 'off' | 'map' | 'trace';
 export type RouteMapVariant = 'standard' | 'dark' | 'satellite';
 export type ChartOrientation = 'vertical' | 'horizontal';
 export type ChartFillStyle = 'gradient' | 'plain';
+export type ChartDisplayVersion = 'v1' | 'v2' | 'v3' | 'v4';
 export type StatsLayoutKind =
   | 'hero'
   | 'vertical'
@@ -108,6 +109,7 @@ export type PreviewTemplateChartElement = {
   isBehind?: boolean;
   opacity?: number;
   color?: string;
+  version?: ChartDisplayVersion;
   showAxes?: boolean;
   showGrid?: boolean;
   orientation?: ChartOrientation;

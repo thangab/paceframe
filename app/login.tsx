@@ -2,28 +2,39 @@ import { useMemo, useState } from 'react';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import {
+  Image,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
-  Image,
 } from 'react-native';
-import { FontAwesome6, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { PrimaryButton } from '@/components/PrimaryButton';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LoginHeroCarousel from '@/components/login/LoginHeroCarousel';
 import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { importActivitiesFromHealthKit } from '@/lib/healthkit';
-import { getMockTokens, isMockStravaEnabled } from '@/lib/strava';
+import { getMockTokens } from '@/lib/strava';
+import { buildStravaMobileAuthorizeUrl } from '@/lib/stravaOAuth';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
 
-const PACEFRAME_LOGO = require('../assets/logo/paceframe-blue.png');
 const STRAVA_BUTTON_ORANGE = require('../assets/strava/btn-strava-orange.png');
+
+const HERO_TEMPLATE_SOURCES = [
+  require('../assets/login/template1.jpg'),
+  require('../assets/login/template2.jpg'),
+  require('../assets/login/template3.jpg'),
+  require('../assets/login/template4.jpg'),
+  require('../assets/login/template5.jpg'),
+  require('../assets/login/template6.jpg'),
+];
 
 export default function LoginScreen() {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const clientId = process.env.EXPO_PUBLIC_STRAVA_CLIENT_ID?.trim();
   const login = useAuthStore((s) => s.login);
@@ -36,9 +47,6 @@ export default function LoginScreen() {
       error && /(healthkit|authorization|denied|permission)/i.test(error),
     );
 
-  // Strava validates redirect host against "Authorization Callback Domain".
-  // Keep host as "app" for native deep link compatibility.
-  const redirectUri = 'paceframe://app/oauth';
   function resetAndReplace(path: '/activities' | '/login') {
     if (router.canGoBack()) {
       router.dismissAll();
@@ -47,12 +55,6 @@ export default function LoginScreen() {
   }
 
   async function handleLogin() {
-    if (isMockStravaEnabled()) {
-      await login(getMockTokens());
-      resetAndReplace('/activities');
-      return;
-    }
-
     if (!clientId) {
       setError('Missing EXPO_PUBLIC_STRAVA_CLIENT_ID in .env');
       return;
@@ -68,12 +70,7 @@ export default function LoginScreen() {
       setIsBusy(true);
       setError(null);
 
-      const authUrl =
-        `https://www.strava.com/oauth/mobile/authorize?client_id=${encodeURIComponent(clientId)}` +
-        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-        `&response_type=code` +
-        `&approval_prompt=auto` +
-        `&scope=read,activity:read_all`;
+      const authUrl = buildStravaMobileAuthorizeUrl({ clientId });
       await Linking.openURL(authUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed.');
@@ -107,11 +104,10 @@ export default function LoginScreen() {
         return;
       }
       setActivities(activities, 'healthkit');
-      // HealthKit flow should not be blocked by optional mock auth setup.
       try {
         await login(getMockTokens());
       } catch {
-        // Non-blocking: Activities screen allows healthkit source without Strava token.
+        // Keep Health import non-blocking if auth setup is unavailable.
       }
       resetAndReplace('/activities');
     } catch (err) {
@@ -124,24 +120,27 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={[colors.background, colors.surfaceAlt]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.backdrop}
+        colors={['#131B2E', '#141E2C', '#0E1523']}
+        start={{ x: 0.2, y: 0 }}
+        end={{ x: 0.8, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
       />
-      <View style={styles.glowTop} />
-      <View style={styles.glowBottom} />
-      <View style={styles.card}>
-        <View style={styles.brandMark}>
-          <Image
-            source={PACEFRAME_LOGO}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
+
+      <View
+        style={[styles.topSection, { paddingTop: insets.top + spacing.xs }]}
+      >
+        <LoginHeroCarousel images={HERO_TEMPLATE_SOURCES} />
+      </View>
+
+      <View
+        style={[
+          styles.bottomSheet,
+          { paddingBottom: insets.bottom + spacing.md },
+        ]}
+      >
         <Text style={styles.title}>PaceFrame</Text>
         <Text style={styles.subtitle}>
-          Create beautiful run cards from your Strava activities.
+          Connect Strava and generate amazing cards to share in seconds.
         </Text>
 
         {error ? (
@@ -156,98 +155,86 @@ export default function LoginScreen() {
         ) : null}
 
         <View style={styles.actions}>
-          {isMockStravaEnabled() ? (
-            <PrimaryButton
-              label={isBusy ? 'Connecting...' : 'Continue (Mock Mode)'}
-              iconElement={
-                <FontAwesome6
-                  name="strava"
-                  size={16}
-                  color={colors.primaryText}
-                />
-              }
-              onPress={handleLogin}
-              disabled={isBusy}
+          <Pressable
+            onPress={handleLogin}
+            disabled={isBusy}
+            accessibilityRole="button"
+            accessibilityLabel="Connect with Strava"
+            style={({ pressed }) => [
+              styles.stravaButton,
+              pressed && !isBusy ? styles.pressed : null,
+              isBusy ? styles.disabled : null,
+            ]}
+          >
+            <Image
+              source={STRAVA_BUTTON_ORANGE}
+              resizeMode="contain"
+              style={styles.stravaButtonImage}
             />
-          ) : (
-            <Pressable
-              onPress={handleLogin}
-              disabled={isBusy}
-              accessibilityRole="button"
-              accessibilityLabel="Connect with Strava"
-              style={({ pressed }) => [
-                styles.stravaButton,
-                pressed && !isBusy ? styles.stravaButtonPressed : null,
-                isBusy ? styles.stravaButtonDisabled : null,
-              ]}
-            >
-              <Image
-                source={STRAVA_BUTTON_ORANGE}
-                resizeMode="contain"
-                style={styles.stravaButtonImage}
-              />
-            </Pressable>
-          )}
+          </Pressable>
 
-          {!isMockStravaEnabled() ? (
-            <Pressable
-              onPress={handleMockLogin}
-              disabled={isBusy}
-              style={({ pressed }) => [
-                styles.demoCard,
-                pressed && !isBusy ? styles.demoCardPressed : null,
-                isBusy ? styles.demoCardDisabled : null,
-              ]}
-            >
-              <View style={styles.demoIconWrap}>
-                <MaterialCommunityIcons
-                  name="flask-outline"
-                  size={18}
-                  color={colors.primaryText}
-                />
-              </View>
-              <View style={styles.demoCopy}>
-                <Text style={styles.demoTitle}>Use Demo Activity</Text>
-                <Text style={styles.demoSubtitle}>
-                  No Strava account? Try the app with sample data.
-                </Text>
-              </View>
+          <Pressable
+            onPress={handleMockLogin}
+            disabled={isBusy}
+            style={({ pressed }) => [
+              styles.demoCard,
+              pressed && !isBusy ? styles.demoCardPressed : null,
+              isBusy ? styles.demoCardDisabled : null,
+            ]}
+          >
+            <View style={styles.demoIconWrap}>
               <MaterialCommunityIcons
-                name="chevron-right"
+                name="flask-outline"
                 size={18}
-                color={colors.textMuted}
+                color={colors.primaryText}
               />
-            </Pressable>
-          ) : null}
+            </View>
+            <View style={styles.demoCopy}>
+              <Text style={styles.demoTitle}>Use Demo Activity</Text>
+              <Text style={styles.demoSubtitle}>
+                No Strava account? Try the app with sample data.
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={18}
+              color={colors.textMuted}
+            />
+          </Pressable>
 
           {Platform.OS === 'ios' ? (
-            <PrimaryButton
-              label="Import from Health"
-              icon="heart-pulse"
+            <Pressable
               onPress={handleHealthKitImport}
-              variant="secondary"
               disabled={isBusy}
-            />
+              style={({ pressed }) => [
+                styles.healthButton,
+                pressed && !isBusy ? styles.pressed : null,
+                isBusy ? styles.disabled : null,
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="heart"
+                size={20}
+                color={colors.danger}
+              />
+              <Text style={styles.healthLinkText}>
+                Import from Apple Health
+              </Text>
+            </Pressable>
           ) : null}
         </View>
 
         {shouldShowHealthSettings ? (
-          <View style={styles.healthHelpWrap}>
-            <MaterialCommunityIcons
-              name="cog-outline"
-              size={15}
-              color={colors.textMuted}
-            />
-            <Text style={styles.healthHelpText}>
-              Open Settings {'>'} Privacy & Security {'>'} Health app {'>'}{' '}
-              PaceFrame and enable Workout + Workout Routes.
-            </Text>
-          </View>
+          <Text style={styles.healthHelpText}>
+            Open Settings {'>'} Privacy & Security {'>'} Health app {'>'}{' '}
+            PaceFrame and enable Workout + Workout Routes.
+          </Text>
         ) : null}
+
+        <Text style={styles.legal}>
+          Your Strava login is used only to read activities.
+        </Text>
       </View>
-      <Text style={styles.footerHint}>
-        Your Strava login is used only to read activities.
-      </Text>
     </View>
   );
 }
@@ -256,87 +243,48 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: {
       flex: 1,
-      padding: spacing.lg,
-      justifyContent: 'center',
-      backgroundColor: colors.surface,
+      backgroundColor: '#131B2E',
     },
-    backdrop: {
-      ...StyleSheet.absoluteFillObject,
+    topSection: {
+      flex: 1,
+      justifyContent: 'flex-start',
     },
-    glowTop: {
-      position: 'absolute',
-      top: -110,
-      right: -60,
-      width: 260,
-      height: 260,
-      borderRadius: 999,
-      backgroundColor: `${colors.primary}24`,
-    },
-    glowBottom: {
-      position: 'absolute',
-      left: -80,
-      bottom: -120,
-      width: 260,
-      height: 260,
-      borderRadius: 999,
-      backgroundColor: `${colors.accent}1F`,
-    },
-    logo: {
-      width: 26,
-      height: 26,
-    },
-    card: {
-      // borderRadius: 24,
-      // borderWidth: 1,
-      // borderColor: colors.border,
-      // backgroundColor: colors.surface,
-      padding: spacing.lg + 2,
-      // gap: spacing.md,
-      // shadowColor: colors.text,
-      // shadowOpacity: 0.12,
-      // shadowRadius: 20,
-      // shadowOffset: { width: 0, height: 10 },
-      // elevation: 6,
-    },
-    brandMark: {
-      width: 54,
-      height: 54,
-      borderRadius: 18,
-      backgroundColor: colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
+    bottomSheet: {
+      paddingHorizontal: spacing.lg,
+      gap: spacing.sm,
+      marginTop: -8,
+      backgroundColor: '#131B2E',
     },
     title: {
-      fontSize: 34,
-      lineHeight: 38,
-      fontWeight: '900',
-      color: colors.text,
+      color: colors.primary,
+      fontSize: 46,
+      lineHeight: 50,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+      marginTop: -16,
+      alignSelf: 'center',
+      fontFamily: 'system',
     },
     subtitle: {
-      color: colors.textMuted,
-      fontSize: 16,
-      lineHeight: 22,
-      marginTop: -4,
+      color: 'rgba(243,246,255,0.78)',
+      fontSize: 15,
+      lineHeight: 21,
+      marginBottom: spacing.sm - 2,
+      alignSelf: 'center',
     },
     actions: {
       gap: spacing.sm,
     },
     stravaButton: {
-      borderRadius: 12,
+      borderRadius: 16,
       overflow: 'hidden',
-    },
-    stravaButtonPressed: {
-      opacity: 0.92,
-    },
-    stravaButtonDisabled: {
-      opacity: 0.6,
     },
     stravaButtonImage: {
       width: '100%',
-      height: 48,
+      height: 56,
     },
     demoCard: {
-      borderRadius: 16,
+      borderRadius: 8,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.surface,
@@ -345,6 +293,8 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
+      width: '72%',
+      margin: 'auto',
     },
     demoCardPressed: {
       opacity: 0.88,
@@ -353,9 +303,9 @@ function createStyles(colors: ThemeColors) {
       opacity: 0.6,
     },
     demoIconWrap: {
-      width: 36,
-      height: 36,
-      borderRadius: 10,
+      width: 24,
+      height: 24,
+      borderRadius: 5,
       backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
@@ -365,14 +315,34 @@ function createStyles(colors: ThemeColors) {
     },
     demoTitle: {
       color: colors.text,
-      fontSize: 15,
+      fontSize: 12,
       fontWeight: '800',
     },
     demoSubtitle: {
       color: colors.textMuted,
-      fontSize: 12,
-      lineHeight: 16,
+      fontSize: 9,
+      lineHeight: 13,
       marginTop: 1,
+    },
+    healthButton: {
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.solidWhite,
+      paddingHorizontal: spacing.md + 2,
+      paddingVertical: spacing.md + 2,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      width: '72%',
+      margin: 'auto',
+      justifyContent: 'center',
+    },
+    healthLinkText: {
+      color: colors.solidBlack,
+      fontSize: 14,
+      lineHeight: 18,
+      fontWeight: '500',
     },
     errorBanner: {
       borderRadius: 12,
@@ -382,8 +352,9 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.sm,
       paddingVertical: spacing.sm,
       flexDirection: 'row',
-      gap: spacing.xs,
       alignItems: 'center',
+      gap: spacing.xs,
+      marginBottom: spacing.xs,
     },
     errorText: {
       color: colors.dangerText,
@@ -391,27 +362,26 @@ function createStyles(colors: ThemeColors) {
       fontSize: 13,
       lineHeight: 18,
     },
-    healthHelpWrap: {
-      gap: spacing.xs,
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: colors.border,
-      padding: spacing.sm,
-      backgroundColor: colors.surface,
-    },
     healthHelpText: {
       color: colors.textMuted,
       fontSize: 12,
       lineHeight: 18,
-      flex: 1,
-    },
-    footerHint: {
-      color: colors.textMuted,
       textAlign: 'center',
+      marginTop: 2,
+    },
+    legal: {
+      marginTop: spacing.sm,
+      textAlign: 'center',
+      color: 'rgba(242,245,255,0.64)',
       fontSize: 12,
-      marginTop: spacing.md,
+      lineHeight: 18,
+      paddingHorizontal: spacing.sm,
+    },
+    pressed: {
+      opacity: 0.9,
+    },
+    disabled: {
+      opacity: 0.65,
     },
   });
 }

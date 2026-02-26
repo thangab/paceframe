@@ -2,6 +2,7 @@ import type * as ImagePicker from 'expo-image-picker';
 import type { DistanceUnit, ElevationUnit } from '@/lib/format';
 import type {
   BackgroundGradient,
+  ChartDisplayVersion,
   ChartFillStyle,
   ChartOrientation,
   FieldId,
@@ -85,6 +86,8 @@ export type PreviewDraft = {
   behindSubjectLayers: Partial<Record<LayerId, boolean>>;
   layerTransforms: Partial<Record<LayerId, LayerTransform>>;
   isSquareFormat: boolean;
+  paceChartVersion?: ChartDisplayVersion;
+  hrChartVersion?: ChartDisplayVersion;
   showChartAxes?: boolean;
   showChartGrid?: boolean;
   paceChartOrientation?: ChartOrientation;
@@ -116,8 +119,8 @@ type SanitizeOptions = {
     };
     visibleLayers: Partial<Record<LayerId, boolean>>;
     isSquareFormat: boolean;
-    showChartAxes: boolean;
-    showChartGrid: boolean;
+    paceChartVersion: ChartDisplayVersion;
+    hrChartVersion: ChartDisplayVersion;
     paceChartOrientation: ChartOrientation;
     paceChartFill: ChartFillStyle;
   };
@@ -163,6 +166,15 @@ function asChartFillStyle(
   fallback: ChartFillStyle,
 ): ChartFillStyle {
   return value === 'plain' || value === 'gradient' ? value : fallback;
+}
+
+function asChartDisplayVersion(
+  value: unknown,
+  fallback: ChartDisplayVersion,
+): ChartDisplayVersion {
+  return value === 'v1' || value === 'v2' || value === 'v3' || value === 'v4'
+    ? value
+    : fallback;
 }
 
 function sanitizeMedia(input: unknown): ImagePicker.ImagePickerAsset | null {
@@ -496,6 +508,13 @@ export function sanitizePreviewDraft(
     sanitizeBlurEffectId(input.selectedBlurEffectId) ??
     sanitizeBlurEffectId(selectedVisualEffectId) ??
     'none';
+  const legacyShowAxes = asBoolean(input.showChartAxes, true);
+  const legacyShowGrid = asBoolean(input.showChartGrid, true);
+  const legacyChartVersion: ChartDisplayVersion = legacyShowAxes
+    ? legacyShowGrid
+      ? 'v1'
+      : 'v2'
+    : 'v3';
 
   return {
     v: 1,
@@ -538,8 +557,14 @@ export function sanitizePreviewDraft(
       input.isSquareFormat,
       options.defaults.isSquareFormat,
     ),
-    showChartAxes: asBoolean(input.showChartAxes, options.defaults.showChartAxes),
-    showChartGrid: asBoolean(input.showChartGrid, options.defaults.showChartGrid),
+    paceChartVersion: asChartDisplayVersion(
+      input.paceChartVersion,
+      legacyChartVersion,
+    ),
+    hrChartVersion: asChartDisplayVersion(
+      input.hrChartVersion,
+      legacyChartVersion,
+    ),
     paceChartOrientation: asChartOrientation(
       input.paceChartOrientation,
       options.defaults.paceChartOrientation,

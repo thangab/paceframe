@@ -1289,8 +1289,8 @@ const styles = StyleSheet.create({
   },
   sunsetCardValueDesktop: {
     color: '#FFFFFF',
-    fontSize: 32,
-    lineHeight: 36,
+    fontSize: 30,
+    lineHeight: 34,
     textAlign: 'center',
   },
   sunsetCardUnitDesktop: {
