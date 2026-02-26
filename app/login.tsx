@@ -29,7 +29,7 @@ const HERO_TEMPLATE_SOURCES = [
   require('../assets/login/template3.jpg'),
   require('../assets/login/template4.jpg'),
   require('../assets/login/template5.jpg'),
-  require('../assets/login/template1.jpg'),
+  require('../assets/login/template6.jpg'),
 ];
 
 export default function LoginScreen() {

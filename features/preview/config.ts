@@ -1,5 +1,6 @@
 import type {
   BackgroundGradient,
+  ChartDisplayVersion,
   ChartFillStyle,
   ChartOrientation,
   FieldId,
@@ -277,8 +278,8 @@ export type NormalPreviewSnapshot = {
   >;
   behindSubjectLayers: Partial<Record<LayerId, boolean>>;
   layerStyleMapByLayout: LayerStyleMapByLayout;
-  showChartAxes: boolean;
-  showChartGrid: boolean;
+  paceChartVersion: ChartDisplayVersion;
+  hrChartVersion: ChartDisplayVersion;
   paceChartOrientation: ChartOrientation;
   paceChartFill: ChartFillStyle;
   isSquareFormat: boolean;

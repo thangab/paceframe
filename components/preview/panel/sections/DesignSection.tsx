@@ -4,8 +4,15 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { LayoutPreview } from '@/components/preview/panel/LayoutPreview';
 import { isSameSunsetPrimaryGradient } from '@/components/preview/panel/utils';
 import { FONT_PRESETS, TEMPLATES } from '@/lib/previewConfig';
-import type { FieldId, StatsLayout } from '@/types/preview';
-import type { HeaderFieldId, StyleLayerId } from '@/components/preview/panel/types';
+import type {
+  ChartDisplayVersion,
+  FieldId,
+  StatsLayout,
+} from '@/types/preview';
+import type {
+  HeaderFieldId,
+  StyleLayerId,
+} from '@/components/preview/panel/types';
 
 type Props = {
   styles: any;
@@ -26,10 +33,10 @@ type Props = {
   onToggleField: (field: FieldId, value: boolean) => void;
   hasLapPaceLayer: boolean;
   hasHeartRateLayer: boolean;
-  showChartAxes: boolean;
-  onSetShowChartAxes: (value: boolean) => void;
-  showChartGrid: boolean;
-  onSetShowChartGrid: (value: boolean) => void;
+  paceChartVersion: ChartDisplayVersion;
+  onSetPaceChartVersion: (value: ChartDisplayVersion) => void;
+  hrChartVersion: ChartDisplayVersion;
+  onSetHrChartVersion: (value: ChartDisplayVersion) => void;
   paceChartOrientation: 'horizontal' | 'vertical';
   onSetPaceChartOrientation: (value: 'horizontal' | 'vertical') => void;
   paceChartFill: 'gradient' | 'plain';
@@ -71,10 +78,10 @@ export function DesignSection({
   onToggleField,
   hasLapPaceLayer,
   hasHeartRateLayer,
-  showChartAxes,
-  onSetShowChartAxes,
-  showChartGrid,
-  onSetShowChartGrid,
+  paceChartVersion,
+  onSetPaceChartVersion,
+  hrChartVersion,
+  onSetHrChartVersion,
   paceChartOrientation,
   onSetPaceChartOrientation,
   paceChartFill,
@@ -99,8 +106,14 @@ export function DesignSection({
   return (
     <ScrollView style={styles.panelScroll} showsVerticalScrollIndicator={false}>
       <View style={styles.controls}>
-        <Text style={styles.sectionTitle}>{quickTemplateMode ? 'Templates' : 'Layouts'}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+        <Text style={styles.sectionTitle}>
+          {quickTemplateMode ? 'Templates' : 'Layouts'}
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
           {quickTemplateMode
             ? templateOptions.map((item) => {
                 const isLocked = item.premium && !isPremium;
@@ -112,7 +125,12 @@ export function DesignSection({
                     onPress={() => onSelectTemplate?.(item.id)}
                     accessibilityLabel={item.name}
                   >
-                    <View style={[styles.templateCard, selected && styles.templateCardSelected]}>
+                    <View
+                      style={[
+                        styles.templateCard,
+                        selected && styles.templateCardSelected,
+                      ]}
+                    >
                       <View style={styles.templateModeIconWrap}>
                         <MaterialCommunityIcons
                           name="view-grid-outline"
@@ -120,7 +138,9 @@ export function DesignSection({
                           color={colors.text}
                         />
                       </View>
-                      {isLocked ? <Text style={styles.templatePremiumBadge}>Premium</Text> : null}
+                      {isLocked ? (
+                        <Text style={styles.templatePremiumBadge}>Premium</Text>
+                      ) : null}
                     </View>
                     <Text style={styles.templateCardName}>{item.name}</Text>
                   </Pressable>
@@ -136,9 +156,16 @@ export function DesignSection({
                     onPress={() => onSelectLayout(item)}
                     accessibilityLabel={item.name}
                   >
-                    <View style={[styles.templateCard, selected && styles.templateCardSelected]}>
+                    <View
+                      style={[
+                        styles.templateCard,
+                        selected && styles.templateCardSelected,
+                      ]}
+                    >
                       <LayoutPreview template={item} colors={colors} />
-                      {isLocked ? <Text style={styles.templatePremiumBadge}>Premium</Text> : null}
+                      {isLocked ? (
+                        <Text style={styles.templatePremiumBadge}>Premium</Text>
+                      ) : null}
                     </View>
                     <Text style={styles.templateCardName}>{item.name}</Text>
                   </Pressable>
@@ -167,7 +194,8 @@ export function DesignSection({
                 ] as [FieldId, string][]
               ).map(([id, label]) => {
                 const selected = effectiveVisible[id];
-                const disabled = !statsFieldAvailability[id] || !supportsFullStatsPreview;
+                const disabled =
+                  !statsFieldAvailability[id] || !supportsFullStatsPreview;
                 const primaryDisabled = disabled || !selected;
                 const isPrimary = supportsPrimaryLayer && id === primaryField;
                 return (
@@ -185,12 +213,17 @@ export function DesignSection({
                       <MaterialCommunityIcons
                         name="check"
                         size={14}
-                        color={selected ? colors.primaryText : colors.textSubtle}
+                        color={
+                          selected ? colors.primaryText : colors.textSubtle
+                        }
                       />
                       <Text
                         numberOfLines={1}
                         ellipsizeMode="tail"
-                        style={[styles.statsPillText, selected && styles.statsPillTextSelected]}
+                        style={[
+                          styles.statsPillText,
+                          selected && styles.statsPillTextSelected,
+                        ]}
                       >
                         {label}
                       </Text>
@@ -210,7 +243,9 @@ export function DesignSection({
                         <MaterialCommunityIcons
                           name={isPrimary ? 'star' : 'star-outline'}
                           size={13}
-                          color={isPrimary ? colors.primaryText : colors.textSubtle}
+                          color={
+                            isPrimary ? colors.primaryText : colors.textSubtle
+                          }
                         />
                       </Pressable>
                     ) : null}
@@ -221,83 +256,101 @@ export function DesignSection({
 
             {hasLapPaceLayer || hasHeartRateLayer ? (
               <>
-                <Text style={styles.sectionTitle}>Chart Axes</Text>
-                <View style={styles.mediaPickRow}>
-                  <Pressable
-                    style={[styles.chip, showChartAxes && styles.chipSelected, styles.unitChip]}
-                    onPress={() => onSetShowChartAxes(true)}
-                  >
-                    <Text style={styles.chipText}>Show X/Y</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.chip, !showChartAxes && styles.chipSelected, styles.unitChip]}
-                    onPress={() => onSetShowChartAxes(false)}
-                  >
-                    <Text style={styles.chipText}>Hide X/Y</Text>
-                  </Pressable>
-                </View>
-                <Text style={styles.sectionTitle}>Chart Grid</Text>
-                <View style={styles.mediaPickRow}>
-                  <Pressable
-                    style={[styles.chip, showChartGrid && styles.chipSelected, styles.unitChip]}
-                    onPress={() => onSetShowChartGrid(true)}
-                  >
-                    <Text style={styles.chipText}>Show Grid</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.chip, !showChartGrid && styles.chipSelected, styles.unitChip]}
-                    onPress={() => onSetShowChartGrid(false)}
-                  >
-                    <Text style={styles.chipText}>Hide Grid</Text>
-                  </Pressable>
-                </View>
+                {hasHeartRateLayer ? (
+                  <>
+                    <Text style={styles.sectionTitle}>HR Chart</Text>
+                    <View style={styles.mediaPickRow}>
+                      {(
+                        [
+                          ['v1', 'V1'],
+                          ['v2', 'V2'],
+                          ['v3', 'V3'],
+                          ['v4', 'V4'],
+                        ] as [ChartDisplayVersion, string][]
+                      ).map(([id, label]) => (
+                        <Pressable
+                          key={id}
+                          style={[
+                            styles.chip,
+                            hrChartVersion === id && styles.chipSelected,
+                            styles.unitChip,
+                          ]}
+                          onPress={() => onSetHrChartVersion(id)}
+                        >
+                          <Text style={styles.chipText}>{label}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </>
+                ) : null}
                 {hasLapPaceLayer ? (
                   <>
-                    <Text style={styles.sectionTitle}>Pace Chart Direction</Text>
-                    <View style={styles.mediaPickRow}>
-                      <Pressable
-                        style={[
-                          styles.chip,
-                          paceChartOrientation === 'vertical' && styles.chipSelected,
-                          styles.unitChip,
-                        ]}
-                        onPress={() => onSetPaceChartOrientation('vertical')}
-                      >
-                        <Text style={styles.chipText}>Vertical</Text>
-                      </Pressable>
-                      <Pressable
-                        style={[
-                          styles.chip,
-                          paceChartOrientation === 'horizontal' && styles.chipSelected,
-                          styles.unitChip,
-                        ]}
-                        onPress={() => onSetPaceChartOrientation('horizontal')}
-                      >
-                        <Text style={styles.chipText}>Horizontal</Text>
-                      </Pressable>
+                    <View
+                      style={[styles.chartHeaderRow, { justifyContent: 'flex-start' }]}
+                    >
+                      <Text style={styles.sectionTitle}>Pace Chart</Text>
+                      <View style={styles.chartToggleRow}>
+                        <Pressable
+                          style={[
+                            styles.chartToggleBtn,
+                            paceChartOrientation === 'vertical' &&
+                              styles.chartToggleBtnSelected,
+                          ]}
+                          onPress={() => onSetPaceChartOrientation('vertical')}
+                        >
+                          <Text
+                            style={[
+                              styles.chartToggleText,
+                              paceChartOrientation === 'vertical' &&
+                                styles.chartToggleTextSelected,
+                            ]}
+                          >
+                            Vertical
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          style={[
+                            styles.chartToggleBtn,
+                            paceChartOrientation === 'horizontal' &&
+                              styles.chartToggleBtnSelected,
+                          ]}
+                          onPress={() =>
+                            onSetPaceChartOrientation('horizontal')
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.chartToggleText,
+                              paceChartOrientation === 'horizontal' &&
+                                styles.chartToggleTextSelected,
+                            ]}
+                          >
+                            Horizontal
+                          </Text>
+                        </Pressable>
+                      </View>
                     </View>
-                    <Text style={styles.sectionTitle}>Pace Chart Fill</Text>
                     <View style={styles.mediaPickRow}>
-                      <Pressable
-                        style={[
-                          styles.chip,
-                          paceChartFill === 'gradient' && styles.chipSelected,
-                          styles.unitChip,
-                        ]}
-                        onPress={() => onSetPaceChartFill('gradient')}
-                      >
-                        <Text style={styles.chipText}>Gradient</Text>
-                      </Pressable>
-                      <Pressable
-                        style={[
-                          styles.chip,
-                          paceChartFill === 'plain' && styles.chipSelected,
-                          styles.unitChip,
-                        ]}
-                        onPress={() => onSetPaceChartFill('plain')}
-                      >
-                        <Text style={styles.chipText}>Plain</Text>
-                      </Pressable>
+                      {(
+                        [
+                          ['v1', 'V1'],
+                          ['v2', 'V2'],
+                          ['v3', 'V3'],
+                          ['v4', 'V4'],
+                        ] as [ChartDisplayVersion, string][]
+                      ).map(([id, label]) => (
+                        <Pressable
+                          key={id}
+                          style={[
+                            styles.chip,
+                            paceChartVersion === id && styles.chipSelected,
+                            styles.unitChip,
+                          ]}
+                          onPress={() => onSetPaceChartVersion(id)}
+                        >
+                          <Text style={styles.chipText}>{label}</Text>
+                        </Pressable>
+                      ))}
                     </View>
                   </>
                 ) : null}
@@ -318,14 +371,22 @@ export function DesignSection({
                   <Pressable
                     key={id}
                     onPress={() => onToggleHeaderField(id, !selected)}
-                    style={[styles.statsPill, selected && styles.statsPillSelected]}
+                    style={[
+                      styles.statsPill,
+                      selected && styles.statsPillSelected,
+                    ]}
                   >
                     <MaterialCommunityIcons
                       name="check"
                       size={14}
                       color={selected ? colors.primaryText : colors.textSubtle}
                     />
-                    <Text style={[styles.statsPillText, selected && styles.statsPillTextSelected]}>
+                    <Text
+                      style={[
+                        styles.statsPillText,
+                        selected && styles.statsPillTextSelected,
+                      ]}
+                    >
                       {label}
                     </Text>
                   </Pressable>
@@ -334,7 +395,11 @@ export function DesignSection({
             </View>
 
             <Text style={styles.sectionTitle}>Font</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRow}
+            >
               {FONT_PRESETS.map((item) => {
                 const selected = item.id === selectedFontId;
                 return (
@@ -343,7 +408,11 @@ export function DesignSection({
                     style={[styles.chip, selected && styles.chipSelected]}
                     onPress={() => onSelectFont(item.id)}
                   >
-                    <Text style={[styles.chipText, { fontFamily: item.family }]}>{item.name}</Text>
+                    <Text
+                      style={[styles.chipText, { fontFamily: item.family }]}
+                    >
+                      {item.name}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -356,7 +425,10 @@ export function DesignSection({
                 return (
                   <Pressable
                     key={item.id}
-                    style={[styles.styleLayerButton, selected && styles.styleLayerButtonSelected]}
+                    style={[
+                      styles.styleLayerButton,
+                      selected && styles.styleLayerButtonSelected,
+                    ]}
                     onPress={() => setSelectedStyleLayer(item.id)}
                   >
                     <View
@@ -383,11 +455,41 @@ export function DesignSection({
             <Text style={styles.stylePickerHint}>
               Choose a layer, then pick a default color or open the picker.
             </Text>
+            {selectedStyleLayer === 'chartPace' ? (
+              <>
+                <Text style={styles.sectionTitle}>Pace Fill</Text>
+                <View style={styles.mediaPickRow}>
+                  <Pressable
+                    style={[
+                      styles.chip,
+                      paceChartFill === 'gradient' && styles.chipSelected,
+                      styles.unitChip,
+                    ]}
+                    onPress={() => onSetPaceChartFill('gradient')}
+                  >
+                    <Text style={styles.chipText}>Gradient</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.chip,
+                      paceChartFill === 'plain' && styles.chipSelected,
+                      styles.unitChip,
+                    ]}
+                    onPress={() => onSetPaceChartFill('plain')}
+                  >
+                    <Text style={styles.chipText}>Plain</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
             <View style={styles.stylePickerMetaRow}>
               <View style={styles.stylePickerPreviewSwatch}>
                 <View style={styles.stylePickerPreviewSwatchChecker}>
                   {Array.from({ length: 2 }).map((_, row) => (
-                    <View key={`preview-row-${row}`} style={styles.opacityCheckerRow}>
+                    <View
+                      key={`preview-row-${row}`}
+                      style={styles.opacityCheckerRow}
+                    >
                       {Array.from({ length: 4 }).map((__, col) => (
                         <View
                           key={`preview-cell-${row}-${col}`}
@@ -406,15 +508,16 @@ export function DesignSection({
                   style={[
                     styles.stylePickerPreviewSwatchTint,
                     {
-                      backgroundColor: selectedLayerStyle?.color ?? colors.solidWhite,
+                      backgroundColor:
+                        selectedLayerStyle?.color ?? colors.solidWhite,
                       opacity: selectedLayerStyle?.opacity ?? 1,
                     },
                   ]}
                 />
               </View>
               <Text style={styles.stylePickerMetaText}>
-                {(selectedLayerStyle?.color ?? colors.solidWhite).toUpperCase()} •{' '}
-                {Math.round((selectedLayerStyle?.opacity ?? 1) * 100)}%
+                {(selectedLayerStyle?.color ?? colors.solidWhite).toUpperCase()}{' '}
+                • {Math.round((selectedLayerStyle?.opacity ?? 1) * 100)}%
               </Text>
             </View>
             {isSunsetPrimaryStyleSelected ? (
@@ -480,9 +583,12 @@ export function DesignSection({
                     style={[
                       styles.colorSwatch,
                       { backgroundColor: color },
-                      selectedLayerStyle?.color === color && styles.colorSwatchSelected,
+                      selectedLayerStyle?.color === color &&
+                        styles.colorSwatchSelected,
                     ]}
-                    onPress={() => onSetLayerStyleColor(selectedStyleLayer, color)}
+                    onPress={() =>
+                      onSetLayerStyleColor(selectedStyleLayer, color)
+                    }
                   />
                 ))}
               </ScrollView>

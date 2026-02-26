@@ -44,6 +44,7 @@ import type { DistanceUnit, ElevationUnit } from '@/lib/format';
 import { useThemeStore } from '@/store/themeStore';
 import type {
   BackgroundGradient,
+  ChartDisplayVersion,
   ChartFillStyle,
   ChartOrientation,
   FieldId,
@@ -133,10 +134,10 @@ type Props = {
   showBackgroundTab?: boolean;
   hasLapPaceLayer: boolean;
   hasHeartRateLayer: boolean;
-  showChartAxes: boolean;
-  onSetShowChartAxes: (value: boolean) => void;
-  showChartGrid: boolean;
-  onSetShowChartGrid: (value: boolean) => void;
+  paceChartVersion: ChartDisplayVersion;
+  onSetPaceChartVersion: (value: ChartDisplayVersion) => void;
+  hrChartVersion: ChartDisplayVersion;
+  onSetHrChartVersion: (value: ChartDisplayVersion) => void;
   paceChartOrientation: ChartOrientation;
   onSetPaceChartOrientation: (value: ChartOrientation) => void;
   paceChartFill: ChartFillStyle;
@@ -220,10 +221,10 @@ export function PreviewEditorPanel({
   showBackgroundTab = true,
   hasLapPaceLayer,
   hasHeartRateLayer,
-  showChartAxes,
-  onSetShowChartAxes,
-  showChartGrid,
-  onSetShowChartGrid,
+  paceChartVersion,
+  onSetPaceChartVersion,
+  hrChartVersion,
+  onSetHrChartVersion,
   paceChartOrientation,
   onSetPaceChartOrientation,
   paceChartFill,
@@ -519,10 +520,10 @@ export function PreviewEditorPanel({
               onToggleField={onToggleField}
               hasLapPaceLayer={hasLapPaceLayer}
               hasHeartRateLayer={hasHeartRateLayer}
-              showChartAxes={showChartAxes}
-              onSetShowChartAxes={onSetShowChartAxes}
-              showChartGrid={showChartGrid}
-              onSetShowChartGrid={onSetShowChartGrid}
+              paceChartVersion={paceChartVersion}
+              onSetPaceChartVersion={onSetPaceChartVersion}
+              hrChartVersion={hrChartVersion}
+              onSetHrChartVersion={onSetHrChartVersion}
               paceChartOrientation={paceChartOrientation}
               onSetPaceChartOrientation={onSetPaceChartOrientation}
               paceChartFill={paceChartFill}

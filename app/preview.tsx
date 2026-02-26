@@ -66,6 +66,7 @@ import { useActivityStore } from '@/store/activityStore';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import {
   BackgroundGradient,
+  ChartDisplayVersion,
   ChartFillStyle,
   ChartOrientation,
   FieldId,
@@ -374,8 +375,10 @@ export default function PreviewScreen() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [helpPopoverOpen, setHelpPopoverOpen] = useState(false);
   const [isSquareFormat, setIsSquareFormat] = useState(false);
-  const [showChartAxes, setShowChartAxes] = useState(true);
-  const [showChartGrid, setShowChartGrid] = useState(true);
+  const [paceChartVersion, setPaceChartVersion] =
+    useState<ChartDisplayVersion>('v1');
+  const [hrChartVersion, setHrChartVersion] =
+    useState<ChartDisplayVersion>('v1');
   const [paceChartOrientation, setPaceChartOrientation] =
     useState<ChartOrientation>('vertical');
   const [paceChartFill, setPaceChartFill] =
@@ -1296,8 +1299,8 @@ export default function PreviewScreen() {
     setBehindSubjectLayers({});
     setLayerTransforms({});
     setIsSquareFormat(false);
-    setShowChartAxes(true);
-    setShowChartGrid(true);
+    setPaceChartVersion('v1');
+    setHrChartVersion('v1');
     setPaceChartOrientation('vertical');
     setPaceChartFill('gradient');
     setLayerStyleMapByLayout({
@@ -1341,8 +1344,8 @@ export default function PreviewScreen() {
     setBehindSubjectLayers(draft.behindSubjectLayers ?? {});
     setLayerTransforms(draft.layerTransforms ?? {});
     setIsSquareFormat(Boolean(draft.isSquareFormat));
-    setShowChartAxes(draft.showChartAxes ?? true);
-    setShowChartGrid(draft.showChartGrid ?? true);
+    setPaceChartVersion(draft.paceChartVersion ?? 'v1');
+    setHrChartVersion(draft.hrChartVersion ?? 'v1');
     setPaceChartOrientation(draft.paceChartOrientation ?? 'vertical');
     setPaceChartFill(draft.paceChartFill ?? 'gradient');
     if (draft.layerStyleMapByLayout) {
@@ -1419,8 +1422,8 @@ export default function PreviewScreen() {
               headerVisible: DEFAULT_HEADER_VISIBLE,
               visibleLayers: DEFAULT_VISIBLE_LAYERS,
               isSquareFormat: false,
-              showChartAxes: true,
-              showChartGrid: true,
+              paceChartVersion: 'v1',
+              hrChartVersion: 'v1',
               paceChartOrientation: 'vertical',
               paceChartFill: 'gradient',
             },
@@ -1479,8 +1482,8 @@ export default function PreviewScreen() {
       behindSubjectLayers,
       layerTransforms,
       isSquareFormat,
-      showChartAxes,
-      showChartGrid,
+      paceChartVersion,
+      hrChartVersion,
       paceChartOrientation,
       paceChartFill,
       layerStyleMap,
@@ -1512,8 +1515,8 @@ export default function PreviewScreen() {
     headerVisible,
     imageOverlays,
     isSquareFormat,
-    showChartAxes,
-    showChartGrid,
+    paceChartVersion,
+    hrChartVersion,
     paceChartOrientation,
     paceChartFill,
     layerOrder,
@@ -1744,8 +1747,8 @@ export default function PreviewScreen() {
           layerTransforms,
           behindSubjectLayers,
           layerStyleMapByLayout,
-          showChartAxes,
-          showChartGrid,
+          paceChartVersion,
+          hrChartVersion,
           paceChartOrientation,
           paceChartFill,
           isSquareFormat,
@@ -1778,8 +1781,8 @@ export default function PreviewScreen() {
     setLayerTransforms(snapshot.layerTransforms);
     setBehindSubjectLayers(snapshot.behindSubjectLayers);
     setLayerStyleMapByLayout(snapshot.layerStyleMapByLayout);
-    setShowChartAxes(snapshot.showChartAxes);
-    setShowChartGrid(snapshot.showChartGrid);
+    setPaceChartVersion(snapshot.paceChartVersion);
+    setHrChartVersion(snapshot.hrChartVersion);
     setPaceChartOrientation(snapshot.paceChartOrientation);
     setPaceChartFill(snapshot.paceChartFill);
     setIsSquareFormat(snapshot.isSquareFormat);
@@ -1798,8 +1801,8 @@ export default function PreviewScreen() {
     routeMapVariant,
     routeMode,
     selectedLayoutId,
-    showChartAxes,
-    showChartGrid,
+    paceChartVersion,
+    hrChartVersion,
     paceChartOrientation,
     paceChartFill,
     isSquareFormat,
@@ -2952,8 +2955,8 @@ export default function PreviewScreen() {
           onRotationGuideChange={setShowRotationGuide}
           lapPaceChartData={lapPaceChartData}
           heartRateAreaChartData={heartRateAreaChartData}
-          showChartAxes={showChartAxes}
-          showChartGrid={showChartGrid}
+          paceChartVersion={paceChartVersion}
+          hrChartVersion={hrChartVersion}
           paceChartOrientation={paceChartOrientation}
           paceChartFill={paceChartFill}
           distanceUnit={distanceUnit}
@@ -3050,10 +3053,10 @@ export default function PreviewScreen() {
           showBackgroundTab={showTemplateBackgroundTab}
           hasLapPaceLayer={hasLapPaceLayer}
           hasHeartRateLayer={hasHeartRateLayer}
-          showChartAxes={showChartAxes}
-          onSetShowChartAxes={setShowChartAxes}
-          showChartGrid={showChartGrid}
-          onSetShowChartGrid={setShowChartGrid}
+          paceChartVersion={paceChartVersion}
+          onSetPaceChartVersion={setPaceChartVersion}
+          hrChartVersion={hrChartVersion}
+          onSetHrChartVersion={setHrChartVersion}
           paceChartOrientation={paceChartOrientation}
           onSetPaceChartOrientation={setPaceChartOrientation}
           paceChartFill={paceChartFill}

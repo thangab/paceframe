@@ -11,6 +11,7 @@ import {
   Group,
   ImageShader,
   LinearGradient as SkiaLinearGradient,
+  Circle,
   Rect,
   RuntimeShader,
   Skia,
@@ -45,6 +46,7 @@ import type { DistanceUnit } from '@/lib/format';
 import type { HeartRateAreaChartPoint, LapPaceChartPoint } from '@/lib/strava';
 import type {
   BackgroundGradient,
+  ChartDisplayVersion,
   ChartFillStyle,
   ChartOrientation,
   FieldId,
@@ -171,8 +173,8 @@ type Props = {
   onRotationGuideChange: (active: boolean) => void;
   lapPaceChartData: LapPaceChartPoint[];
   heartRateAreaChartData: HeartRateAreaChartPoint[];
-  showChartAxes: boolean;
-  showChartGrid: boolean;
+  paceChartVersion: ChartDisplayVersion;
+  hrChartVersion: ChartDisplayVersion;
   paceChartOrientation: ChartOrientation;
   paceChartFill: ChartFillStyle;
   distanceUnit: DistanceUnit;
@@ -300,8 +302,8 @@ export function PreviewEditorCanvas({
   onRotationGuideChange,
   lapPaceChartData,
   heartRateAreaChartData,
-  showChartAxes,
-  showChartGrid,
+  paceChartVersion,
+  hrChartVersion,
   paceChartOrientation,
   paceChartFill,
   distanceUnit,
@@ -781,6 +783,19 @@ export function PreviewEditorCanvas({
     () => buildPaceSplitsByUnit(lapPaceChartData, distanceUnit),
     [distanceUnit, lapPaceChartData],
   );
+  const maxPaceDomainValue = useMemo(() => {
+    const values = lapPaceVictoryData
+      .map((item) => item.pace)
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .sort((a, b) => a - b);
+    if (!values.length) return 1;
+
+    const maxPace = values[values.length - 1] ?? 1;
+    const p90 = values[Math.floor((values.length - 1) * 0.9)] ?? maxPace;
+    // Keep baseline at 0 but avoid a single outlier flattening all bars.
+    const robustMax = Math.min(maxPace, p90 * 1.25);
+    return Math.max(1, Math.ceil(robustMax * 1.05));
+  }, [lapPaceVictoryData]);
   const heartRateVictoryData = useMemo(
     () =>
       sampledHeartRateData.map((item) => ({
@@ -790,6 +805,129 @@ export function PreviewEditorCanvas({
     [sampledHeartRateData],
   );
   const isMainPaceChartHorizontal = paceChartOrientation === 'horizontal';
+  const extraPaceBars = Math.max(0, lapPaceVictoryData.length - 10);
+  const shouldRotateMainPaceVerticalLabels = lapPaceVictoryData.length > 10;
+  const mainPaceVerticalLabelReserve =
+    paceChartVersion === 'v4' && !isMainPaceChartHorizontal
+      ? shouldRotateMainPaceVerticalLabels
+        ? 22
+        : 14
+      : 0;
+  const mainPaceChartWidth = isMainPaceChartHorizontal
+    ? 252
+    : 252 + Math.round(extraPaceBars * 20);
+  const mainPaceChartHeight = isMainPaceChartHorizontal
+    ? 110 + Math.round(extraPaceBars * 14)
+    : 110 + mainPaceVerticalLabelReserve;
+  const resolveHrChartVersionConfig = (
+    version: ChartDisplayVersion,
+  ): {
+    showAxes: boolean;
+    showGrid: boolean;
+    lineOnly: boolean;
+    showPeakLabel: boolean;
+  } => {
+    if (version === 'v1') {
+      return {
+        showAxes: true,
+        showGrid: true,
+        lineOnly: false,
+        showPeakLabel: false,
+      };
+    }
+    if (version === 'v2') {
+      return {
+        showAxes: true,
+        showGrid: false,
+        lineOnly: false,
+        showPeakLabel: false,
+      };
+    }
+    if (version === 'v3') {
+      return {
+        showAxes: false,
+        showGrid: false,
+        lineOnly: false,
+        showPeakLabel: true,
+      };
+    }
+    return {
+      showAxes: false,
+      showGrid: false,
+      lineOnly: true,
+      showPeakLabel: true,
+    };
+  };
+  const resolvePaceChartVersionConfig = (
+    version: ChartDisplayVersion,
+  ): {
+    showAxes: boolean;
+    showGrid: boolean;
+    lineOnly: boolean;
+    showBarLabels: boolean;
+  } => {
+    if (version === 'v1') {
+      return {
+        showAxes: true,
+        showGrid: true,
+        lineOnly: false,
+        showBarLabels: false,
+      };
+    }
+    if (version === 'v2') {
+      return {
+        showAxes: true,
+        showGrid: false,
+        lineOnly: false,
+        showBarLabels: false,
+      };
+    }
+    if (version === 'v3') {
+      return {
+        showAxes: false,
+        showGrid: false,
+        lineOnly: false,
+        showBarLabels: false,
+      };
+    }
+    return {
+      showAxes: false,
+      showGrid: false,
+      lineOnly: false,
+      showBarLabels: true,
+    };
+  };
+  const mainPaceChartVersionConfig =
+    resolvePaceChartVersionConfig(paceChartVersion);
+  const mainHrChartVersionConfig = resolveHrChartVersionConfig(hrChartVersion);
+  const findMaxHrPoint = (
+    points: { x: number; y: number | null | undefined }[],
+  ): { x: number; y: number; value: number } | null =>
+    points.reduce<{ x: number; y: number; value: number } | null>(
+      (best, point, index) => {
+        const value = heartRateVictoryData[index]?.bpm;
+        if (
+          typeof point.x !== 'number' ||
+          typeof point.y !== 'number' ||
+          !Number.isFinite(value)
+        ) {
+          return best;
+        }
+        if (!best || value > best.value) {
+          return { x: point.x, y: point.y, value };
+        }
+        return best;
+      },
+      null,
+    );
+  const mainPaceAxisFont = mainPaceChartVersionConfig.showAxes
+    ? chartAxisFont
+    : null;
+  const mainHrAxisFont = mainHrChartVersionConfig.showAxes
+    ? chartAxisFont
+    : null;
+  const mainPaceGridLineWidth = mainPaceChartVersionConfig.showGrid ? 1 : 0;
+  const mainHrGridLineWidth = mainHrChartVersionConfig.showGrid ? 1 : 0;
 
   const defaultChartPaceX = Math.round(18 * canvasScaleX);
   const defaultChartPaceY = Math.round(300 * canvasScaleY);
@@ -1448,6 +1586,7 @@ export function PreviewEditorCanvas({
               style={[
                 styles.chartBlock,
                 styles.chartPaceBlock,
+                { width: mainPaceChartWidth },
                 { opacity: layerStyleSettings.chartPace.opacity },
                 {
                   zIndex: baseLayerZ('chartPace'),
@@ -1455,61 +1594,204 @@ export function PreviewEditorCanvas({
                 },
               ]}
             >
-              <View style={styles.chartCanvasWrapPace}>
+              <View
+                style={[
+                  styles.chartCanvasWrapPace,
+                  mainPaceChartVersionConfig.showBarLabels &&
+                  !isMainPaceChartHorizontal
+                    ? styles.chartCanvasWrapPaceOverflowVisible
+                    : null,
+                  { height: mainPaceChartHeight },
+                ]}
+              >
                 <CartesianChart
                   data={lapPaceVictoryData}
                   xKey={isMainPaceChartHorizontal ? 'pace' : 'lap'}
                   yKeys={isMainPaceChartHorizontal ? ['lap'] : ['pace']}
-                  padding={{ left: 6, right: 6, top: 6, bottom: 6 }}
+                  domain={
+                    isMainPaceChartHorizontal
+                      ? { x: [0, maxPaceDomainValue] }
+                      : { y: [0, maxPaceDomainValue] }
+                  }
+                  renderOutside={({ points, chartBounds }) => {
+                    if (!mainPaceChartVersionConfig.showBarLabels) {
+                      return null;
+                    }
+
+                    const pacePoints = (
+                      isMainPaceChartHorizontal ? points.lap : points.pace
+                    ).filter(
+                      (point) =>
+                        typeof point.y === 'number' && point.y !== null,
+                    );
+                    if (!pacePoints.length) return null;
+
+                    const step =
+                      pacePoints.length > 1
+                        ? Math.abs(
+                            (isMainPaceChartHorizontal
+                              ? (pacePoints[1]?.y ?? 0)
+                              : pacePoints[1]?.x) -
+                              (isMainPaceChartHorizontal
+                                ? (pacePoints[0]?.y ?? 0)
+                                : pacePoints[0]?.x),
+                          )
+                        : (isMainPaceChartHorizontal
+                            ? chartBounds.bottom - chartBounds.top
+                            : chartBounds.right - chartBounds.left) * 0.35;
+                    const slot = isMainPaceChartHorizontal
+                      ? (chartBounds.bottom - chartBounds.top) /
+                        Math.max(1, pacePoints.length)
+                      : (chartBounds.right - chartBounds.left) /
+                        Math.max(1, pacePoints.length);
+                    const maxThickness = isMainPaceChartHorizontal
+                      ? Math.max(1, slot * 0.82)
+                      : 28;
+                    const minThickness = isMainPaceChartHorizontal ? 1 : 4;
+                    const thickness = Math.max(
+                      minThickness,
+                      Math.min(maxThickness, step * 0.62),
+                    );
+
+                    return (
+                      <>
+                        {pacePoints.map((point, index) => {
+                          const paceValue = lapPaceVictoryData[index]?.pace;
+                          const paceLabel =
+                            typeof paceValue === 'number'
+                              ? formatPaceAxisLabel(paceValue)
+                              : null;
+                          if (!paceLabel) return null;
+
+                          const left = isMainPaceChartHorizontal
+                            ? chartBounds.left
+                            : point.x - thickness / 2;
+                          const pointY = point.y ?? chartBounds.bottom;
+                          const top = isMainPaceChartHorizontal
+                            ? chartBounds.top +
+                              index * slot +
+                              Math.max(0, (slot - thickness) / 2)
+                            : pointY;
+                          const width = isMainPaceChartHorizontal
+                            ? Math.max(1, point.x - chartBounds.left)
+                            : thickness;
+                          const height = isMainPaceChartHorizontal
+                            ? thickness
+                            : Math.max(1, chartBounds.bottom - top);
+                          const paceLabelWidthEstimate = paceLabel.length * 5;
+                          const barCenterX = left + width / 2;
+                          const centeredHorizontalLabelX = Math.max(
+                            chartBounds.left + 2,
+                            barCenterX - paceLabelWidthEstimate / 2,
+                          );
+                          const rotatedLabelX = Math.max(
+                            chartBounds.left + 2,
+                            barCenterX - 4,
+                          );
+                          const labelY = shouldRotateMainPaceVerticalLabels
+                            ? chartBounds.bottom + 3
+                            : chartBounds.bottom + 8;
+
+                          return isMainPaceChartHorizontal ? (
+                            <SkiaText
+                              key={`pace-label-out-${index}`}
+                              x={point.x + 6}
+                              y={top + height - 1}
+                              text={paceLabel}
+                              font={chartAxisFont}
+                              color={`${layerStyleSettings.chartPace.color}EE`}
+                            />
+                          ) : shouldRotateMainPaceVerticalLabels ? (
+                            <Group
+                              key={`pace-label-out-${index}`}
+                              transform={[
+                                { translateX: rotatedLabelX },
+                                { translateY: labelY },
+                                { rotate: Math.PI / 2 },
+                              ]}
+                            >
+                              <SkiaText
+                                x={0}
+                                y={0}
+                                text={paceLabel}
+                                font={chartAxisFont}
+                                color={`${layerStyleSettings.chartPace.color}EE`}
+                              />
+                            </Group>
+                          ) : (
+                            <SkiaText
+                              key={`pace-label-out-${index}`}
+                              x={centeredHorizontalLabelX}
+                              y={labelY}
+                              text={paceLabel}
+                              font={chartAxisFont}
+                              color={`${layerStyleSettings.chartPace.color}EE`}
+                            />
+                          );
+                        })}
+                      </>
+                    );
+                  }}
+                  padding={{
+                    left: 6,
+                    right:
+                      mainPaceChartVersionConfig.showBarLabels &&
+                      isMainPaceChartHorizontal
+                        ? 10
+                        : 6,
+                    top: 6,
+                    bottom: Math.max(6, mainPaceVerticalLabelReserve),
+                  }}
                   domainPadding={{ left: 10, right: 10, top: 8 }}
-                  xAxis={
-                    showChartAxes
-                      ? {
-                          font: chartAxisFont,
-                          lineColor: `${layerStyleSettings.chartPace.color}7A`,
-                          lineWidth: showChartGrid ? 1 : 0,
-                          labelColor: `${layerStyleSettings.chartPace.color}CC`,
-                          labelPosition: 'outset',
-                          labelOffset: 2,
-                          tickCount: isMainPaceChartHorizontal
-                            ? 3
-                            : Math.min(6, lapPaceVictoryData.length),
-                          formatXLabel: (value) =>
-                            isMainPaceChartHorizontal
-                              ? formatPaceAxisLabel(Number(value))
-                              : formatPaceSplitLabel(
-                                  Number(value),
-                                  distanceUnit,
-                                ),
-                        }
-                      : undefined
-                  }
-                  yAxis={
-                    showChartAxes
-                      ? [
-                          {
-                            font: chartAxisFont,
-                            lineColor: `${layerStyleSettings.chartPace.color}7A`,
-                            lineWidth: showChartGrid ? 1 : 0,
-                            labelColor: `${layerStyleSettings.chartPace.color}CC`,
-                            labelPosition: 'outset',
-                            labelOffset: 2,
-                            tickCount: isMainPaceChartHorizontal
-                              ? Math.min(6, lapPaceVictoryData.length)
-                              : 3,
-                            formatYLabel: (value) =>
-                              isMainPaceChartHorizontal
-                                ? formatPaceSplitLabel(
-                                    Number(value),
-                                    distanceUnit,
-                                  )
-                                : formatPaceAxisLabel(Number(value)),
-                          },
-                        ]
-                      : undefined
-                  }
+                  xAxis={{
+                    font: mainPaceAxisFont,
+                    lineColor: mainPaceChartVersionConfig.showGrid
+                      ? `${layerStyleSettings.chartPace.color}7A`
+                      : `${layerStyleSettings.chartPace.color}00`,
+                    lineWidth: mainPaceGridLineWidth,
+                    labelColor: `${layerStyleSettings.chartPace.color}CC`,
+                    labelPosition: 'outset',
+                    labelOffset: 2,
+                    tickCount: isMainPaceChartHorizontal
+                      ? 3
+                      : Math.min(6, lapPaceVictoryData.length),
+                    formatXLabel: (value) =>
+                      isMainPaceChartHorizontal
+                        ? formatPaceAxisLabel(Number(value))
+                        : formatPaceSplitLabel(Number(value), distanceUnit),
+                  }}
+                  yAxis={[
+                    {
+                      font: mainPaceAxisFont,
+                      lineColor: mainPaceChartVersionConfig.showGrid
+                        ? `${layerStyleSettings.chartPace.color}7A`
+                        : `${layerStyleSettings.chartPace.color}00`,
+                      lineWidth: mainPaceGridLineWidth,
+                      labelColor: `${layerStyleSettings.chartPace.color}CC`,
+                      labelPosition: 'outset',
+                      labelOffset: 2,
+                      tickCount: isMainPaceChartHorizontal
+                        ? Math.min(6, lapPaceVictoryData.length)
+                        : 3,
+                      formatYLabel: (value) =>
+                        isMainPaceChartHorizontal
+                          ? formatPaceSplitLabel(Number(value), distanceUnit)
+                          : formatPaceAxisLabel(Number(value)),
+                    },
+                  ]}
                 >
                   {({ points, chartBounds }) => {
+                    if (mainPaceChartVersionConfig.lineOnly) {
+                      return (
+                        <Line
+                          points={
+                            isMainPaceChartHorizontal ? points.lap : points.pace
+                          }
+                          color={layerStyleSettings.chartPace.color}
+                          strokeWidth={2}
+                        />
+                      );
+                    }
                     const pacePoints = (
                       isMainPaceChartHorizontal ? points.lap : points.pace
                     ).filter(
@@ -1552,6 +1834,9 @@ export function PreviewEditorCanvas({
                       paceChartFill === 'plain'
                         ? topColor
                         : withAlpha(layerStyleSettings.chartPace.color, '4A');
+                    const barBottom = isMainPaceChartHorizontal
+                      ? chartBounds.bottom
+                      : chartBounds.bottom;
 
                     return (
                       <>
@@ -1573,26 +1858,51 @@ export function PreviewEditorCanvas({
                             : thickness;
                           const height = isMainPaceChartHorizontal
                             ? thickness
-                            : Math.max(1, chartBounds.bottom - top);
+                            : Math.max(1, barBottom - top);
+                          const paceValue = lapPaceVictoryData[index]?.pace;
+                          const paceLabel =
+                            typeof paceValue === 'number'
+                              ? formatPaceAxisLabel(paceValue)
+                              : null;
+
+                          const labelX = Math.min(
+                            chartBounds.right - 24,
+                            left + width + 6,
+                          );
+                          const labelY = isMainPaceChartHorizontal
+                            ? top + height - 1
+                            : barBottom + 8;
 
                           return (
-                            <Rect
-                              key={`pace-bar-${index}`}
-                              x={left}
-                              y={top}
-                              width={width}
-                              height={height}
-                            >
-                              <SkiaLinearGradient
-                                start={vec(left, top)}
-                                end={
-                                  isMainPaceChartHorizontal
-                                    ? vec(left + width, top)
-                                    : vec(left, chartBounds.bottom)
-                                }
-                                colors={[topColor, bottomColor]}
-                              />
-                            </Rect>
+                            <Group key={`pace-bar-${index}`}>
+                              <Rect
+                                x={left}
+                                y={top}
+                                width={width}
+                                height={height}
+                              >
+                                <SkiaLinearGradient
+                                  start={vec(left, top)}
+                                  end={
+                                    isMainPaceChartHorizontal
+                                      ? vec(left + width, top)
+                                      : vec(left, barBottom)
+                                  }
+                                  colors={[topColor, bottomColor]}
+                                />
+                              </Rect>
+                              {mainPaceChartVersionConfig.showBarLabels &&
+                              false &&
+                              paceLabel ? (
+                                <SkiaText
+                                  x={labelX}
+                                  y={labelY}
+                                  text={paceLabel ?? ''}
+                                  font={chartAxisFont}
+                                  color={`${layerStyleSettings.chartPace.color}EE`}
+                                />
+                              ) : null}
+                            </Group>
                           );
                         })}
                       </>
@@ -1643,53 +1953,82 @@ export function PreviewEditorCanvas({
                   yKeys={['bpm']}
                   padding={{ left: 4, right: 4, top: 6, bottom: 6 }}
                   domainPadding={{ left: 0, right: 0, top: 8 }}
-                  xAxis={
-                    showChartAxes
-                      ? {
-                          font: chartAxisFont,
-                          lineColor: `${layerStyleSettings.chartHr.color}7A`,
-                          lineWidth: showChartGrid ? 1 : 0,
-                          labelColor: `${layerStyleSettings.chartHr.color}CC`,
-                          labelPosition: 'outset',
-                          labelOffset: 2,
-                          tickCount: 3,
-                          formatXLabel: (value) =>
-                            formatElapsedAxisLabel(Number(value)),
-                        }
-                      : undefined
-                  }
-                  yAxis={
-                    showChartAxes
-                      ? [
-                          {
-                            font: chartAxisFont,
-                            lineColor: `${layerStyleSettings.chartHr.color}7A`,
-                            lineWidth: showChartGrid ? 1 : 0,
-                            labelColor: `${layerStyleSettings.chartHr.color}CC`,
-                            labelPosition: 'outset',
-                            labelOffset: 2,
-                            tickCount: 3,
-                            formatYLabel: (value) =>
-                              `${Math.round(Number(value))}`,
-                          },
-                        ]
-                      : undefined
-                  }
+                  renderOutside={({ points, chartBounds }) => {
+                    if (!mainHrChartVersionConfig.showPeakLabel) return null;
+                    const maxHrPoint = findMaxHrPoint(points.bpm);
+                    if (!maxHrPoint) return null;
+
+                    return (
+                      <SkiaText
+                        x={Math.max(
+                          chartBounds.left + 2,
+                          Math.min(chartBounds.right - 24, maxHrPoint.x + 4),
+                        )}
+                        y={Math.max(11, maxHrPoint.y - 10)}
+                        text={`${Math.round(maxHrPoint.value)}`}
+                        font={chartAxisFont}
+                        color={`${layerStyleSettings.chartHr.color}EE`}
+                      />
+                    );
+                  }}
+                  xAxis={{
+                    font: mainHrAxisFont,
+                    lineColor: mainHrChartVersionConfig.showGrid
+                      ? `${layerStyleSettings.chartHr.color}7A`
+                      : `${layerStyleSettings.chartHr.color}00`,
+                    lineWidth: mainHrGridLineWidth,
+                    labelColor: `${layerStyleSettings.chartHr.color}CC`,
+                    labelPosition: 'outset',
+                    labelOffset: 2,
+                    tickCount: 3,
+                    formatXLabel: (value) =>
+                      formatElapsedAxisLabel(Number(value)),
+                  }}
+                  yAxis={[
+                    {
+                      font: mainHrAxisFont,
+                      lineColor: mainHrChartVersionConfig.showGrid
+                        ? `${layerStyleSettings.chartHr.color}7A`
+                        : `${layerStyleSettings.chartHr.color}00`,
+                      lineWidth: mainHrGridLineWidth,
+                      labelColor: `${layerStyleSettings.chartHr.color}CC`,
+                      labelPosition: 'outset',
+                      labelOffset: 2,
+                      tickCount: 3,
+                      formatYLabel: (value) => `${Math.round(Number(value))}`,
+                    },
+                  ]}
                 >
-                  {({ points, chartBounds }) => (
-                    <>
-                      <Area
-                        points={points.bpm}
-                        y0={chartBounds.bottom}
-                        color={`${layerStyleSettings.chartHr.color}66`}
-                      />
-                      <Line
-                        points={points.bpm}
-                        color={layerStyleSettings.chartHr.color}
-                        strokeWidth={2}
-                      />
-                    </>
-                  )}
+                  {({ points, chartBounds }) => {
+                    const maxHrPoint = mainHrChartVersionConfig.showPeakLabel
+                      ? findMaxHrPoint(points.bpm)
+                      : null;
+                    return (
+                      <>
+                        {!mainHrChartVersionConfig.lineOnly ? (
+                          <Area
+                            points={points.bpm}
+                            y0={chartBounds.bottom}
+                            color={`${layerStyleSettings.chartHr.color}66`}
+                          />
+                        ) : null}
+                        <Line
+                          points={points.bpm}
+                          color={layerStyleSettings.chartHr.color}
+                          strokeWidth={2}
+                        />
+                        {mainHrChartVersionConfig.showPeakLabel &&
+                        maxHrPoint ? (
+                          <Circle
+                            cx={maxHrPoint.x}
+                            cy={maxHrPoint.y}
+                            r={2.5}
+                            color={layerStyleSettings.chartHr.color}
+                          />
+                        ) : null}
+                      </>
+                    );
+                  }}
                 </CartesianChart>
               </View>
             </DraggableBlock>
@@ -1780,12 +2119,50 @@ export function PreviewEditorCanvas({
                     ? layerStyleSettings.chartPace.color
                     : layerStyleSettings.chartHr.color);
                 const opacity = item.opacity ?? 1;
-                const showAxesForItem = item.showAxes ?? showChartAxes;
-                const showGridForItem = item.showGrid ?? showChartGrid;
+                const paceVersionConfigForItem =
+                  item.kind === 'pace' && item.version
+                    ? resolvePaceChartVersionConfig(item.version)
+                    : null;
+                const hrVersionConfigForItem =
+                  item.kind === 'hr' && item.version
+                    ? resolveHrChartVersionConfig(item.version)
+                    : null;
+                const showAxesForItem =
+                  paceVersionConfigForItem?.showAxes ??
+                  hrVersionConfigForItem?.showAxes ??
+                  item.showAxes ??
+                  true;
+                const showGridForItem =
+                  paceVersionConfigForItem?.showGrid ??
+                  hrVersionConfigForItem?.showGrid ??
+                  item.showGrid ??
+                  true;
+                const lineOnlyForItem =
+                  paceVersionConfigForItem?.lineOnly ??
+                  hrVersionConfigForItem?.lineOnly ??
+                  false;
+                const showPaceBarLabelsForItem =
+                  item.kind === 'pace'
+                    ? (paceVersionConfigForItem?.showBarLabels ?? false)
+                    : false;
+                const shouldRotateTemplatePaceVerticalLabels =
+                  item.kind === 'pace' && lapPaceVictoryData.length > 10;
+                const showPeakLabelForItem =
+                  item.kind === 'hr'
+                    ? (hrVersionConfigForItem?.showPeakLabel ?? false)
+                    : false;
+                const axisFontForItem = showAxesForItem ? chartAxisFont : null;
+                const axisGridLineWidthForItem = showGridForItem ? 1 : 0;
                 const paceOrientationForItem =
                   item.orientation ?? paceChartOrientation;
                 const isPaceHorizontalForItem =
                   paceOrientationForItem === 'horizontal';
+                const templatePaceVerticalLabelReserve =
+                  showPaceBarLabelsForItem && !isPaceHorizontalForItem
+                    ? shouldRotateTemplatePaceVerticalLabels
+                      ? 22
+                      : 14
+                    : 0;
                 const paceFillForItem = item.fillStyle ?? paceChartFill;
                 const zIndex = item.isBehind ? 8 : 170;
 
@@ -1795,6 +2172,9 @@ export function PreviewEditorCanvas({
                     pointerEvents="none"
                     style={[
                       styles.templateChartLayer,
+                      showPaceBarLabelsForItem && !isPaceHorizontalForItem
+                        ? styles.templateChartLayerOverflowVisible
+                        : null,
                       {
                         left,
                         top,
@@ -1811,56 +2191,201 @@ export function PreviewEditorCanvas({
                         data={lapPaceVictoryData}
                         xKey={isPaceHorizontalForItem ? 'pace' : 'lap'}
                         yKeys={isPaceHorizontalForItem ? ['lap'] : ['pace']}
-                        padding={{ left: 6, right: 6, top: 6, bottom: 6 }}
+                        domain={
+                          isPaceHorizontalForItem
+                            ? { x: [0, maxPaceDomainValue] }
+                            : { y: [0, maxPaceDomainValue] }
+                        }
+                        renderOutside={({ points, chartBounds }) => {
+                          if (!showPaceBarLabelsForItem) {
+                            return null;
+                          }
+
+                          const pacePoints = (
+                            isPaceHorizontalForItem ? points.lap : points.pace
+                          ).filter(
+                            (point) =>
+                              typeof point.y === 'number' && point.y !== null,
+                          );
+                          if (!pacePoints.length) return null;
+
+                          const step =
+                            pacePoints.length > 1
+                              ? Math.abs(
+                                  (isPaceHorizontalForItem
+                                    ? (pacePoints[1]?.y ?? 0)
+                                    : pacePoints[1]?.x) -
+                                    (isPaceHorizontalForItem
+                                      ? (pacePoints[0]?.y ?? 0)
+                                      : pacePoints[0]?.x),
+                                )
+                              : (isPaceHorizontalForItem
+                                  ? chartBounds.bottom - chartBounds.top
+                                  : chartBounds.right - chartBounds.left) *
+                                0.35;
+                          const slot = isPaceHorizontalForItem
+                            ? (chartBounds.bottom - chartBounds.top) /
+                              Math.max(1, pacePoints.length)
+                            : (chartBounds.right - chartBounds.left) /
+                              Math.max(1, pacePoints.length);
+                          const maxThickness = isPaceHorizontalForItem
+                            ? Math.max(1, slot * 0.82)
+                            : 28;
+                          const minThickness = isPaceHorizontalForItem ? 1 : 4;
+                          const thickness = Math.max(
+                            minThickness,
+                            Math.min(maxThickness, step * 0.62),
+                          );
+
+                          return (
+                            <>
+                              {pacePoints.map((point, index) => {
+                                const paceValue =
+                                  lapPaceVictoryData[index]?.pace;
+                                const paceLabel =
+                                  typeof paceValue === 'number'
+                                    ? formatPaceAxisLabel(paceValue)
+                                    : null;
+                                if (!paceLabel) return null;
+
+                                const barLeft = isPaceHorizontalForItem
+                                  ? chartBounds.left
+                                  : point.x - thickness / 2;
+                                const pointY = point.y ?? chartBounds.bottom;
+                                const barTop = isPaceHorizontalForItem
+                                  ? chartBounds.top +
+                                    index * slot +
+                                    Math.max(0, (slot - thickness) / 2)
+                                  : pointY;
+                                const barWidth = isPaceHorizontalForItem
+                                  ? Math.max(1, point.x - chartBounds.left)
+                                  : thickness;
+                                const barHeight = isPaceHorizontalForItem
+                                  ? thickness
+                                  : Math.max(1, chartBounds.bottom - barTop);
+                                const paceLabelWidthEstimate =
+                                  paceLabel.length * 5;
+                                const barCenterX = barLeft + barWidth / 2;
+                                const centeredHorizontalLabelX = Math.max(
+                                  chartBounds.left + 2,
+                                  barCenterX - paceLabelWidthEstimate / 2,
+                                );
+                                const rotatedLabelX = Math.max(
+                                  chartBounds.left + 2,
+                                  barCenterX - 4,
+                                );
+                                const labelY =
+                                  shouldRotateTemplatePaceVerticalLabels
+                                    ? chartBounds.bottom + 3
+                                    : chartBounds.bottom + 8;
+
+                                return isPaceHorizontalForItem ? (
+                                  <SkiaText
+                                    key={`template-pace-label-out-${item.id}-${index}`}
+                                    x={point.x + 6}
+                                    y={barTop + barHeight - 1}
+                                    text={paceLabel}
+                                    font={chartAxisFont}
+                                    color={`${color}EE`}
+                                  />
+                                ) : shouldRotateTemplatePaceVerticalLabels ? (
+                                  <Group
+                                    key={`template-pace-label-out-${item.id}-${index}`}
+                                    transform={[
+                                      { translateX: rotatedLabelX },
+                                      { translateY: labelY },
+                                      { rotate: Math.PI / 2 },
+                                    ]}
+                                  >
+                                    <SkiaText
+                                      x={0}
+                                      y={0}
+                                      text={paceLabel}
+                                      font={chartAxisFont}
+                                      color={`${color}EE`}
+                                    />
+                                  </Group>
+                                ) : (
+                                  <SkiaText
+                                    key={`template-pace-label-out-${item.id}-${index}`}
+                                    x={centeredHorizontalLabelX}
+                                    y={labelY}
+                                    text={paceLabel}
+                                    font={chartAxisFont}
+                                    color={`${color}EE`}
+                                  />
+                                );
+                              })}
+                            </>
+                          );
+                        }}
+                        padding={{
+                          left: 6,
+                          right:
+                            showPaceBarLabelsForItem && isPaceHorizontalForItem
+                              ? 10
+                              : 6,
+                          top: 6,
+                          bottom: Math.max(6, templatePaceVerticalLabelReserve),
+                        }}
                         domainPadding={{ left: 10, right: 10, top: 8 }}
-                        xAxis={
-                          showAxesForItem
-                            ? {
-                                font: chartAxisFont,
-                                lineColor: `${color}7A`,
-                                lineWidth: showGridForItem ? 1 : 0,
-                                labelColor: `${color}CC`,
-                                labelPosition: 'outset',
-                                labelOffset: 2,
-                                tickCount: isPaceHorizontalForItem
-                                  ? 3
-                                  : Math.min(6, lapPaceVictoryData.length),
-                                formatXLabel: (value) =>
-                                  isPaceHorizontalForItem
-                                    ? formatPaceAxisLabel(Number(value))
-                                    : formatPaceSplitLabel(
-                                        Number(value),
-                                        distanceUnit,
-                                      ),
-                              }
-                            : undefined
-                        }
-                        yAxis={
-                          showAxesForItem
-                            ? [
-                                {
-                                  font: chartAxisFont,
-                                  lineColor: `${color}7A`,
-                                  lineWidth: showGridForItem ? 1 : 0,
-                                  labelColor: `${color}CC`,
-                                  labelPosition: 'outset',
-                                  labelOffset: 2,
-                                  tickCount: isPaceHorizontalForItem
-                                    ? Math.min(6, lapPaceVictoryData.length)
-                                    : 3,
-                                  formatYLabel: (value) =>
-                                    isPaceHorizontalForItem
-                                      ? formatPaceSplitLabel(
-                                          Number(value),
-                                          distanceUnit,
-                                        )
-                                      : formatPaceAxisLabel(Number(value)),
-                                },
-                              ]
-                            : undefined
-                        }
+                        xAxis={{
+                          font: axisFontForItem,
+                          lineColor: showGridForItem
+                            ? `${color}7A`
+                            : `${color}00`,
+                          lineWidth: axisGridLineWidthForItem,
+                          labelColor: `${color}CC`,
+                          labelPosition: 'outset',
+                          labelOffset: 2,
+                          tickCount: isPaceHorizontalForItem
+                            ? 3
+                            : Math.min(6, lapPaceVictoryData.length),
+                          formatXLabel: (value) =>
+                            isPaceHorizontalForItem
+                              ? formatPaceAxisLabel(Number(value))
+                              : formatPaceSplitLabel(
+                                  Number(value),
+                                  distanceUnit,
+                                ),
+                        }}
+                        yAxis={[
+                          {
+                            font: axisFontForItem,
+                            lineColor: showGridForItem
+                              ? `${color}7A`
+                              : `${color}00`,
+                            lineWidth: axisGridLineWidthForItem,
+                            labelColor: `${color}CC`,
+                            labelPosition: 'outset',
+                            labelOffset: 2,
+                            tickCount: isPaceHorizontalForItem
+                              ? Math.min(6, lapPaceVictoryData.length)
+                              : 3,
+                            formatYLabel: (value) =>
+                              isPaceHorizontalForItem
+                                ? formatPaceSplitLabel(
+                                    Number(value),
+                                    distanceUnit,
+                                  )
+                                : formatPaceAxisLabel(Number(value)),
+                          },
+                        ]}
                       >
                         {({ points, chartBounds }) => {
+                          if (lineOnlyForItem) {
+                            return (
+                              <Line
+                                points={
+                                  isPaceHorizontalForItem
+                                    ? points.lap
+                                    : points.pace
+                                }
+                                color={color}
+                                strokeWidth={2}
+                              />
+                            );
+                          }
                           const pacePoints = (
                             isPaceHorizontalForItem ? points.lap : points.pace
                           ).filter(
@@ -1901,6 +2426,9 @@ export function PreviewEditorCanvas({
                             paceFillForItem === 'plain'
                               ? topColor
                               : withAlpha(color, '4A');
+                          const barBottom = isPaceHorizontalForItem
+                            ? chartBounds.bottom
+                            : chartBounds.bottom;
 
                           return (
                             <>
@@ -1922,26 +2450,61 @@ export function PreviewEditorCanvas({
                                   : thickness;
                                 const barHeight = isPaceHorizontalForItem
                                   ? thickness
-                                  : Math.max(1, chartBounds.bottom - barTop);
+                                  : Math.max(1, barBottom - barTop);
+                                const paceValue =
+                                  lapPaceVictoryData[index]?.pace;
+                                const paceLabel =
+                                  typeof paceValue === 'number'
+                                    ? formatPaceAxisLabel(paceValue)
+                                    : null;
+                                const paceLabelWidthEstimate =
+                                  (paceLabel?.length ?? 0) * 5;
+                                const centeredHorizontalLabelX = Math.max(
+                                  chartBounds.left + 2,
+                                  barLeft +
+                                    barWidth / 2 -
+                                    paceLabelWidthEstimate / 2,
+                                );
+                                const labelX = Math.min(
+                                  chartBounds.right - 24,
+                                  barLeft + barWidth + 6,
+                                );
+                                const labelY = isPaceHorizontalForItem
+                                  ? barTop + barHeight - 1
+                                  : barBottom + 8;
 
                                 return (
-                                  <Rect
+                                  <Group
                                     key={`template-pace-bar-${item.id}-${index}`}
-                                    x={barLeft}
-                                    y={barTop}
-                                    width={barWidth}
-                                    height={barHeight}
                                   >
-                                    <SkiaLinearGradient
-                                      start={vec(barLeft, barTop)}
-                                      end={
-                                        isPaceHorizontalForItem
-                                          ? vec(barLeft + barWidth, barTop)
-                                          : vec(barLeft, chartBounds.bottom)
-                                      }
-                                      colors={[topColor, bottomColor]}
-                                    />
-                                  </Rect>
+                                    <Rect
+                                      x={barLeft}
+                                      y={barTop}
+                                      width={barWidth}
+                                      height={barHeight}
+                                    >
+                                      <SkiaLinearGradient
+                                        start={vec(barLeft, barTop)}
+                                        end={
+                                          isPaceHorizontalForItem
+                                            ? vec(barLeft + barWidth, barTop)
+                                            : vec(barLeft, barBottom)
+                                        }
+                                        colors={[topColor, bottomColor]}
+                                      />
+                                    </Rect>
+                                    {showPaceBarLabelsForItem &&
+                                    false &&
+                                    paceLabel ? (
+                                      <SkiaText
+                                        x={labelX}
+                                        y={labelY}
+                                        text={paceLabel ?? ''}
+                                        font={chartAxisFont}
+                                        color={`${color}EE`}
+                                      />
+                                    ) : null}
+                                  </Group>
                                 );
                               })}
                             </>
@@ -1955,53 +2518,85 @@ export function PreviewEditorCanvas({
                         yKeys={['bpm']}
                         padding={{ left: 4, right: 4, top: 6, bottom: 6 }}
                         domainPadding={{ left: 0, right: 0, top: 8 }}
-                        xAxis={
-                          showAxesForItem
-                            ? {
-                                font: chartAxisFont,
-                                lineColor: `${color}7A`,
-                                lineWidth: showGridForItem ? 1 : 0,
-                                labelColor: `${color}CC`,
-                                labelPosition: 'outset',
-                                labelOffset: 2,
-                                tickCount: 3,
-                                formatXLabel: (value) =>
-                                  formatElapsedAxisLabel(Number(value)),
-                              }
-                            : undefined
-                        }
-                        yAxis={
-                          showAxesForItem
-                            ? [
-                                {
-                                  font: chartAxisFont,
-                                  lineColor: `${color}7A`,
-                                  lineWidth: showGridForItem ? 1 : 0,
-                                  labelColor: `${color}CC`,
-                                  labelPosition: 'outset',
-                                  labelOffset: 2,
-                                  tickCount: 3,
-                                  formatYLabel: (value) =>
-                                    `${Math.round(Number(value))}`,
-                                },
-                              ]
-                            : undefined
-                        }
+                        renderOutside={({ points, chartBounds }) => {
+                          if (!showPeakLabelForItem) return null;
+                          const maxHrPoint = findMaxHrPoint(points.bpm);
+                          if (!maxHrPoint) return null;
+
+                          return (
+                            <SkiaText
+                              x={Math.max(
+                                chartBounds.left + 2,
+                                Math.min(
+                                  chartBounds.right - 24,
+                                  maxHrPoint.x + 4,
+                                ),
+                              )}
+                              y={Math.max(11, maxHrPoint.y - 10)}
+                              text={`${Math.round(maxHrPoint.value)}`}
+                              font={chartAxisFont}
+                              color={`${color}EE`}
+                            />
+                          );
+                        }}
+                        xAxis={{
+                          font: axisFontForItem,
+                          lineColor: showGridForItem
+                            ? `${color}7A`
+                            : `${color}00`,
+                          lineWidth: axisGridLineWidthForItem,
+                          labelColor: `${color}CC`,
+                          labelPosition: 'outset',
+                          labelOffset: 2,
+                          tickCount: 3,
+                          formatXLabel: (value) =>
+                            formatElapsedAxisLabel(Number(value)),
+                        }}
+                        yAxis={[
+                          {
+                            font: axisFontForItem,
+                            lineColor: showGridForItem
+                              ? `${color}7A`
+                              : `${color}00`,
+                            lineWidth: axisGridLineWidthForItem,
+                            labelColor: `${color}CC`,
+                            labelPosition: 'outset',
+                            labelOffset: 2,
+                            tickCount: 3,
+                            formatYLabel: (value) =>
+                              `${Math.round(Number(value))}`,
+                          },
+                        ]}
                       >
-                        {({ points, chartBounds }) => (
-                          <>
-                            <Area
-                              points={points.bpm}
-                              y0={chartBounds.bottom}
-                              color={`${color}66`}
-                            />
-                            <Line
-                              points={points.bpm}
-                              color={color}
-                              strokeWidth={2}
-                            />
-                          </>
-                        )}
+                        {({ points, chartBounds }) => {
+                          const maxHrPoint = showPeakLabelForItem
+                            ? findMaxHrPoint(points.bpm)
+                            : null;
+                          return (
+                            <>
+                              {!lineOnlyForItem ? (
+                                <Area
+                                  points={points.bpm}
+                                  y0={chartBounds.bottom}
+                                  color={`${color}66`}
+                                />
+                              ) : null}
+                              <Line
+                                points={points.bpm}
+                                color={color}
+                                strokeWidth={2}
+                              />
+                              {showPeakLabelForItem && maxHrPoint ? (
+                                <Circle
+                                  cx={maxHrPoint.x}
+                                  cy={maxHrPoint.y}
+                                  r={2.5}
+                                  color={color}
+                                />
+                              ) : null}
+                            </>
+                          );
+                        }}
                       </CartesianChart>
                     )}
                   </View>
@@ -2535,7 +3130,7 @@ function createStyles(colors: ThemeColors) {
       gap: 6,
     },
     chartPaceBlock: {
-      width: 208,
+      width: 252,
     },
     chartHrBlock: {
       width: 208,
@@ -2556,10 +3151,13 @@ function createStyles(colors: ThemeColors) {
     },
     chartCanvasWrapPace: {
       width: '100%',
-      height: 82,
+      height: 110,
       backgroundColor: 'transparent',
       borderRadius: 0,
       overflow: 'hidden',
+    },
+    chartCanvasWrapPaceOverflowVisible: {
+      overflow: 'visible',
     },
     chartCanvasWrapHr: {
       width: '100%',
@@ -2580,6 +3178,9 @@ function createStyles(colors: ThemeColors) {
     templateChartLayer: {
       position: 'absolute',
       overflow: 'hidden',
+    },
+    templateChartLayerOverflowVisible: {
+      overflow: 'visible',
     },
     templateTextLayer: {
       position: 'absolute',
