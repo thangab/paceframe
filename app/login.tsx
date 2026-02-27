@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
 import {
   Image,
@@ -114,6 +115,14 @@ export default function LoginScreen() {
       setError(err instanceof Error ? err.message : 'HealthKit import failed.');
     } finally {
       setIsBusy(false);
+    }
+  }
+
+  async function openLegalDocument(url: string) {
+    try {
+      await WebBrowser.openBrowserAsync(url);
+    } catch {
+      await Linking.openURL(url);
     }
   }
 
@@ -232,7 +241,26 @@ export default function LoginScreen() {
         ) : null}
 
         <Text style={styles.legal}>
-          Your Strava login is used only to read activities.
+          Your Strava login is used only to read activities. By continuing, you
+          accept our{' '}
+          <Text
+            style={styles.legalLink}
+            onPress={() => {
+              void openLegalDocument('https://paceframe.app/terms');
+            }}
+          >
+            Terms
+          </Text>{' '}
+          and{' '}
+          <Text
+            style={styles.legalLink}
+            onPress={() => {
+              void openLegalDocument('https://paceframe.app/privacy-policy');
+            }}
+          >
+            Privacy Policy
+          </Text>
+          .
         </Text>
       </View>
     </View>
@@ -376,6 +404,10 @@ function createStyles(colors: ThemeColors) {
       fontSize: 12,
       lineHeight: 18,
       paddingHorizontal: spacing.sm,
+    },
+    legalLink: {
+      color: 'rgba(242,245,255,0.9)',
+      textDecorationLine: 'underline',
     },
     pressed: {
       opacity: 0.9,

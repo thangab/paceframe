@@ -312,7 +312,6 @@ export default function PaywallScreen() {
             <Text style={styles.linkText}>Cancel anytime</Text>
           </Pressable>
         </View>
-        {/* {message ? <Text style={styles.message}>{message}</Text> : null} */}
       </ScrollView>
     </View>
   );
