@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import * as Linking from 'expo-linking';
+import {
+  Animated,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StravaActivity } from '@/types/strava';
 import { radius, spacing, type ThemeColors } from '@/constants/theme';
@@ -9,12 +17,18 @@ import { formatDistanceMeters, formatDuration, formatPace } from '@/lib/format';
 type Props = {
   activity: StravaActivity;
   selected?: boolean;
+  showStravaAttribution?: boolean;
   onPress: () => void;
 };
 
 const PACEFRAME_LOGO_GREY = require('../assets/logo/paceframe-grey.png');
 
-export function ActivityCard({ activity, selected, onPress }: Props) {
+export function ActivityCard({
+  activity,
+  selected,
+  showStravaAttribution = false,
+  onPress,
+}: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const overlayOpacity = useRef(new Animated.Value(selected ? 0 : 1)).current;
@@ -43,6 +57,15 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
   const deviceName = activity.device_name?.trim() || null;
   const icon = activityTypeIcon(activity.type);
   const detailedMetrics = shouldShowDetailedMetrics(activity.type);
+  const stravaActivityUrl = `https://www.strava.com/activities/${activity.id}`;
+
+  async function handleOpenStravaActivity() {
+    try {
+      await Linking.openURL(stravaActivityUrl);
+    } catch {
+      // Ignore open failures on card-level action.
+    }
+  }
 
   return (
     <Pressable
@@ -145,6 +168,28 @@ export function ActivityCard({ activity, selected, onPress }: Props) {
               ))}
             </View>
           )}
+          {showStravaAttribution && selected ? (
+            <View style={styles.stravaRow}>
+              <Pressable
+                onPress={() => {
+                  void handleOpenStravaActivity();
+                }}
+                style={({ pressed }) => [
+                  styles.stravaLink,
+                  pressed ? styles.stravaLinkPressed : null,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="View activity on Strava"
+              >
+                <Text style={styles.stravaLinkText}>View on Strava</Text>
+                <MaterialCommunityIcons
+                  name="open-in-new"
+                  size={13}
+                  color={colors.textSubtle}
+                />
+              </Pressable>
+            </View>
+          ) : null}
         </View>
       </View>
     </Pressable>
@@ -392,6 +437,7 @@ function createStyles(colors: ThemeColors) {
     metricsSingle: {
       flexDirection: 'row',
       justifyContent: 'flex-start',
+      marginBottom: 4,
     },
     metricCard: {
       flex: 1,
@@ -426,6 +472,29 @@ function createStyles(colors: ThemeColors) {
     selectionPillActive: {
       backgroundColor: colors.primary,
       borderColor: colors.primaryBorderOnLight,
+    },
+    stravaRow: {
+      marginTop: 4,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: 8,
+    },
+    stravaLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    stravaLinkPressed: {
+      opacity: 0.75,
+    },
+    stravaLinkText: {
+      color: colors.textSubtle,
+      fontSize: 10,
+      fontWeight: '400',
+      textDecorationLine: 'underline',
     },
   });
 }

@@ -55,7 +55,10 @@ export function SettingsSection({
               onPress={() => {
                 void setThemeMode(item.id);
               }}
-              style={[styles.themeModeChip, selected && styles.themeModeChipSelected]}
+              style={[
+                styles.themeModeChip,
+                selected && styles.themeModeChipSelected,
+              ]}
             >
               <Text
                 style={[
@@ -76,7 +79,11 @@ export function SettingsSection({
           return (
             <Pressable
               key={item.id}
-              style={[styles.chip, selected && styles.chipSelected, styles.unitChip]}
+              style={[
+                styles.chip,
+                selected && styles.chipSelected,
+                styles.unitChip,
+              ]}
               onPress={() => onSetDistanceUnit(item.id)}
             >
               <Text style={styles.chipText}>{item.label}</Text>
@@ -91,7 +98,11 @@ export function SettingsSection({
           return (
             <Pressable
               key={item.id}
-              style={[styles.chip, selected && styles.chipSelected, styles.unitChip]}
+              style={[
+                styles.chip,
+                selected && styles.chipSelected,
+                styles.unitChip,
+              ]}
               onPress={() => onSetElevationUnit(item.id)}
             >
               <Text style={styles.chipText}>{item.label}</Text>
@@ -106,7 +117,9 @@ export function SettingsSection({
           : 'Pinch/rotate/drag blocks. Center and rotation guides appear during move. Tap stats to switch template. Tap route to switch map/trace.'}
       </Text>
       {message ? <Text style={styles.note}>{message}</Text> : null}
-      {appCacheUsageLabel ? <Text style={styles.note}>{appCacheUsageLabel}</Text> : null}
+      {appCacheUsageLabel ? (
+        <Text style={styles.note}>{appCacheUsageLabel}</Text>
+      ) : null}
       {onClearAppCache ? (
         <PrimaryButton
           label="Clear cache"
@@ -117,7 +130,9 @@ export function SettingsSection({
         />
       ) : null}
       {!supportsFullStatsPreview ? (
-        <Text style={styles.note}>For this activity type, preview shows Time only.</Text>
+        <Text style={styles.note}>
+          For this activity type, preview shows Time only.
+        </Text>
       ) : null}
       {!isPremium ? (
         <PrimaryButton

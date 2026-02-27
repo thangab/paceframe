@@ -2829,8 +2829,8 @@ export default function PreviewScreen() {
                     name="restore"
                     size={18}
                     color={colors.panelText}
-                  />
-                </Pressable>
+                    />
+                  </Pressable>
               ) : null}
               {!templateMode ? (
                 <Pressable

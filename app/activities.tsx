@@ -11,7 +11,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { MaterialCommunityIcons, FontAwesome6 } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ActivityCard } from '@/components/ActivityCard';
 import { layout, spacing, type ThemeColors } from '@/constants/theme';
@@ -51,6 +51,10 @@ export default function ActivitiesScreen() {
   const selectActivity = useActivityStore((s) => s.selectActivity);
   const isHealthKitSource = source === 'healthkit';
   const refreshColor = themeMode === 'dark' ? colors.primary : colors.textMuted;
+  const hasLiveStravaSource =
+    source === 'strava' &&
+    Boolean(tokens?.accessToken) &&
+    !(tokens?.accessToken?.startsWith('mock-') ?? false);
   const hasLoadedInitialStravaRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(false);
@@ -245,9 +249,7 @@ export default function ActivitiesScreen() {
                   size={18}
                   color={colors.text}
                 />
-              ) : (
-                <FontAwesome6 name="strava" size={18} color={colors.text} />
-              )}
+              ) : null}
               <Text style={styles.navTitleText}>Activities</Text>
             </View>
           ),
@@ -364,9 +366,19 @@ export default function ActivitiesScreen() {
               <ActivityCard
                 activity={item}
                 selected={selectedActivityId === item.id}
+                showStravaAttribution={hasLiveStravaSource}
                 onPress={() => selectActivity(item.id)}
               />
             )}
+            ListFooterComponent={
+              hasLiveStravaSource ? (
+                <View style={styles.listFooterAttribution}>
+                  <Text style={styles.listFooterAttributionText}>
+                    Powered by Strava
+                  </Text>
+                </View>
+              ) : null
+            }
             ListEmptyComponent={
               hasFinishedInitialLoad && !loading ? (
                 <Text style={styles.empty}>No activities found.</Text>
@@ -604,6 +616,16 @@ function createStyles(colors: ThemeColors) {
     },
     listContent: {
       paddingBottom: 124,
+    },
+    listFooterAttribution: {
+      alignItems: 'center',
+      paddingTop: spacing.xs,
+      paddingBottom: spacing.sm,
+    },
+    listFooterAttributionText: {
+      color: colors.textMuted,
+      fontSize: 12,
+      fontWeight: '400',
     },
     bottomBar: {
       position: 'absolute',
