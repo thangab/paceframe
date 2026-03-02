@@ -20,12 +20,6 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
 import ImageCropPicker from 'react-native-image-crop-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import {
-  AlphaType,
-  ColorType,
-  ImageFormat,
-  Skia,
-} from '@shopify/react-native-skia';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { PrimaryButton } from '@/components/PrimaryButton';
@@ -115,7 +109,6 @@ import {
 } from '@/features/preview/config';
 import {
   formatCadence,
-  formatDateWithPattern,
   formatPreviewDate,
   getDynamicStatsWidth,
   getLayoutMetricLimit,
@@ -127,19 +120,16 @@ import {
   isAppOwnedCacheFile,
   normalizeLocalUri,
 } from '@/features/preview/layoutMath';
-type TemplateMediaDraft = {
-  v: 2;
-  media: ImagePicker.ImagePickerAsset | null;
-  backgroundGradient: BackgroundGradient | null;
-  autoSubjectUri: string | null;
-  autoSubjectSourceUri: string | null;
-};
-
-type TemplateMediaHydrationState = {
-  key: string | null;
-  loading: boolean;
-  hasStoredDraft: boolean;
-};
+import {
+  sanitizeTemplateMediaDraft,
+  type TemplateMediaDraft,
+  type TemplateMediaHydrationState,
+} from '@/features/preview/templateMediaDraft';
+import {
+  resolveTemplateText,
+  tokenizeTemplateText,
+} from '@/features/preview/templateText';
+import { trimStickerToOpaqueBounds } from '@/features/preview/stickerTrim';
 
 type ApplyImageBackgroundOptions = {
   silent?: boolean;
@@ -147,159 +137,6 @@ type ApplyImageBackgroundOptions = {
   failurePrefix?: string;
   skipBackgroundRemoval?: boolean;
 };
-
-function sanitizeTemplateMediaAsset(
-  input: unknown,
-): ImagePicker.ImagePickerAsset | null {
-  if (typeof input !== 'object' || !input) return null;
-  const source = input as Record<string, unknown>;
-  const uri = typeof source.uri === 'string' ? source.uri.trim() : '';
-  if (!uri) return null;
-  return {
-    uri,
-    type: source.type === 'video' ? 'video' : 'image',
-    width: typeof source.width === 'number' ? source.width : 0,
-    height: typeof source.height === 'number' ? source.height : 0,
-    fileName:
-      typeof source.fileName === 'string' || source.fileName === null
-        ? source.fileName
-        : null,
-    fileSize: typeof source.fileSize === 'number' ? source.fileSize : undefined,
-    mimeType: typeof source.mimeType === 'string' ? source.mimeType : undefined,
-    duration: typeof source.duration === 'number' ? source.duration : undefined,
-    assetId: typeof source.assetId === 'string' ? source.assetId : undefined,
-    base64:
-      typeof source.base64 === 'string' || source.base64 === null
-        ? source.base64
-        : null,
-    exif:
-      typeof source.exif === 'object' && source.exif !== null
-        ? (source.exif as Record<string, unknown>)
-        : null,
-  };
-}
-
-function sanitizeTemplateMediaDraft(input: unknown): TemplateMediaDraft | null {
-  if (typeof input !== 'object' || !input) return null;
-  const source = input as Record<string, unknown>;
-  const media = sanitizeTemplateMediaAsset(source.media);
-  const version = source.v === 2 ? 2 : 1;
-  const autoSubjectUri =
-    version === 2 && typeof source.autoSubjectUri === 'string'
-      ? source.autoSubjectUri.trim() || null
-      : null;
-  const autoSubjectSourceUri =
-    version === 2 && typeof source.autoSubjectSourceUri === 'string'
-      ? source.autoSubjectSourceUri.trim() || null
-      : null;
-  const gradientCandidate = source.backgroundGradient;
-  let backgroundGradient: BackgroundGradient | null = null;
-  if (typeof gradientCandidate === 'object' && gradientCandidate !== null) {
-    const candidateRecord = gradientCandidate as Record<string, unknown>;
-    const colorsCandidate = candidateRecord.colors;
-    if (
-      Array.isArray(colorsCandidate) &&
-      colorsCandidate.length === 3 &&
-      colorsCandidate.every((value) => typeof value === 'string')
-    ) {
-      backgroundGradient = {
-        colors: colorsCandidate as [string, string, string],
-        direction:
-          candidateRecord.direction === 'horizontal'
-            ? 'horizontal'
-            : 'vertical',
-      };
-    }
-  }
-  return {
-    v: 2,
-    media,
-    backgroundGradient,
-    autoSubjectUri,
-    autoSubjectSourceUri,
-  };
-}
-
-function resolveTemplateText(
-  value: string,
-  vars: {
-    activityName: string;
-    locationText: string;
-    dateIso: string;
-    dateText: string;
-    distanceText: string;
-    distanceValue: string;
-    distanceUnit: string;
-    durationText: string;
-    paceText: string;
-    paceValue: string;
-    paceUnit: string;
-    elevText: string;
-    elevValue: string;
-    elevUnit: string;
-    caloriesText: string;
-    avgHeartRateText: string;
-    avgHeartRateValue: string;
-    avgHeartRateUnit: string;
-  },
-  options?: {
-    formatDate?: string;
-  },
-) {
-  const resolvedDate =
-    options?.formatDate && vars.dateIso
-      ? (formatDateWithPattern(vars.dateIso, options.formatDate) ??
-        vars.dateText)
-      : vars.dateText;
-  return value
-    .replaceAll('{activityName}', vars.activityName)
-    .replaceAll('{location}', vars.locationText)
-    .replaceAll('{date}', resolvedDate)
-    .replaceAll('{distance}', vars.distanceText)
-    .replaceAll('{distanceValue}', vars.distanceValue)
-    .replaceAll('{distanceUnit}', vars.distanceUnit)
-    .replaceAll('{time}', vars.durationText)
-    .replaceAll('{pace}', vars.paceText)
-    .replaceAll('{paceValue}', vars.paceValue)
-    .replaceAll('{paceUnit}', vars.paceUnit)
-    .replaceAll('{elev}', vars.elevText)
-    .replaceAll('{elevValue}', vars.elevValue)
-    .replaceAll('{elevUnit}', vars.elevUnit)
-    .replaceAll('{calories}', vars.caloriesText)
-    .replaceAll('{avgHr}', vars.avgHeartRateText)
-    .replaceAll('{avgHrValue}', vars.avgHeartRateValue)
-    .replaceAll('{avgHrUnit}', vars.avgHeartRateUnit);
-}
-
-function tokenizeTemplateText(
-  text: string,
-  accentStyle?: {
-    fontFamily?: string;
-    fontSize?: number;
-    fontWeight?: '400' | '500' | '600' | '700' | '800' | '900';
-    letterSpacing?: number;
-    color?: string;
-  },
-): { text: string; accent?: boolean }[] {
-  const tokenRegex = /\[\[(.*?)\]\]/g;
-  const tokens: { text: string; accent?: boolean }[] = [];
-  let lastIndex = 0;
-  let match = tokenRegex.exec(text);
-  while (match) {
-    const start = match.index;
-    const end = tokenRegex.lastIndex;
-    if (start > lastIndex) {
-      tokens.push({ text: text.slice(lastIndex, start) });
-    }
-    tokens.push({ text: match[1], accent: true, ...(accentStyle ?? {}) });
-    lastIndex = end;
-    match = tokenRegex.exec(text);
-  }
-  if (lastIndex < text.length) {
-    tokens.push({ text: text.slice(lastIndex) });
-  }
-  return tokens.length ? tokens : [{ text }];
-}
 
 export default function PreviewScreen() {
   const searchParams = useLocalSearchParams<{
@@ -2009,105 +1846,12 @@ export default function PreviewScreen() {
     }
   }
 
-async function cleanupMediaIfTemp(
-  asset: ImagePicker.ImagePickerAsset | null,
-) {
-  if (!asset) return;
-  await cleanupTempUriIfOwned(asset.uri);
-}
-
-type TrimmedStickerResult = {
-  uri: string;
-  width: number;
-  height: number;
-};
-
-async function trimStickerToOpaqueBounds(
-  stickerUri: string,
-): Promise<TrimmedStickerResult | null> {
-  try {
-    const base64 = await FileSystem.readAsStringAsync(stickerUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    const encoded = Skia.Data.fromBase64(base64);
-    if (!encoded) return null;
-
-    const image = Skia.Image.MakeImageFromEncoded(encoded);
-    if (!image) return null;
-
-    const width = image.width();
-    const height = image.height();
-    if (width <= 0 || height <= 0) return null;
-
-    const pixels = image.readPixels(0, 0, {
-      width,
-      height,
-      alphaType: AlphaType.Unpremul,
-      colorType: ColorType.RGBA_8888,
-    });
-    if (!pixels || pixels.length < width * height * 4) return null;
-
-    let minX = width;
-    let minY = height;
-    let maxX = -1;
-    let maxY = -1;
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const alpha = pixels[(y * width + x) * 4 + 3];
-        if (alpha <= 10) continue;
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
-      }
-    }
-
-    if (maxX < 0 || maxY < 0) return null;
-
-    const padding = 2;
-    const cropX = Math.max(0, minX - padding);
-    const cropY = Math.max(0, minY - padding);
-    const cropRight = Math.min(width - 1, maxX + padding);
-    const cropBottom = Math.min(height - 1, maxY + padding);
-    const cropWidth = cropRight - cropX + 1;
-    const cropHeight = cropBottom - cropY + 1;
-
-    if (cropWidth >= width && cropHeight >= height) {
-      return { uri: stickerUri, width, height };
-    }
-
-    const surface = Skia.Surface.Make(cropWidth, cropHeight);
-    if (!surface) return { uri: stickerUri, width, height };
-
-    const canvas = surface.getCanvas();
-    canvas.clear(Skia.Color('transparent'));
-    const paint = Skia.Paint();
-    canvas.drawImageRect(
-      image,
-      Skia.XYWHRect(cropX, cropY, cropWidth, cropHeight),
-      Skia.XYWHRect(0, 0, cropWidth, cropHeight),
-      paint,
-      true,
-    );
-
-    const snapshot = surface.makeImageSnapshot();
-    const trimmedBase64 = snapshot.encodeToBase64(ImageFormat.PNG, 100);
-    if (!trimmedBase64) return { uri: stickerUri, width, height };
-
-    const trimmedUri =
-      `${FileSystem.cacheDirectory ?? ''}` +
-      `paceframe-sticker-${Date.now()}-${Math.round(Math.random() * 1000)}.png`;
-    if (!trimmedUri) return { uri: stickerUri, width, height };
-
-    await FileSystem.writeAsStringAsync(trimmedUri, trimmedBase64, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-
-    return { uri: trimmedUri, width: cropWidth, height: cropHeight };
-  } catch {
-    return null;
+  async function cleanupMediaIfTemp(
+    asset: ImagePicker.ImagePickerAsset | null,
+  ) {
+    if (!asset) return;
+    await cleanupTempUriIfOwned(asset.uri);
   }
-}
 
   async function applyImageBackground(
     asset: ImagePicker.ImagePickerAsset,
