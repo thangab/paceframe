@@ -43,12 +43,7 @@ export function ActivityCard({
   const overlayOpacity = useRef(new Animated.Value(selected ? 0 : 1)).current;
   const logoOpacity = useRef(new Animated.Value(selected ? 0 : 0.5)).current;
   const mapSnapshotPolyline = useMemo(() => {
-    const points = buildRoutePoints(activity);
-    if (points.length < 2) return null;
-
-    return encodePolyline(
-      points.map((point) => ({ x: point.lng, y: point.lat })),
-    );
+    return buildMapSnapshotPolyline(activity);
   }, [activity]);
 
   useEffect(() => {
@@ -270,73 +265,21 @@ export function ActivityCard({
   );
 }
 
-function buildRoutePoints(
-  activity: StravaActivity,
-): { lat: number; lng: number }[] {
-  const points = activity.map?.summary_polyline
-    ? decodePolyline(activity.map.summary_polyline).map((p) => ({
-        lat: p.y,
-        lng: p.x,
-      }))
-    : [];
+function buildMapSnapshotPolyline(activity: StravaActivity): string | null {
+  const summaryPolyline = activity.map?.summary_polyline?.trim();
+  if (summaryPolyline) {
+    const points = decodePolyline(summaryPolyline);
+    if (points.length >= 2) return summaryPolyline;
+  }
 
   const start = toLatLng(activity.start_latlng);
   const end = toLatLng(activity.end_latlng);
+  if (!start || !end) return null;
 
-  if (points.length >= 2) {
-    return fitRouteToKnownEndpoints(points, start, end);
-  }
-  if (start && end) return [start, end];
-  return [];
-}
-
-function fitRouteToKnownEndpoints(
-  points: { lat: number; lng: number }[],
-  start: { lat: number; lng: number } | null,
-  end: { lat: number; lng: number } | null,
-) {
-  if (!start || !end || points.length < 2) return points;
-
-  const first = points[0];
-  const last = points[points.length - 1];
-  const sourceVecX = last.lng - first.lng;
-  const sourceVecY = last.lat - first.lat;
-  const targetVecX = end.lng - start.lng;
-  const targetVecY = end.lat - start.lat;
-
-  const sourceLen = Math.hypot(sourceVecX, sourceVecY);
-  const targetLen = Math.hypot(targetVecX, targetVecY);
-  if (sourceLen < 1e-7 || targetLen < 1e-7) {
-    const translated = points.map((point) => ({
-      lat: point.lat - first.lat + start.lat,
-      lng: point.lng - first.lng + start.lng,
-    }));
-    translated[0] = start;
-    translated[translated.length - 1] = end;
-    return translated;
-  }
-
-  const sourceAngle = Math.atan2(sourceVecY, sourceVecX);
-  const targetAngle = Math.atan2(targetVecY, targetVecX);
-  const rotation = targetAngle - sourceAngle;
-  const scale = targetLen / sourceLen;
-  const cosTheta = Math.cos(rotation);
-  const sinTheta = Math.sin(rotation);
-
-  const transformed = points.map((point) => {
-    const relX = point.lng - first.lng;
-    const relY = point.lat - first.lat;
-    const rotatedX = relX * cosTheta - relY * sinTheta;
-    const rotatedY = relX * sinTheta + relY * cosTheta;
-    return {
-      lat: start.lat + rotatedY * scale,
-      lng: start.lng + rotatedX * scale,
-    };
-  });
-
-  transformed[0] = start;
-  transformed[transformed.length - 1] = end;
-  return transformed;
+  return encodePolyline([
+    { x: start.lng, y: start.lat },
+    { x: end.lng, y: end.lat },
+  ]);
 }
 
 function toLatLng(
