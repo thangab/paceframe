@@ -3021,8 +3021,9 @@ function createStyles(colors: ThemeColors) {
       position: 'absolute',
       width: '100%',
       height: '100%',
-      zIndex: 4,
-      elevation: 4,
+      // Keep activity/background filters behind draggable blocks.
+      zIndex: 0,
+      elevation: 0,
     },
     subjectFilterOverlay: {
       ...StyleSheet.absoluteFillObject,

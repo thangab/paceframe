@@ -137,11 +137,13 @@ class PaceFrameMapSnapshot: NSObject {
       maxLng = max(maxLng, c.longitude)
     }
 
-    // Keep the map centered on activity start (first coordinate).
-    let center = coordinates[0]
+    let center = CLLocationCoordinate2D(
+      latitude: (minLat + maxLat) / 2.0,
+      longitude: (minLng + maxLng) / 2.0
+    )
 
-    // Slightly zoomed out framing: route should occupy ~55% of the viewport.
-    let targetFill = 0.55
+    // Deterministic framing: route should occupy ~62% of the viewport.
+    let targetFill = 0.62
     var latDelta = max((maxLat - minLat) / targetFill, 0.008)
     var lngDelta = max((maxLng - minLng) / targetFill, 0.008)
 

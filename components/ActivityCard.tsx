@@ -46,7 +46,9 @@ export function ActivityCard({
     const points = buildRoutePoints(activity);
     if (points.length < 2) return null;
 
-    return encodePolyline(points.map((point) => ({ x: point.lng, y: point.lat })));
+    return encodePolyline(
+      points.map((point) => ({ x: point.lng, y: point.lat })),
+    );
   }, [activity]);
 
   useEffect(() => {
@@ -268,7 +270,9 @@ export function ActivityCard({
   );
 }
 
-function buildRoutePoints(activity: StravaActivity): { lat: number; lng: number }[] {
+function buildRoutePoints(
+  activity: StravaActivity,
+): { lat: number; lng: number }[] {
   const points = activity.map?.summary_polyline
     ? decodePolyline(activity.map.summary_polyline).map((p) => ({
         lat: p.y,
