@@ -100,7 +100,8 @@ export const mockActivities: StravaActivity[] = [
     total_elevation_gain: 120,
     type: 'Run',
     start_date: '2026-02-02T05:15:00Z',
-    start_latlng: [45.8992, 6.1294],
+    start_latlng: [48.864627, 2.37018],
+    end_latlng: [48.859858, 2.372011],
     average_speed: 3.07,
     average_cadence: 171,
     average_heartrate: 152,
@@ -108,7 +109,8 @@ export const mockActivities: StravaActivity[] = [
     location_city: 'Annecy',
     location_country: 'France',
     map: {
-      summary_polyline: 'mfp_Ix~vpAqCwAqBsBqCaC',
+      summary_polyline:
+        'iwfiHaanMXIlAy@d@e@XQTKPQj@gAd@WHBHALMj@{@HGd@Kf@Ex@SXC`A@dBNh@RTD|EpAr@\fBh@x@b@`A\ZHdB|@b@PPDf@PFFBZRPJ@TJTCL@|Af@XRNDJTHFzAh@XFvAr@nA`@RDP?ZFHHPh@JPt@\^Vl@x@JHLRdAh@jAZNNFt@DLHFr@PVLv@TZLXD^R~CnA`@N`@D`Af@r@NhAf@b@NTDn@Zx@lALZPp@D^FVANGL}AhCyDfFgBzDMJKR_@\k@Vk@NY@q@G_@Dk@CEBQ@e@Cy@Jk@PMN]Pg@n@[`AkChKQb@QZQl@Yr@i@hCKt@i@fC}@nDc@lAw@bCu@pBgAzCMl@Il@o@~B_@v@URGJ_@bA?\E\a@tBqAfEG`@@ZQl@u@vDc@zCEXSj@i@|Do@hD{@tDY|Ai@|CQtCu@`FKh@Qd@gC|E~CcGDAAEDB@QNw@@c@\oCZgDFS?KJs@lBmJt@eERiBV}A^}ABc@L]~@yFr@sCXw@Nu@Ne@P_A@a@TqAZ_@JIXe@n@{BLeAPs@nA_DX_AJULe@`@eAb@oANq@Ts@d@uBtBaKl@oAL_@d@iBp@yBl@iC`@uAFMf@i@PKd@QvAQN@JDH@h@?NDHEh@Ab@I\An@O\Q`@[xCaD~DsIL[p@iAFQBMEAEKCa@Gg@Oa@e@aAQQa@Qs@Qq@YM?QIMIEMc@c@[e@a@OMKyA]eBu@{Aa@_A_@oB}@wBq@{@k@e@e@[Wc@i@QO]Qi@s@QM[I]]QKwAq@eAa@YWu@WcAg@gBg@g@Da@AYBa@Eg@OoAg@i@IWQk@KoAg@i@Os@Y',
     },
     laps: buildMockLaps(9_000_010, 22),
 
@@ -126,7 +128,7 @@ export const mockActivities: StravaActivity[] = [
       { seconds: 6000, bpm: 143 },
       { seconds: 6600, bpm: 137 },
     ],
-    photoUrl:
-      'https://images.unsplash.com/photo-1755764712308-f2b35315d626?auto=format&fit=crop&crop=bottom&h=800&w=600&q=100',
+    // photoUrl:
+    //   'https://images.unsplash.com/photo-1755764712308-f2b35315d626?auto=format&fit=crop&crop=bottom&h=800&w=600&q=100',
   },
 ];

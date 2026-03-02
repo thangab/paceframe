@@ -827,6 +827,9 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.md,
       paddingTop: spacing.sm,
     },
+    panelScroll: {
+      flex: 1,
+    },
     panelTabs: {
       flexDirection: 'row',
       alignItems: 'center',

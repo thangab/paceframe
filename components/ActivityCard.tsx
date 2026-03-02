@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as Linking from 'expo-linking';
 import {
   Animated,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -13,6 +14,8 @@ import { StravaActivity } from '@/types/strava';
 import { radius, spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { formatDistanceMeters, formatDuration, formatPace } from '@/lib/format';
+import { generateMapSnapshot } from '@/lib/nativeMapSnapshot';
+import { decodePolyline, encodePolyline } from '@/lib/polyline';
 import { usePreferencesStore } from '@/store/preferencesStore';
 
 type Props = {
@@ -23,6 +26,9 @@ type Props = {
 };
 
 const PACEFRAME_LOGO_GREY = require('../assets/logo/paceframe-grey.png');
+const CARD_THUMB_SIZE = 88;
+const MAP_TRACE_WIDTH = 0;
+const MAP_SNAPSHOT_CACHE = new Map<string, string>();
 
 export function ActivityCard({
   activity,
@@ -33,8 +39,55 @@ export function ActivityCard({
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const distanceUnit = usePreferencesStore((s) => s.distanceUnit);
+  const [mapSnapshotUri, setMapSnapshotUri] = useState<string | null>(null);
   const overlayOpacity = useRef(new Animated.Value(selected ? 0 : 1)).current;
   const logoOpacity = useRef(new Animated.Value(selected ? 0 : 0.5)).current;
+  const mapSnapshotPolyline = useMemo(() => {
+    const points = buildRoutePoints(activity);
+    if (points.length < 2) return null;
+
+    return encodePolyline(points.map((point) => ({ x: point.lng, y: point.lat })));
+  }, [activity]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMapSnapshot() {
+      if (activity.photoUrl || !mapSnapshotPolyline || Platform.OS !== 'ios') {
+        setMapSnapshotUri(null);
+        return;
+      }
+
+      const cacheKey = `${mapSnapshotPolyline}:${colors.primary}`;
+      const cachedUri = MAP_SNAPSHOT_CACHE.get(cacheKey);
+      if (cachedUri) {
+        setMapSnapshotUri(cachedUri);
+        return;
+      }
+
+      try {
+        const uri = await generateMapSnapshot({
+          polyline: mapSnapshotPolyline,
+          width: CARD_THUMB_SIZE,
+          height: CARD_THUMB_SIZE,
+          strokeColorHex: colors.primary,
+          strokeWidth: MAP_TRACE_WIDTH,
+          mapVariant: 'dark',
+        });
+        if (cancelled) return;
+        MAP_SNAPSHOT_CACHE.set(cacheKey, uri);
+        setMapSnapshotUri(uri);
+      } catch {
+        if (!cancelled) setMapSnapshotUri(null);
+      }
+    }
+
+    void loadMapSnapshot();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activity.photoUrl, colors.primary, mapSnapshotPolyline]);
 
   useEffect(() => {
     Animated.timing(overlayOpacity, {
@@ -83,6 +136,23 @@ export function ActivityCard({
           <View style={styles.thumbnailWrap}>
             <Image
               source={{ uri: activity.photoUrl }}
+              style={styles.thumbnail}
+              resizeMode="cover"
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.thumbnailOverlay, { opacity: overlayOpacity }]}
+            />
+            <Animated.Image
+              source={PACEFRAME_LOGO_GREY}
+              style={[styles.thumbnailWatermark, { opacity: logoOpacity }]}
+              resizeMode="contain"
+            />
+          </View>
+        ) : mapSnapshotUri ? (
+          <View style={styles.thumbnailWrap}>
+            <Image
+              source={{ uri: mapSnapshotUri }}
               style={styles.thumbnail}
               resizeMode="cover"
             />
@@ -196,6 +266,83 @@ export function ActivityCard({
       </View>
     </Pressable>
   );
+}
+
+function buildRoutePoints(activity: StravaActivity): { lat: number; lng: number }[] {
+  const points = activity.map?.summary_polyline
+    ? decodePolyline(activity.map.summary_polyline).map((p) => ({
+        lat: p.y,
+        lng: p.x,
+      }))
+    : [];
+
+  const start = toLatLng(activity.start_latlng);
+  const end = toLatLng(activity.end_latlng);
+
+  if (points.length >= 2) {
+    return fitRouteToKnownEndpoints(points, start, end);
+  }
+  if (start && end) return [start, end];
+  return [];
+}
+
+function fitRouteToKnownEndpoints(
+  points: { lat: number; lng: number }[],
+  start: { lat: number; lng: number } | null,
+  end: { lat: number; lng: number } | null,
+) {
+  if (!start || !end || points.length < 2) return points;
+
+  const first = points[0];
+  const last = points[points.length - 1];
+  const sourceVecX = last.lng - first.lng;
+  const sourceVecY = last.lat - first.lat;
+  const targetVecX = end.lng - start.lng;
+  const targetVecY = end.lat - start.lat;
+
+  const sourceLen = Math.hypot(sourceVecX, sourceVecY);
+  const targetLen = Math.hypot(targetVecX, targetVecY);
+  if (sourceLen < 1e-7 || targetLen < 1e-7) {
+    const translated = points.map((point) => ({
+      lat: point.lat - first.lat + start.lat,
+      lng: point.lng - first.lng + start.lng,
+    }));
+    translated[0] = start;
+    translated[translated.length - 1] = end;
+    return translated;
+  }
+
+  const sourceAngle = Math.atan2(sourceVecY, sourceVecX);
+  const targetAngle = Math.atan2(targetVecY, targetVecX);
+  const rotation = targetAngle - sourceAngle;
+  const scale = targetLen / sourceLen;
+  const cosTheta = Math.cos(rotation);
+  const sinTheta = Math.sin(rotation);
+
+  const transformed = points.map((point) => {
+    const relX = point.lng - first.lng;
+    const relY = point.lat - first.lat;
+    const rotatedX = relX * cosTheta - relY * sinTheta;
+    const rotatedY = relX * sinTheta + relY * cosTheta;
+    return {
+      lat: start.lat + rotatedY * scale,
+      lng: start.lng + rotatedX * scale,
+    };
+  });
+
+  transformed[0] = start;
+  transformed[transformed.length - 1] = end;
+  return transformed;
+}
+
+function toLatLng(
+  pair: [number, number] | null | undefined,
+): { lat: number; lng: number } | null {
+  if (!pair || pair.length !== 2) return null;
+  const lat = pair[0];
+  const lng = pair[1];
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
 }
 
 function normalizeDistance(distance: string) {

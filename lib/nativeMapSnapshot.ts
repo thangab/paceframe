@@ -5,6 +5,7 @@ type GenerateMapSnapshotParams = {
   width: number;
   height: number;
   strokeColorHex?: string;
+  strokeWidth?: number;
   mapVariant?: 'standard' | 'dark' | 'satellite';
 };
 

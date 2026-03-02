@@ -38,6 +38,40 @@ export function decodePolyline(encoded: string): Point[] {
   return coordinates;
 }
 
+export function encodePolyline(points: Point[]): string {
+  if (!points.length) return '';
+
+  let lastLat = 0;
+  let lastLng = 0;
+  let result = '';
+
+  for (const point of points) {
+    const lat = Math.round(point.y * 1e5);
+    const lng = Math.round(point.x * 1e5);
+
+    result += encodeSignedValue(lat - lastLat);
+    result += encodeSignedValue(lng - lastLng);
+
+    lastLat = lat;
+    lastLng = lng;
+  }
+
+  return result;
+}
+
+function encodeSignedValue(value: number): string {
+  let shifted = value < 0 ? ~(value << 1) : value << 1;
+  let encoded = '';
+
+  while (shifted >= 0x20) {
+    encoded += String.fromCharCode((0x20 | (shifted & 0x1f)) + 63);
+    shifted >>= 5;
+  }
+
+  encoded += String.fromCharCode(shifted + 63);
+  return encoded;
+}
+
 export function normalizePoints(points: Point[], width: number, height: number, padding = 80): Point[] {
   if (!points.length) return [];
 
