@@ -2311,6 +2311,11 @@ export default function PreviewScreen() {
       return;
     }
     setVisibleLayers((prev) => ({ ...prev, [layerId]: value }));
+    if (!value && selectedLayer === layerId) {
+      setSelectedLayer(null);
+      setOutlinedLayer(null);
+      setActiveLayer(null);
+    }
   }
 
   function removeLayer(layerId: LayerId) {
@@ -2716,6 +2721,8 @@ export default function PreviewScreen() {
           cycleRouteMode={cycleRouteMode}
           imageOverlays={activeImageOverlays}
           imageOverlayMaxInitial={IMAGE_OVERLAY_MAX_INITIAL}
+          onRemoveLayer={removeLayer}
+          onToggleLayerVisibility={toggleLayer}
           isPremium={isPremium}
           quickTemplateMode={templateMode}
           templateFixedTextElements={templateFixedTextElements}
