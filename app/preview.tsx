@@ -55,14 +55,13 @@ import {
   buildLapPaceChartData,
 } from '@/lib/strava';
 import {
-  DistanceUnit,
-  ElevationUnit,
   formatDistanceMeters,
   formatElevationMeters,
   formatDuration,
   formatPace,
 } from '@/lib/format';
 import { useActivityStore } from '@/store/activityStore';
+import { usePreferencesStore } from '@/store/preferencesStore';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import {
   BackgroundGradient,
@@ -110,7 +109,6 @@ import {
 } from '@/features/preview/config';
 import {
   formatCadence,
-  formatDateWithPattern,
   formatPreviewDate,
   getDynamicStatsWidth,
   getLayoutMetricLimit,
@@ -122,19 +120,16 @@ import {
   isAppOwnedCacheFile,
   normalizeLocalUri,
 } from '@/features/preview/layoutMath';
-type TemplateMediaDraft = {
-  v: 2;
-  media: ImagePicker.ImagePickerAsset | null;
-  backgroundGradient: BackgroundGradient | null;
-  autoSubjectUri: string | null;
-  autoSubjectSourceUri: string | null;
-};
-
-type TemplateMediaHydrationState = {
-  key: string | null;
-  loading: boolean;
-  hasStoredDraft: boolean;
-};
+import {
+  sanitizeTemplateMediaDraft,
+  type TemplateMediaDraft,
+  type TemplateMediaHydrationState,
+} from '@/features/preview/templateMediaDraft';
+import {
+  resolveTemplateText,
+  tokenizeTemplateText,
+} from '@/features/preview/templateText';
+import { trimStickerToOpaqueBounds } from '@/features/preview/stickerTrim';
 
 type ApplyImageBackgroundOptions = {
   silent?: boolean;
@@ -142,159 +137,6 @@ type ApplyImageBackgroundOptions = {
   failurePrefix?: string;
   skipBackgroundRemoval?: boolean;
 };
-
-function sanitizeTemplateMediaAsset(
-  input: unknown,
-): ImagePicker.ImagePickerAsset | null {
-  if (typeof input !== 'object' || !input) return null;
-  const source = input as Record<string, unknown>;
-  const uri = typeof source.uri === 'string' ? source.uri.trim() : '';
-  if (!uri) return null;
-  return {
-    uri,
-    type: source.type === 'video' ? 'video' : 'image',
-    width: typeof source.width === 'number' ? source.width : 0,
-    height: typeof source.height === 'number' ? source.height : 0,
-    fileName:
-      typeof source.fileName === 'string' || source.fileName === null
-        ? source.fileName
-        : null,
-    fileSize: typeof source.fileSize === 'number' ? source.fileSize : undefined,
-    mimeType: typeof source.mimeType === 'string' ? source.mimeType : undefined,
-    duration: typeof source.duration === 'number' ? source.duration : undefined,
-    assetId: typeof source.assetId === 'string' ? source.assetId : undefined,
-    base64:
-      typeof source.base64 === 'string' || source.base64 === null
-        ? source.base64
-        : null,
-    exif:
-      typeof source.exif === 'object' && source.exif !== null
-        ? (source.exif as Record<string, unknown>)
-        : null,
-  };
-}
-
-function sanitizeTemplateMediaDraft(input: unknown): TemplateMediaDraft | null {
-  if (typeof input !== 'object' || !input) return null;
-  const source = input as Record<string, unknown>;
-  const media = sanitizeTemplateMediaAsset(source.media);
-  const version = source.v === 2 ? 2 : 1;
-  const autoSubjectUri =
-    version === 2 && typeof source.autoSubjectUri === 'string'
-      ? source.autoSubjectUri.trim() || null
-      : null;
-  const autoSubjectSourceUri =
-    version === 2 && typeof source.autoSubjectSourceUri === 'string'
-      ? source.autoSubjectSourceUri.trim() || null
-      : null;
-  const gradientCandidate = source.backgroundGradient;
-  let backgroundGradient: BackgroundGradient | null = null;
-  if (typeof gradientCandidate === 'object' && gradientCandidate !== null) {
-    const candidateRecord = gradientCandidate as Record<string, unknown>;
-    const colorsCandidate = candidateRecord.colors;
-    if (
-      Array.isArray(colorsCandidate) &&
-      colorsCandidate.length === 3 &&
-      colorsCandidate.every((value) => typeof value === 'string')
-    ) {
-      backgroundGradient = {
-        colors: colorsCandidate as [string, string, string],
-        direction:
-          candidateRecord.direction === 'horizontal'
-            ? 'horizontal'
-            : 'vertical',
-      };
-    }
-  }
-  return {
-    v: 2,
-    media,
-    backgroundGradient,
-    autoSubjectUri,
-    autoSubjectSourceUri,
-  };
-}
-
-function resolveTemplateText(
-  value: string,
-  vars: {
-    activityName: string;
-    locationText: string;
-    dateIso: string;
-    dateText: string;
-    distanceText: string;
-    distanceValue: string;
-    distanceUnit: string;
-    durationText: string;
-    paceText: string;
-    paceValue: string;
-    paceUnit: string;
-    elevText: string;
-    elevValue: string;
-    elevUnit: string;
-    caloriesText: string;
-    avgHeartRateText: string;
-    avgHeartRateValue: string;
-    avgHeartRateUnit: string;
-  },
-  options?: {
-    formatDate?: string;
-  },
-) {
-  const resolvedDate =
-    options?.formatDate && vars.dateIso
-      ? (formatDateWithPattern(vars.dateIso, options.formatDate) ??
-        vars.dateText)
-      : vars.dateText;
-  return value
-    .replaceAll('{activityName}', vars.activityName)
-    .replaceAll('{location}', vars.locationText)
-    .replaceAll('{date}', resolvedDate)
-    .replaceAll('{distance}', vars.distanceText)
-    .replaceAll('{distanceValue}', vars.distanceValue)
-    .replaceAll('{distanceUnit}', vars.distanceUnit)
-    .replaceAll('{time}', vars.durationText)
-    .replaceAll('{pace}', vars.paceText)
-    .replaceAll('{paceValue}', vars.paceValue)
-    .replaceAll('{paceUnit}', vars.paceUnit)
-    .replaceAll('{elev}', vars.elevText)
-    .replaceAll('{elevValue}', vars.elevValue)
-    .replaceAll('{elevUnit}', vars.elevUnit)
-    .replaceAll('{calories}', vars.caloriesText)
-    .replaceAll('{avgHr}', vars.avgHeartRateText)
-    .replaceAll('{avgHrValue}', vars.avgHeartRateValue)
-    .replaceAll('{avgHrUnit}', vars.avgHeartRateUnit);
-}
-
-function tokenizeTemplateText(
-  text: string,
-  accentStyle?: {
-    fontFamily?: string;
-    fontSize?: number;
-    fontWeight?: '400' | '500' | '600' | '700' | '800' | '900';
-    letterSpacing?: number;
-    color?: string;
-  },
-): { text: string; accent?: boolean }[] {
-  const tokenRegex = /\[\[(.*?)\]\]/g;
-  const tokens: { text: string; accent?: boolean }[] = [];
-  let lastIndex = 0;
-  let match = tokenRegex.exec(text);
-  while (match) {
-    const start = match.index;
-    const end = tokenRegex.lastIndex;
-    if (start > lastIndex) {
-      tokens.push({ text: text.slice(lastIndex, start) });
-    }
-    tokens.push({ text: match[1], accent: true, ...(accentStyle ?? {}) });
-    lastIndex = end;
-    match = tokenRegex.exec(text);
-  }
-  if (lastIndex < text.length) {
-    tokens.push({ text: text.slice(lastIndex) });
-  }
-  return tokens.length ? tokens : [{ text }];
-}
 
 export default function PreviewScreen() {
   const searchParams = useLocalSearchParams<{
@@ -311,7 +153,7 @@ export default function PreviewScreen() {
   const [isCapturingOverlay, setIsCapturingOverlay] = useState(false);
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [pngTransparentOnly, setPngTransparentOnly] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [, setMessage] = useState<string | null>(null);
   const [centerGuides, setCenterGuides] = useState({
     showVertical: false,
     showHorizontal: false,
@@ -343,8 +185,8 @@ export default function PreviewScreen() {
       DEFAULT_PREVIEW_TEMPLATE_ID,
   );
   const [selectedFontId, setSelectedFontId] = useState(FONT_PRESETS[0].id);
-  const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>('km');
-  const [elevationUnit, setElevationUnit] = useState<ElevationUnit>('m');
+  const distanceUnit = usePreferencesStore((s) => s.distanceUnit);
+  const elevationUnit = usePreferencesStore((s) => s.elevationUnit);
   const [routeMode, setRouteMode] = useState<RouteMode>('trace');
   const [routeMapVariant, setRouteMapVariant] =
     useState<RouteMapVariant>('standard');
@@ -371,9 +213,11 @@ export default function PreviewScreen() {
   const [selectedLayer, setSelectedLayer] = useState<LayerId | null>(null);
   const [outlinedLayer, setOutlinedLayer] = useState<LayerId | null>(null);
   const [, setActiveLayer] = useState<LayerId | null>(null);
+  const [pendingStickerLayer, setPendingStickerLayer] = useState<LayerId | null>(
+    null,
+  );
   const [activePanel, setActivePanel] = useState<PreviewPanelTab>('background');
   const [panelOpen, setPanelOpen] = useState(false);
-  const [helpPopoverOpen, setHelpPopoverOpen] = useState(false);
   const [isSquareFormat, setIsSquareFormat] = useState(false);
   const [paceChartVersion, setPaceChartVersion] =
     useState<ChartDisplayVersion>('v1');
@@ -389,7 +233,6 @@ export default function PreviewScreen() {
   const [resolvedLocationText, setResolvedLocationText] = useState('');
   const [draftReady, setDraftReady] = useState(false);
   const [isHydratingDraft, setIsHydratingDraft] = useState(false);
-  const [appCacheUsageLabel, setAppCacheUsageLabel] = useState('Cache: --');
   const [layerStyleMapByLayout, setLayerStyleMapByLayout] =
     useState<LayerStyleMapByLayout>({});
   const [sunsetPrimaryGradient, setSunsetPrimaryGradient] =
@@ -1287,8 +1130,6 @@ export default function PreviewScreen() {
     setImageOverlays([]);
     setSelectedLayoutId(nextLayoutId);
     setSelectedFontId(FONT_PRESETS[0].id);
-    setDistanceUnit('km');
-    setElevationUnit('m');
     setRouteMode('trace');
     setRouteMapVariant('standard');
     setPrimaryField('distance');
@@ -1327,8 +1168,6 @@ export default function PreviewScreen() {
     setImageOverlays(draft.imageOverlays ?? []);
     setSelectedLayoutId(draft.selectedLayoutId ?? LAYOUTS[0].id);
     setSelectedFontId(draft.selectedFontId ?? FONT_PRESETS[0].id);
-    setDistanceUnit(draft.distanceUnit ?? 'km');
-    setElevationUnit(draft.elevationUnit ?? 'm');
     setRouteMode(draft.routeMode ?? 'trace');
     setRouteMapVariant(draft.routeMapVariant ?? 'standard');
     setPrimaryField(draft.primaryField ?? 'distance');
@@ -1669,6 +1508,16 @@ export default function PreviewScreen() {
   }
 
   useEffect(() => {
+    if (!pendingStickerLayer) return;
+    const pendingId = pendingStickerLayer.replace('image:', '');
+    const stickerExists = imageOverlays.some((overlay) => overlay.id === pendingId);
+    if (!stickerExists) return;
+
+    selectLayer(pendingStickerLayer);
+    setPendingStickerLayer(null);
+  }, [imageOverlays, pendingStickerLayer]);
+
+  useEffect(() => {
     if (routeMode === 'off' && selectedLayer === 'route') {
       setSelectedLayer('stats');
       setOutlinedLayer('stats');
@@ -1861,12 +1710,6 @@ export default function PreviewScreen() {
   }, [headerVisible, selectedLayer, visibleLayers.meta]);
 
   useEffect(() => {
-    if (!helpPopoverOpen) return;
-    void refreshAppCacheUsage();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [helpPopoverOpen]);
-
-  useEffect(() => {
     if (hasSubjectFree) return;
     if (selectedBlurEffectId !== 'none') {
       setSelectedBlurEffectId('none');
@@ -2000,67 +1843,6 @@ export default function PreviewScreen() {
       managedTempUrisRef.current.delete(uri);
     } catch {
       // Best effort cache cleanup only.
-    }
-  }
-
-  async function directorySizeBytes(dirUri: string): Promise<number> {
-    try {
-      const entries = await FileSystem.readDirectoryAsync(dirUri);
-      let total = 0;
-      for (const name of entries) {
-        const child = `${dirUri}${name}`;
-        const info = await FileSystem.getInfoAsync(child);
-        if (!info.exists) continue;
-        if (info.isDirectory) {
-          total += await directorySizeBytes(`${child}/`);
-        } else if (typeof info.size === 'number') {
-          total += info.size;
-        }
-      }
-      return total;
-    } catch {
-      return 0;
-    }
-  }
-
-  async function refreshAppCacheUsage() {
-    const cacheDir = FileSystem.cacheDirectory;
-    if (!cacheDir) {
-      setAppCacheUsageLabel('Cache: unavailable');
-      return;
-    }
-
-    const bytes = await directorySizeBytes(cacheDir);
-    const mb = bytes / (1024 * 1024);
-    setAppCacheUsageLabel(`Cache: ${mb.toFixed(mb >= 100 ? 0 : 1)} MB`);
-  }
-
-  async function clearAppCache() {
-    const keepUris = new Set(
-      [
-        media?.uri,
-        autoSubjectUri,
-        ...imageOverlays.map((item) => item.uri),
-      ].filter((uri): uri is string =>
-        Boolean(uri && uri.startsWith('file://')),
-      ),
-    );
-
-    try {
-      setMessage('Clearing cache...');
-      const candidates = Array.from(managedTempUrisRef.current);
-      for (const uri of candidates) {
-        if (keepUris.has(uri)) continue;
-        await cleanupTempUriIfOwned(uri);
-      }
-      await refreshAppCacheUsage();
-      setMessage('Cache cleared.');
-    } catch (err) {
-      setMessage(
-        err instanceof Error
-          ? `Could not clear cache (${err.message}).`
-          : 'Could not clear cache.',
-      );
     }
   }
 
@@ -2287,8 +2069,16 @@ export default function PreviewScreen() {
       setMessage('Creating sticker...');
       const stickerUri = await removeBackgroundOnDevice(asset.uri);
       trackManagedTempUri(stickerUri);
+      const trimmedSticker = await trimStickerToOpaqueBounds(stickerUri);
+      const finalStickerUri = trimmedSticker?.uri ?? stickerUri;
+      const stickerPixelWidth = trimmedSticker?.width ?? asset.width;
+      const stickerPixelHeight = trimmedSticker?.height ?? asset.height;
+      if (finalStickerUri !== stickerUri) {
+        trackManagedTempUri(finalStickerUri);
+        await cleanupTempUriIfOwned(stickerUri);
+      }
       const { width: overlayWidth, height: overlayHeight } =
-        getInitialOverlaySize(asset.width, asset.height);
+        getInitialOverlaySize(stickerPixelWidth, stickerPixelHeight);
       const id = `${Date.now()}-${Math.round(Math.random() * 1000)}`;
       const layerId: LayerId = `image:${id}`;
 
@@ -2296,7 +2086,7 @@ export default function PreviewScreen() {
         ...prev,
         {
           id,
-          uri: stickerUri,
+          uri: finalStickerUri,
           name: `Sticker ${prev.length + 1}`,
           opacity: 1,
           rotationDeg: 0,
@@ -2306,6 +2096,7 @@ export default function PreviewScreen() {
       ]);
       setVisibleLayers((prev) => ({ ...prev, [layerId]: true }));
       setLayerOrder((prev) => [...prev, layerId]);
+      setPendingStickerLayer(layerId);
       selectLayer(layerId);
       setMessage('Sticker created.');
     } catch (err) {
@@ -2520,6 +2311,11 @@ export default function PreviewScreen() {
       return;
     }
     setVisibleLayers((prev) => ({ ...prev, [layerId]: value }));
+    if (!value && selectedLayer === layerId) {
+      setSelectedLayer(null);
+      setOutlinedLayer(null);
+      setActiveLayer(null);
+    }
   }
 
   function removeLayer(layerId: LayerId) {
@@ -2752,10 +2548,6 @@ export default function PreviewScreen() {
     void (media?.type === 'video' ? exportVideo() : exportAndShare());
   }
 
-  function toggleHelpPanel() {
-    setHelpPopoverOpen((prev) => !prev);
-  }
-
   return (
     <>
       <Stack.Screen
@@ -2859,22 +2651,6 @@ export default function PreviewScreen() {
                   />
                 </Pressable>
               ) : null}
-              <Pressable
-                onPress={toggleHelpPanel}
-                hitSlop={8}
-                style={[
-                  styles.headerFormatButton,
-                  helpPopoverOpen ? styles.headerHelpButtonActive : null,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel="Settings"
-              >
-                <MaterialCommunityIcons
-                  name="cog-outline"
-                  size={18}
-                  color={colors.panelText}
-                />
-              </Pressable>
             </View>
           ),
         }}
@@ -2886,7 +2662,6 @@ export default function PreviewScreen() {
           isCompactViewport={isCompactViewport}
           onCanvasTouch={() => {
             if (panelOpen) setPanelOpen(false);
-            if (helpPopoverOpen) setHelpPopoverOpen(false);
             setOutlinedLayer(null);
           }}
           canvasDisplayWidth={canvasDisplayWidth}
@@ -2946,6 +2721,8 @@ export default function PreviewScreen() {
           cycleRouteMode={cycleRouteMode}
           imageOverlays={activeImageOverlays}
           imageOverlayMaxInitial={IMAGE_OVERLAY_MAX_INITIAL}
+          onRemoveLayer={removeLayer}
+          onToggleLayerVisibility={toggleLayer}
           isPremium={isPremium}
           quickTemplateMode={templateMode}
           templateFixedTextElements={templateFixedTextElements}
@@ -3013,10 +2790,6 @@ export default function PreviewScreen() {
           onToggleField={toggleField}
           headerVisible={activeHeaderVisible}
           onToggleHeaderField={toggleHeaderField}
-          distanceUnit={distanceUnit}
-          onSetDistanceUnit={setDistanceUnit}
-          elevationUnit={elevationUnit}
-          onSetElevationUnit={setElevationUnit}
           layerStyleMap={activeLayerStyleMap}
           onSetLayerStyleColor={setLayerStyleColor}
           onSetLayerStyleOpacity={setLayerStyleOpacity}
@@ -3035,19 +2808,11 @@ export default function PreviewScreen() {
           hasSubjectFree={hasSubjectFree}
           effectsEnabled={hasFilterableBackground}
           isPremium={isPremium}
-          message={message}
-          appCacheUsageLabel={appCacheUsageLabel}
-          onClearAppCache={() => {
-            void clearAppCache();
-          }}
-          onOpenPaywall={() => router.push('/paywall')}
           onQuickExport={() => {
             if (busy) return;
             triggerExport();
           }}
           quickExportBusy={busy}
-          helpPopoverOpen={helpPopoverOpen}
-          onCloseHelpPopover={() => setHelpPopoverOpen(false)}
           quickTemplateMode={templateMode}
           allowVideoBackground={!templateDisablesVideoBackground}
           showBackgroundTab={showTemplateBackgroundTab}
@@ -3111,9 +2876,6 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.primary,
       borderWidth: 1,
       borderColor: colors.borderStrong,
-    },
-    headerHelpButtonActive: {
-      borderColor: colors.primaryBorderOnLight,
     },
     centered: {
       flex: 1,

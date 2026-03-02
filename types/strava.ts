@@ -39,6 +39,7 @@ export type StravaActivity = {
   type: string;
   start_date: string;
   start_latlng?: [number, number] | null;
+  end_latlng?: [number, number] | null;
   timezone?: string | null;
   average_speed: number;
   average_cadence?: number | null;

@@ -4,8 +4,7 @@ export type PreviewPanelTab =
   | 'background'
   | 'content'
   | 'design'
-  | 'effects'
-  | 'settings';
+  | 'effects';
 
 export type HeaderFieldId = 'title' | 'date' | 'location';
 

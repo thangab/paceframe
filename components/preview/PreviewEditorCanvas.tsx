@@ -1,8 +1,17 @@
 import { RefObject, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  Easing,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import type * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   AlphaType,
   Canvas,
@@ -162,6 +171,8 @@ type Props = {
   cycleRouteMode: () => void;
   imageOverlays: ImageOverlay[];
   imageOverlayMaxInitial: number;
+  onRemoveLayer: (layerId: LayerId) => void;
+  onToggleLayerVisibility: (layerId: LayerId, value: boolean) => void;
   isPremium: boolean;
   quickTemplateMode?: boolean;
   templateFixedTextElements?: PreviewTemplateRenderableTextElement[];
@@ -293,6 +304,8 @@ export function PreviewEditorCanvas({
   cycleRouteMode,
   imageOverlays,
   imageOverlayMaxInitial,
+  onRemoveLayer,
+  onToggleLayerVisibility,
   isPremium,
   quickTemplateMode = false,
   templateFixedTextElements = [],
@@ -321,6 +334,44 @@ export function PreviewEditorCanvas({
   } | null>(null);
   const showSelectionOutline = !isCapturingOverlay && !isExportingPng;
   const interactionLocked = quickTemplateMode;
+  const showLayerActionMenu = showSelectionOutline && !interactionLocked;
+  const renderLayerAction = (layerId: LayerId) => {
+    if (!showLayerActionMenu || selectedLayer !== layerId) return null;
+
+    if (layerId.startsWith('image:')) {
+      return (
+        <Pressable
+          style={[styles.layerActionFab, styles.layerActionFabDelete]}
+          onPress={() => onRemoveLayer(layerId)}
+          accessibilityRole="button"
+          accessibilityLabel="Delete image overlay"
+          hitSlop={10}
+        >
+          <MaterialCommunityIcons
+            name="trash-can-outline"
+            size={15}
+            color={colors.primaryText}
+          />
+        </Pressable>
+      );
+    }
+
+    return (
+      <Pressable
+        style={[styles.layerActionFab, styles.layerActionFabHide]}
+        onPress={() => onToggleLayerVisibility(layerId, false)}
+        accessibilityRole="button"
+        accessibilityLabel="Hide block"
+        hitSlop={10}
+      >
+        <MaterialCommunityIcons
+          name="eye-off-outline"
+          size={15}
+          color={colors.primaryText}
+        />
+      </Pressable>
+    );
+  };
   const resolvedTemplateBackgroundFrame = useMemo(() => {
     if (!quickTemplateMode || !templateBackgroundMediaFrame) return null;
     const width = Math.max(
@@ -1317,6 +1368,7 @@ export function PreviewEditorCanvas({
                 setActiveLayer(active ? 'meta' : null)
               }
               onTransformEnd={(next) => onLayerTransformChange('meta', next)}
+              selectionAction={renderLayerAction('meta')}
               style={[
                 styles.metaBlock,
                 usesLayoutHeader ? styles.metaBlockSunset : null,
@@ -1408,6 +1460,7 @@ export function PreviewEditorCanvas({
                 setActiveLayer(active ? 'stats' : null)
               }
               onTransformEnd={(next) => onLayerTransformChange('stats', next)}
+              selectionAction={renderLayerAction('stats')}
               style={[
                 styles.statsBlock,
                 {
@@ -1474,6 +1527,7 @@ export function PreviewEditorCanvas({
                 setActiveLayer(active ? 'primary' : null)
               }
               onTransformEnd={(next) => onLayerTransformChange('primary', next)}
+              selectionAction={renderLayerAction('primary')}
               style={[
                 styles.primaryBlock,
                 {
@@ -1541,6 +1595,7 @@ export function PreviewEditorCanvas({
                 setActiveLayer(active ? 'route' : null)
               }
               onTransformEnd={(next) => onLayerTransformChange('route', next)}
+              selectionAction={renderLayerAction('route')}
               style={[
                 styles.routeBlock,
                 { opacity: layerStyleSettings.route.opacity },
@@ -1583,6 +1638,7 @@ export function PreviewEditorCanvas({
               onTransformEnd={(next) =>
                 onLayerTransformChange('chartPace', next)
               }
+              selectionAction={renderLayerAction('chartPace')}
               style={[
                 styles.chartBlock,
                 styles.chartPaceBlock,
@@ -1936,6 +1992,7 @@ export function PreviewEditorCanvas({
                 setActiveLayer(active ? 'chartHr' : null)
               }
               onTransformEnd={(next) => onLayerTransformChange('chartHr', next)}
+              selectionAction={renderLayerAction('chartHr')}
               style={[
                 styles.chartBlock,
                 styles.chartHrBlock,
@@ -2077,6 +2134,7 @@ export function PreviewEditorCanvas({
                   setActiveLayer(active ? layerId : null)
                 }
                 onTransformEnd={(next) => onLayerTransformChange(layerId, next)}
+                selectionAction={renderLayerAction(layerId)}
                 style={[
                   styles.imageOverlayBlock,
                   {
@@ -3021,8 +3079,9 @@ function createStyles(colors: ThemeColors) {
       position: 'absolute',
       width: '100%',
       height: '100%',
-      zIndex: 4,
-      elevation: 4,
+      // Keep activity/background filters behind draggable blocks.
+      zIndex: 0,
+      elevation: 0,
     },
     subjectFilterOverlay: {
       ...StyleSheet.absoluteFillObject,
@@ -3168,12 +3227,30 @@ function createStyles(colors: ThemeColors) {
     },
     imageOverlayBlock: {
       borderRadius: 0,
-      overflow: 'hidden',
+      overflow: 'visible',
       backgroundColor: 'transparent',
     },
     imageOverlayImage: {
       width: '100%',
       height: '100%',
+    },
+    layerActionFab: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      zIndex: 1000,
+      elevation: 1000,
+    },
+    layerActionFabDelete: {
+      backgroundColor: colors.danger,
+      borderColor: colors.danger,
+    },
+    layerActionFabHide: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primaryBorderOnLight,
     },
     templateChartLayer: {
       position: 'absolute',

@@ -32,6 +32,7 @@ class PaceFrameMapSnapshot: NSObject {
 
     let colorHex = (params["strokeColorHex"] as? String) ?? "#F97316"
     let strokeColor = UIColor(hex: colorHex) ?? UIColor(red: 0.976, green: 0.451, blue: 0.086, alpha: 1)
+    let strokeWidth = max(0, CGFloat((params["strokeWidth"] as? NSNumber)?.doubleValue ?? 4))
     let mapVariant = (params["mapVariant"] as? String) ?? "standard"
 
     let size = CGSize(width: max(1, CGFloat(truncating: width)), height: max(1, CGFloat(truncating: height)))
@@ -46,7 +47,7 @@ class PaceFrameMapSnapshot: NSObject {
         options.traitCollection = UITraitCollection(userInterfaceStyle: .dark)
       }
     }
-    options.region = regionFitting(coordinates: coordinates)
+    options.region = regionFitting(coordinates: coordinates, targetSize: size)
     options.showsBuildings = false
     options.pointOfInterestFilter = .excludingAll
 
@@ -62,12 +63,18 @@ class PaceFrameMapSnapshot: NSObject {
         return
       }
 
-      let image = self.drawRoute(
-        on: snapshot.image,
-        snapshot: snapshot,
-        coordinates: coordinates,
-        strokeColor: strokeColor
-      )
+      let image: UIImage
+      if strokeWidth > 0 {
+        image = self.drawRoute(
+          on: snapshot.image,
+          snapshot: snapshot,
+          coordinates: coordinates,
+          strokeColor: strokeColor,
+          strokeWidth: strokeWidth
+        )
+      } else {
+        image = snapshot.image
+      }
 
       guard let pngData = image.pngData() else {
         reject("E_IMAGE_ENCODE", "Unable to encode map snapshot image.", nil)
@@ -90,7 +97,8 @@ class PaceFrameMapSnapshot: NSObject {
     on image: UIImage,
     snapshot: MKMapSnapshotter.Snapshot,
     coordinates: [CLLocationCoordinate2D],
-    strokeColor: UIColor
+    strokeColor: UIColor,
+    strokeWidth: CGFloat
   ) -> UIImage {
     let renderer = UIGraphicsImageRenderer(size: image.size)
     return renderer.image { context in
@@ -105,7 +113,7 @@ class PaceFrameMapSnapshot: NSObject {
           path.addLine(to: point)
         }
       }
-      path.lineWidth = 4
+      path.lineWidth = strokeWidth
       path.lineJoinStyle = .round
       path.lineCapStyle = .round
       strokeColor.setStroke()
@@ -113,7 +121,10 @@ class PaceFrameMapSnapshot: NSObject {
     }
   }
 
-  private func regionFitting(coordinates: [CLLocationCoordinate2D]) -> MKCoordinateRegion {
+  private func regionFitting(
+    coordinates: [CLLocationCoordinate2D],
+    targetSize: CGSize
+  ) -> MKCoordinateRegion {
     var minLat = coordinates[0].latitude
     var maxLat = coordinates[0].latitude
     var minLng = coordinates[0].longitude
@@ -131,13 +142,33 @@ class PaceFrameMapSnapshot: NSObject {
       longitude: (minLng + maxLng) / 2.0
     )
 
+    // Deterministic framing: route should occupy ~62% of the viewport.
+    let targetFill = 0.62
+    var latDelta = max((maxLat - minLat) / targetFill, 0.008)
+    var lngDelta = max((maxLng - minLng) / targetFill, 0.008)
+
+    // Keep route framing consistent with the snapshot aspect ratio.
+    let safeWidth = max(Double(targetSize.width), 1.0)
+    let safeHeight = max(Double(targetSize.height), 1.0)
+    let viewAspect = safeWidth / safeHeight
+    let cosLat = max(Darwin.cos(center.latitude * .pi / 180.0), 0.01)
+    var effectiveLngDelta = lngDelta * cosLat
+    let routeAspect = effectiveLngDelta / max(latDelta, 0.000001)
+
+    if routeAspect > viewAspect {
+      latDelta = effectiveLngDelta / viewAspect
+    } else {
+      effectiveLngDelta = latDelta * viewAspect
+      lngDelta = effectiveLngDelta / cosLat
+    }
+
     var span = MKCoordinateSpan(
-      latitudeDelta: max((maxLat - minLat) * 1.35, 0.005),
-      longitudeDelta: max((maxLng - minLng) * 1.35, 0.005)
+      latitudeDelta: latDelta,
+      longitudeDelta: lngDelta
     )
 
-    span.latitudeDelta = min(span.latitudeDelta, 180)
-    span.longitudeDelta = min(span.longitudeDelta, 360)
+    span.latitudeDelta = min(max(span.latitudeDelta, 0.005), 180)
+    span.longitudeDelta = min(max(span.longitudeDelta, 0.005), 360)
 
     return MKCoordinateRegion(center: center, span: span)
   }

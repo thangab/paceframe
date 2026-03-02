@@ -21,6 +21,7 @@ type Props = {
   snapThreshold?: number;
   style?: StyleProp<ViewStyle>;
   children: ReactNode;
+  selectionAction?: ReactNode;
   selected?: boolean;
   outlineRadius?: number;
   onSelect?: () => void;
@@ -64,6 +65,7 @@ export function DraggableBlock({
   snapThreshold = 8,
   style,
   children,
+  selectionAction,
   selected,
   outlineRadius,
   onSelect,
@@ -350,14 +352,24 @@ export function DraggableBlock({
 
   const gesture = Gesture.Simultaneous(tap, pan, pinch, rotate);
 
-  const animatedStyle = useAnimatedStyle(() => ({
+  const containerAnimatedStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: tx.value },
       { translateY: ty.value },
-      { scale: scale.value },
       { rotateZ: `${rotationDeg + dynamicRotationDeg.value}deg` },
     ],
   }));
+  const contentScaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+  const selectionActionAnchorStyle = useAnimatedStyle(() => {
+    const scaledRight = (width.value * (1 + scale.value)) / 2;
+    const scaledTop = (height.value * (1 - scale.value)) / 2;
+    return {
+      left: scaledRight,
+      top: scaledTop,
+    };
+  });
 
   useEffect(() => {
     runOnUI(clampInsideCanvas)();
@@ -388,20 +400,33 @@ export function DraggableBlock({
           ty.value = clamp(ty.value, yBounds.min, yBounds.max);
         }
       }}
-      style={[{ position: 'absolute', left: 0, top: 0 }, style, animatedStyle]}
+      style={[
+        { position: 'absolute', left: 0, top: 0 },
+        style,
+        containerAnimatedStyle,
+      ]}
     >
-      {children}
-      {selected ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.selectionOutline,
-            { borderColor: colors.selectionOutline },
-            typeof outlineRadius === 'number'
-              ? { borderRadius: outlineRadius }
-              : null,
-          ]}
-        />
+      <Animated.View style={contentScaleStyle}>
+        {children}
+        {selected ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.selectionOutline,
+              { borderColor: colors.selectionOutline },
+              typeof outlineRadius === 'number'
+                ? { borderRadius: outlineRadius }
+                : null,
+            ]}
+          />
+        ) : null}
+      </Animated.View>
+      {selected && selectionAction ? (
+        <Animated.View
+          style={[styles.selectionActionAnchor, selectionActionAnchorStyle]}
+        >
+          {selectionAction}
+        </Animated.View>
       ) : null}
     </Animated.View>
   );
@@ -418,5 +443,11 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     borderWidth: 2,
     borderColor: 'transparent',
+  },
+  selectionActionAnchor: {
+    position: 'absolute',
+    transform: [{ translateX: -12 }, { translateY: -12 }],
+    zIndex: 1001,
+    elevation: 1001,
   },
 });

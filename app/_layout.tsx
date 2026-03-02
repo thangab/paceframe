@@ -5,10 +5,12 @@ import { ActivityIndicator, LogBox, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { Monoton_400Regular } from '@expo-google-fonts/monoton';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/authStore';
 import { useAppBootstrap } from '@/hooks/useAppBootstrap';
 import { ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { usePreferencesStore } from '@/store/preferencesStore';
 import { useThemeStore } from '@/store/themeStore';
 
 if (__DEV__) {
@@ -21,16 +23,18 @@ export default function RootLayout() {
   useAppBootstrap();
   const [fontsLoaded] = useFonts({
     Monoton: Monoton_400Regular,
+    ...MaterialCommunityIcons.font,
   });
   const colors = useThemeColors();
   const isHydrated = useAuthStore((s) => s.isHydrated);
   const isThemeHydrated = useThemeStore((s) => s.isHydrated);
+  const isPreferencesHydrated = usePreferencesStore((s) => s.isHydrated);
   const styles = createStyles(colors);
   const statusBarStyle = useThemeStore((s) =>
     s.mode === 'dark' ? 'light' : 'dark',
   );
 
-  if (!isHydrated || !isThemeHydrated || !fontsLoaded) {
+  if (!isHydrated || !isThemeHydrated || !isPreferencesHydrated || !fontsLoaded) {
     return (
       <View style={styles.loading}>
         <StatusBar style={statusBarStyle} />

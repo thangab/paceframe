@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as Linking from 'expo-linking';
 import {
   Animated,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -13,6 +14,9 @@ import { StravaActivity } from '@/types/strava';
 import { radius, spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { formatDistanceMeters, formatDuration, formatPace } from '@/lib/format';
+import { generateMapSnapshot } from '@/lib/nativeMapSnapshot';
+import { decodePolyline, encodePolyline } from '@/lib/polyline';
+import { usePreferencesStore } from '@/store/preferencesStore';
 
 type Props = {
   activity: StravaActivity;
@@ -22,6 +26,9 @@ type Props = {
 };
 
 const PACEFRAME_LOGO_GREY = require('../assets/logo/paceframe-grey.png');
+const CARD_THUMB_SIZE = 88;
+const MAP_TRACE_WIDTH = 0;
+const MAP_SNAPSHOT_CACHE = new Map<string, string>();
 
 export function ActivityCard({
   activity,
@@ -31,8 +38,53 @@ export function ActivityCard({
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const distanceUnit = usePreferencesStore((s) => s.distanceUnit);
+  const [mapSnapshotUri, setMapSnapshotUri] = useState<string | null>(null);
   const overlayOpacity = useRef(new Animated.Value(selected ? 0 : 1)).current;
   const logoOpacity = useRef(new Animated.Value(selected ? 0 : 0.5)).current;
+  const mapSnapshotPolyline = useMemo(() => {
+    return buildMapSnapshotPolyline(activity);
+  }, [activity]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMapSnapshot() {
+      if (activity.photoUrl || !mapSnapshotPolyline || Platform.OS !== 'ios') {
+        setMapSnapshotUri(null);
+        return;
+      }
+
+      const cacheKey = `${mapSnapshotPolyline}:${colors.primary}`;
+      const cachedUri = MAP_SNAPSHOT_CACHE.get(cacheKey);
+      if (cachedUri) {
+        setMapSnapshotUri(cachedUri);
+        return;
+      }
+
+      try {
+        const uri = await generateMapSnapshot({
+          polyline: mapSnapshotPolyline,
+          width: CARD_THUMB_SIZE,
+          height: CARD_THUMB_SIZE,
+          strokeColorHex: colors.primary,
+          strokeWidth: MAP_TRACE_WIDTH,
+          mapVariant: 'dark',
+        });
+        if (cancelled) return;
+        MAP_SNAPSHOT_CACHE.set(cacheKey, uri);
+        setMapSnapshotUri(uri);
+      } catch {
+        if (!cancelled) setMapSnapshotUri(null);
+      }
+    }
+
+    void loadMapSnapshot();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activity.photoUrl, colors.primary, mapSnapshotPolyline]);
 
   useEffect(() => {
     Animated.timing(overlayOpacity, {
@@ -48,9 +100,9 @@ export function ActivityCard({
   }, [logoOpacity, overlayOpacity, selected]);
 
   const distanceText = normalizeDistance(
-    formatDistanceMeters(activity.distance),
+    formatDistanceMeters(activity.distance, distanceUnit),
   );
-  const secondaryMetric = getSecondaryMetric(activity);
+  const secondaryMetric = getSecondaryMetric(activity, distanceUnit);
   const timeText = formatDuration(activity.moving_time);
   const fallbackMetrics = getFallbackMetrics(activity, timeText);
   const whenText = formatWhen(activity.start_date);
@@ -81,6 +133,23 @@ export function ActivityCard({
           <View style={styles.thumbnailWrap}>
             <Image
               source={{ uri: activity.photoUrl }}
+              style={styles.thumbnail}
+              resizeMode="cover"
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.thumbnailOverlay, { opacity: overlayOpacity }]}
+            />
+            <Animated.Image
+              source={PACEFRAME_LOGO_GREY}
+              style={[styles.thumbnailWatermark, { opacity: logoOpacity }]}
+              resizeMode="contain"
+            />
+          </View>
+        ) : mapSnapshotUri ? (
+          <View style={styles.thumbnailWrap}>
+            <Image
+              source={{ uri: mapSnapshotUri }}
               style={styles.thumbnail}
               resizeMode="cover"
             />
@@ -196,6 +265,33 @@ export function ActivityCard({
   );
 }
 
+function buildMapSnapshotPolyline(activity: StravaActivity): string | null {
+  const summaryPolyline = activity.map?.summary_polyline?.trim();
+  if (summaryPolyline) {
+    const points = decodePolyline(summaryPolyline);
+    if (points.length >= 2) return summaryPolyline;
+  }
+
+  const start = toLatLng(activity.start_latlng);
+  const end = toLatLng(activity.end_latlng);
+  if (!start || !end) return null;
+
+  return encodePolyline([
+    { x: start.lng, y: start.lat },
+    { x: end.lng, y: end.lat },
+  ]);
+}
+
+function toLatLng(
+  pair: [number, number] | null | undefined,
+): { lat: number; lng: number } | null {
+  if (!pair || pair.length !== 2) return null;
+  const lat = pair[0];
+  const lng = pair[1];
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
 function normalizeDistance(distance: string) {
   // 12.40 km -> 12.4 km, 12.00 km -> 12 km
   return distance
@@ -221,25 +317,33 @@ function activityTypeIcon(
   return 'dumbbell';
 }
 
-function getSecondaryMetric(activity: StravaActivity) {
+function getSecondaryMetric(
+  activity: StravaActivity,
+  distanceUnit: 'km' | 'mi',
+) {
   if (isRideActivity(activity.type)) {
-    const kmh = activity.average_speed > 0 ? activity.average_speed * 3.6 : 0;
+    const speed = activity.average_speed > 0 ? activity.average_speed * 3.6 : 0;
+    const convertedSpeed = distanceUnit === 'mi' ? speed * 0.621371 : speed;
+    const speedUnit = distanceUnit === 'mi' ? 'mph' : 'km/h';
     return {
       label: 'Avg Speed',
-      value: kmh > 0 ? `${kmh.toFixed(1)} km/h` : '--.- km/h',
+      value:
+        convertedSpeed > 0
+          ? `${convertedSpeed.toFixed(1)} ${speedUnit}`
+          : `--.- ${speedUnit}`,
     };
   }
 
   if (isRunLikeActivity(activity.type)) {
     return {
       label: 'Pace',
-      value: formatPace(activity.distance, activity.moving_time),
+      value: formatPace(activity.distance, activity.moving_time, distanceUnit),
     };
   }
 
   return {
     label: 'Pace',
-    value: formatPace(activity.distance, activity.moving_time),
+    value: formatPace(activity.distance, activity.moving_time, distanceUnit),
   };
 }
 

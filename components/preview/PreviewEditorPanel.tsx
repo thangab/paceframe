@@ -3,10 +3,8 @@ import {
   Animated,
   Easing,
   LayoutChangeEvent,
-  Modal,
   PanResponder,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -14,12 +12,10 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EffectsSection } from '@/components/preview/panel/sections/EffectsSection';
 import { BackgroundSection } from '@/components/preview/panel/sections/BackgroundSection';
 import { ContentSection } from '@/components/preview/panel/sections/ContentSection';
 import { DesignSection } from '@/components/preview/panel/sections/DesignSection';
-import { SettingsSection } from '@/components/preview/panel/sections/SettingsSection';
 import { ColorPickerPopover } from '@/components/preview/panel/sections/ColorPickerPopover';
 import {
   buildColorGrid,
@@ -40,8 +36,6 @@ import {
 } from '@/components/preview/panel/utils';
 import { layout, spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import type { DistanceUnit, ElevationUnit } from '@/lib/format';
-import { useThemeStore } from '@/store/themeStore';
 import type {
   BackgroundGradient,
   ChartDisplayVersion,
@@ -103,10 +97,6 @@ type Props = {
   onToggleField: (field: FieldId, value: boolean) => void;
   headerVisible: Record<HeaderFieldId, boolean>;
   onToggleHeaderField: (field: HeaderFieldId, value: boolean) => void;
-  distanceUnit: DistanceUnit;
-  onSetDistanceUnit: (unit: DistanceUnit) => void;
-  elevationUnit: ElevationUnit;
-  onSetElevationUnit: (unit: ElevationUnit) => void;
   layerStyleMap: Record<StyleLayerId, { color: string; opacity: number }>;
   onSetLayerStyleColor: (layerId: StyleLayerId, color: string) => void;
   onSetLayerStyleOpacity: (layerId: StyleLayerId, opacity: number) => void;
@@ -121,14 +111,8 @@ type Props = {
   hasSubjectFree: boolean;
   effectsEnabled: boolean;
   isPremium: boolean;
-  message: string | null;
-  appCacheUsageLabel?: string;
-  onClearAppCache?: () => void;
-  onOpenPaywall: () => void;
   onQuickExport: () => void;
   quickExportBusy?: boolean;
-  helpPopoverOpen?: boolean;
-  onCloseHelpPopover?: () => void;
   quickTemplateMode?: boolean;
   allowVideoBackground?: boolean;
   showBackgroundTab?: boolean;
@@ -190,10 +174,6 @@ export function PreviewEditorPanel({
   onToggleField,
   headerVisible,
   onToggleHeaderField,
-  distanceUnit,
-  onSetDistanceUnit,
-  elevationUnit,
-  onSetElevationUnit,
   layerStyleMap,
   onSetLayerStyleColor,
   onSetLayerStyleOpacity,
@@ -208,14 +188,8 @@ export function PreviewEditorPanel({
   hasSubjectFree,
   effectsEnabled,
   isPremium,
-  message,
-  appCacheUsageLabel,
-  onClearAppCache,
-  onOpenPaywall,
   onQuickExport,
   quickExportBusy = false,
-  helpPopoverOpen = false,
-  onCloseHelpPopover,
   quickTemplateMode = false,
   allowVideoBackground = true,
   showBackgroundTab = true,
@@ -232,14 +206,11 @@ export function PreviewEditorPanel({
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isCompactViewport = screenHeight < 740 || screenWidth < 390;
   const floatingBottomOffset = isCompactViewport
     ? 5
     : layout.floatingBottomOffset;
-  const themeMode = useThemeStore((s) => s.mode);
-  const setThemeMode = useThemeStore((s) => s.setMode);
   const [selectedStyleLayer, setSelectedStyleLayer] =
     useState<StyleLayerId>('meta');
   const [stylePickerOpen, setStylePickerOpen] = useState(false);
@@ -257,7 +228,6 @@ export function PreviewEditorPanel({
   const [renderPanelBody, setRenderPanelBody] = useState(panelOpen);
   const panelBodyAnim = useRef(new Animated.Value(panelOpen ? 1 : 0)).current;
   const popoverAnim = useRef(new Animated.Value(0)).current;
-  const helpPopoverAnim = useRef(new Animated.Value(0)).current;
   const colorGrid = buildColorGrid(hsvToHex);
   const { filterEffects, blurEffects } = splitEffectPresets(visualEffectPresets);
 
@@ -350,15 +320,6 @@ export function PreviewEditorPanel({
     }).start();
   }, [activePanel, panelOpen, popoverAnim, stylePickerOpen]);
 
-  useEffect(() => {
-    Animated.spring(helpPopoverAnim, {
-      toValue: helpPopoverOpen ? 1 : 0,
-      tension: 70,
-      friction: 10,
-      useNativeDriver: true,
-    }).start();
-  }, [helpPopoverAnim, helpPopoverOpen]);
-
   const mainTabs = buildMainTabs({
     quickTemplateMode,
     effectsEnabled,
@@ -373,7 +334,6 @@ export function PreviewEditorPanel({
 
   function onPressTab(tabId: PreviewPanelTab, disabled?: boolean) {
     if (disabled) return;
-    onCloseHelpPopover?.();
     if (panelOpen && activePanel === tabId) {
       setPanelOpen(false);
       return;
@@ -560,31 +520,6 @@ export function PreviewEditorPanel({
             />
           ) : null}
 
-          {activePanel === 'settings' ? (
-            <ScrollView
-              style={styles.panelScroll}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.helpContent}
-            >
-              <SettingsSection
-                styles={styles}
-                themeMode={themeMode}
-                setThemeMode={setThemeMode}
-                distanceUnit={distanceUnit}
-                onSetDistanceUnit={onSetDistanceUnit}
-                elevationUnit={elevationUnit}
-                onSetElevationUnit={onSetElevationUnit}
-                message={message}
-                appCacheUsageLabel={appCacheUsageLabel}
-                onClearAppCache={onClearAppCache}
-                supportsFullStatsPreview={supportsFullStatsPreview}
-                isPremium={isPremium}
-                onOpenPaywall={onOpenPaywall}
-                onCloseHelpPopover={onCloseHelpPopover}
-                compactNote={false}
-              />
-            </ScrollView>
-          ) : null}
         </Animated.View>
       ) : null}
 
@@ -603,86 +538,6 @@ export function PreviewEditorPanel({
         opacityTrackWidth={opacityTrackWidth}
         opacityHandleLeft={opacityHandleLeft}
       />
-
-      <Modal
-        visible={helpPopoverOpen}
-        transparent
-        animationType="none"
-        onRequestClose={() => onCloseHelpPopover?.()}
-      >
-        <View style={styles.helpModalRoot}>
-          <Pressable
-            style={styles.helpModalBackdrop}
-            onPress={() => onCloseHelpPopover?.()}
-          />
-          <Animated.View
-            style={[
-              styles.helpPopoverTop,
-              { top: insets.top + 54 },
-              {
-                opacity: helpPopoverAnim,
-                transform: [
-                  {
-                    translateY: helpPopoverAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [20, 0],
-                    }),
-                  },
-                  {
-                    scale: helpPopoverAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.96, 1],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <View style={[styles.stylePickerCard, styles.helpPopoverCard]}>
-              <View style={styles.stylePickerHeaderRow}>
-                <View style={styles.stylePickerTitleWrap}>
-                  <Text style={styles.stylePickerTitle}>Settings</Text>
-                  <Text style={styles.stylePickerSubtitle}>Quick settings</Text>
-                </View>
-                <Pressable
-                  onPress={() => {
-                    onCloseHelpPopover?.();
-                  }}
-                  style={({ pressed }) => [
-                    styles.stylePickerCloseBtn,
-                    pressed && styles.stylePickerCloseBtnPressed,
-                  ]}
-                  hitSlop={8}
-                >
-                  <MaterialCommunityIcons
-                    name="close"
-                    size={18}
-                    color={colors.textMuted}
-                  />
-                </Pressable>
-              </View>
-
-              <SettingsSection
-                styles={styles}
-                themeMode={themeMode}
-                setThemeMode={setThemeMode}
-                distanceUnit={distanceUnit}
-                onSetDistanceUnit={onSetDistanceUnit}
-                elevationUnit={elevationUnit}
-                onSetElevationUnit={onSetElevationUnit}
-                message={message}
-                appCacheUsageLabel={appCacheUsageLabel}
-                onClearAppCache={onClearAppCache}
-                supportsFullStatsPreview={supportsFullStatsPreview}
-                isPremium={isPremium}
-                onOpenPaywall={onOpenPaywall}
-                onCloseHelpPopover={onCloseHelpPopover}
-                compactNote
-              />
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
 
       <View style={styles.panelTabs}>
         <View style={styles.mainTabsRow}>
@@ -1237,9 +1092,6 @@ function createStyles(colors: ThemeColors) {
       gap: 8,
       marginTop: 10,
     },
-    helpContent: {
-      paddingBottom: 8,
-    },
     overlayActionsRow: {
       flexDirection: 'row',
       gap: spacing.sm,
@@ -1602,19 +1454,6 @@ function createStyles(colors: ThemeColors) {
       bottom: 76,
       zIndex: 40,
     },
-    helpModalRoot: {
-      flex: 1,
-      justifyContent: 'flex-start',
-    },
-    helpModalBackdrop: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(0,0,0,0.16)',
-    },
-    helpPopoverTop: {
-      position: 'absolute',
-      left: spacing.md,
-      right: spacing.md,
-    },
     stylePickerCard: {
       borderWidth: 1,
       borderColor: colors.border,
@@ -1628,10 +1467,6 @@ function createStyles(colors: ThemeColors) {
       shadowRadius: 20,
       shadowOffset: { width: 0, height: 10 },
       elevation: 12,
-    },
-    helpPopoverCard: {
-      backgroundColor: colors.panelSurfaceOverlay,
-      borderColor: colors.glassStroke,
     },
     stylePickerHeaderRow: {
       flexDirection: 'row',
@@ -1849,32 +1684,6 @@ function createStyles(colors: ThemeColors) {
     },
     note: {
       color: colors.textMuted,
-    },
-    themeModeRow: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    themeModeChip: {
-      flex: 1,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      backgroundColor: colors.surfaceAlt,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 10,
-    },
-    themeModeChipSelected: {
-      borderColor: colors.primaryBorderOnLight,
-      backgroundColor: colors.primary,
-    },
-    themeModeChipText: {
-      color: colors.text,
-      fontSize: 13,
-      fontWeight: '700',
-    },
-    themeModeChipTextSelected: {
-      color: colors.primaryText,
     },
     unitChip: {
       flex: 1,

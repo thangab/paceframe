@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router, Stack } from 'expo-router';
+import * as FileSystem from 'expo-file-system/legacy';
 import {
   ActivityIndicator,
   FlatList,
   Image,
+  Modal,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -14,6 +16,8 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ActivityCard } from '@/components/ActivityCard';
+import { PrimaryButton } from '@/components/PrimaryButton';
+import { createThemeModeOptions } from '@/components/preview/panel/data';
 import { layout, spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import {
@@ -24,6 +28,8 @@ import {
 } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
+import { usePreferencesStore } from '@/store/preferencesStore';
+import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { useThemeStore } from '@/store/themeStore';
 
 let initialStravaLoadDone = false;
@@ -39,9 +45,14 @@ export default function ActivitiesScreen() {
     : layout.floatingBottomOffset;
   const themeMode = useThemeStore((s) => s.mode);
   const setThemeMode = useThemeStore((s) => s.setMode);
+  const distanceUnit = usePreferencesStore((s) => s.distanceUnit);
+  const elevationUnit = usePreferencesStore((s) => s.elevationUnit);
+  const setDistanceUnit = usePreferencesStore((s) => s.setDistanceUnit);
+  const setElevationUnit = usePreferencesStore((s) => s.setElevationUnit);
   const tokens = useAuthStore((s) => s.tokens);
   const login = useAuthStore((s) => s.login);
   const logout = useAuthStore((s) => s.logout);
+  const isPremium = useSubscriptionStore((s) => s.isPremium);
   const activities = useActivityStore((s) => s.activities);
   const source = useActivityStore((s) => s.source);
   const clearActivities = useActivityStore((s) => s.clearActivities);
@@ -59,6 +70,10 @@ export default function ActivitiesScreen() {
   const [loading, setLoading] = useState(false);
   const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(false);
   const [isPreparingPreview, setIsPreparingPreview] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
+  const [appCacheUsageLabel, setAppCacheUsageLabel] = useState('Cache: --');
+  const [isClearingCache, setIsClearingCache] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const resetAndReplace = useCallback((path: '/login' | '/activities') => {
     if (router.canGoBack()) {
@@ -166,6 +181,7 @@ export default function ActivitiesScreen() {
   }, [loadActivities]);
 
   async function handleLogout() {
+    setIsProfileMenuOpen(false);
     await logout();
     initialStravaLoadDone = false;
     initialStravaLoadInFlight = null;
@@ -173,6 +189,84 @@ export default function ActivitiesScreen() {
     clearActivities();
     resetAndReplace('/login');
   }
+
+  const directorySizeBytes = useCallback(
+    async (dirUri: string): Promise<number> => {
+      try {
+        const entries = await FileSystem.readDirectoryAsync(dirUri);
+        let total = 0;
+        for (const name of entries) {
+          const child = `${dirUri}${name}`;
+          const info = await FileSystem.getInfoAsync(child);
+          if (!info.exists) continue;
+          if (info.isDirectory) {
+            total += await directorySizeBytes(`${child}/`);
+          } else if (typeof info.size === 'number') {
+            total += info.size;
+          }
+        }
+        return total;
+      } catch {
+        return 0;
+      }
+    },
+    [],
+  );
+
+  const refreshAppCacheUsage = useCallback(async () => {
+    const cacheDir = FileSystem.cacheDirectory;
+    if (!cacheDir) {
+      setAppCacheUsageLabel('Cache: unavailable');
+      return;
+    }
+
+    const bytes = await directorySizeBytes(cacheDir);
+    const mb = bytes / (1024 * 1024);
+    setAppCacheUsageLabel(`Cache: ${mb.toFixed(mb >= 100 ? 0 : 1)} MB`);
+  }, [directorySizeBytes]);
+
+  async function clearDirectory(dirUri: string) {
+    const entries = await FileSystem.readDirectoryAsync(dirUri);
+    for (const name of entries) {
+      const child = `${dirUri}${name}`;
+      const info = await FileSystem.getInfoAsync(child);
+      if (!info.exists) continue;
+      if (info.isDirectory) {
+        await clearDirectory(`${child}/`);
+      }
+      await FileSystem.deleteAsync(child, { idempotent: true });
+    }
+  }
+
+  async function clearAppCache() {
+    if (isClearingCache) return;
+    const cacheDir = FileSystem.cacheDirectory;
+    if (!cacheDir) {
+      setSettingsMessage('Cache unavailable.');
+      return;
+    }
+
+    try {
+      setIsClearingCache(true);
+      setSettingsMessage('Clearing cache...');
+      await clearDirectory(cacheDir);
+      await refreshAppCacheUsage();
+      setSettingsMessage('Cache cleared.');
+    } catch (err) {
+      setSettingsMessage(
+        err instanceof Error
+          ? `Could not clear cache (${err.message}).`
+          : 'Could not clear cache.',
+      );
+    } finally {
+      setIsClearingCache(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!isProfileMenuOpen) return;
+    void refreshAppCacheUsage();
+  }, [isProfileMenuOpen, refreshAppCacheUsage]);
 
   async function handleOpenPreview(
     target: '/preview' | '/preview?mode=templates',
@@ -253,77 +347,174 @@ export default function ActivitiesScreen() {
               <Text style={styles.navTitleText}>Activities</Text>
             </View>
           ),
-          headerRight: () => (
-            <Pressable
-              onPress={handleLogout}
-              style={styles.logoutBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Logout"
-            >
-              <MaterialCommunityIcons
-                name="logout"
-                size={20}
-                color={colors.text}
-                style={{ transform: [{ scaleX: -1 }] }}
-              />
-            </Pressable>
-          ),
           headerLeft: () => (
             <View style={styles.navAvatarContainer}>
-              <View style={styles.navAvatarWrap}>
-                {tokens?.athleteProfileUrl ? (
-                  <Image
-                    source={{ uri: tokens.athleteProfileUrl }}
-                    style={styles.navAvatar}
-                  />
-                ) : (
-                  <View style={styles.navAvatarFallback}>
-                    <MaterialCommunityIcons
-                      name="account-outline"
-                      size={16}
-                      color={colors.textSubtle}
-                    />
-                  </View>
-                )}
-              </View>
               <Pressable
-                onPress={() => {
-                  void setThemeMode(themeMode === 'dark' ? 'light' : 'dark');
-                }}
-                style={styles.themeToggleBtn}
+                onPress={() => setIsProfileMenuOpen(true)}
+                style={({ pressed }) => [
+                  styles.avatarTrigger,
+                  pressed ? styles.avatarTriggerPressed : null,
+                ]}
                 accessibilityRole="button"
-                accessibilityLabel={
-                  themeMode === 'dark'
-                    ? 'Switch to light theme'
-                    : 'Switch to dark theme'
-                }
+                accessibilityLabel="Open profile menu"
               >
-                <LinearGradient
-                  pointerEvents="none"
-                  colors={[colors.glassSurfaceStart, colors.glassSurfaceEnd]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.themeToggleGlassBg}
-                />
-                <LinearGradient
-                  pointerEvents="none"
-                  colors={['rgba(255,255,255,0.7)', 'rgba(255,255,255,0.08)']}
-                  start={{ x: 0.2, y: 0 }}
-                  end={{ x: 0.8, y: 1 }}
-                  style={styles.themeToggleGlassSheen}
-                />
-                <MaterialCommunityIcons
-                  name={
-                    themeMode === 'dark' ? 'weather-sunny' : 'weather-night'
-                  }
-                  size={16}
-                  color={colors.text}
-                />
+                <View style={styles.navAvatarWrap}>
+                  {tokens?.athleteProfileUrl ? (
+                    <Image
+                      source={{ uri: tokens.athleteProfileUrl }}
+                      style={styles.navAvatar}
+                    />
+                  ) : (
+                    <View style={styles.navAvatarFallback}>
+                      <MaterialCommunityIcons
+                        name="account-outline"
+                        size={16}
+                        color={colors.textSubtle}
+                      />
+                    </View>
+                  )}
+                </View>
+                <View pointerEvents="none" style={styles.avatarSettingsBadge}>
+                  <MaterialCommunityIcons
+                    name="cog"
+                    size={10}
+                    color={colors.primaryText}
+                  />
+                </View>
               </Pressable>
             </View>
           ),
         }}
       />
+      <Modal
+        visible={isProfileMenuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsProfileMenuOpen(false)}
+      >
+        <Pressable
+          style={styles.menuOverlay}
+          onPress={() => setIsProfileMenuOpen(false)}
+        >
+          <Pressable style={styles.profileMenu} onPress={() => {}}>
+            <Text style={styles.profileMenuTitle}>Settings</Text>
+            <Text style={styles.menuSectionLabel}>Theme</Text>
+            <View style={styles.menuChipsRow}>
+              {createThemeModeOptions().map((item) => {
+                const selected = item.id === themeMode;
+                return (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => {
+                      void setThemeMode(item.id);
+                    }}
+                    style={[
+                      styles.menuChip,
+                      selected ? styles.menuChipSelected : null,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.menuChipText,
+                        selected ? styles.menuChipTextSelected : null,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={styles.menuSectionLabel}>Units</Text>
+            <View style={styles.menuChipsRow}>
+              {[
+                { id: 'metric', label: 'Metric' },
+                { id: 'imperial', label: 'Imperial' },
+              ].map((item) => {
+                const selected =
+                  item.id === 'metric'
+                    ? distanceUnit === 'km' && elevationUnit === 'm'
+                    : distanceUnit === 'mi' && elevationUnit === 'ft';
+                return (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => {
+                      if (item.id === 'metric') {
+                        void Promise.all([
+                          setDistanceUnit('km'),
+                          setElevationUnit('m'),
+                        ]);
+                        return;
+                      }
+                      void Promise.all([
+                        setDistanceUnit('mi'),
+                        setElevationUnit('ft'),
+                      ]);
+                    }}
+                    style={[
+                      styles.menuChip,
+                      selected ? styles.menuChipSelected : null,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.menuChipText,
+                        selected ? styles.menuChipTextSelected : null,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={styles.menuNote}>{appCacheUsageLabel}</Text>
+            {settingsMessage ? (
+              <Text style={styles.menuNote}>{settingsMessage}</Text>
+            ) : null}
+            <View style={styles.menuButtonWrap}>
+              <PrimaryButton
+                label="Clear cache"
+                icon="broom"
+                onPress={() => {
+                  void clearAppCache();
+                }}
+                disabled={isClearingCache}
+                variant="secondary"
+                colorScheme="panel"
+                compact
+              />
+            </View>
+            {!isPremium ? (
+              <View style={styles.menuButtonWrap}>
+                <PrimaryButton
+                  label="Unlock Premium Layouts"
+                  onPress={() => {
+                    setIsProfileMenuOpen(false);
+                    router.push('/paywall');
+                  }}
+                  variant="secondary"
+                  compact
+                />
+              </View>
+            ) : null}
+            <Pressable
+              onPress={handleLogout}
+              style={[styles.menuItem, styles.menuLogoutButton]}
+              accessibilityRole="button"
+              accessibilityLabel="Logout"
+            >
+              <MaterialCommunityIcons
+                name="logout"
+                size={18}
+                color={colors.danger}
+                style={{ transform: [{ scaleX: -1 }] }}
+              />
+              <Text style={styles.logoutText}>Logout</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <View style={styles.container}>
         <LinearGradient
           pointerEvents="none"
@@ -440,8 +631,6 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: {
       flex: 1,
-      paddingTop: spacing.md,
-      paddingHorizontal: spacing.md,
       backgroundColor: colors.background,
     },
     sportBg: {
@@ -521,31 +710,136 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.surface,
     },
     navAvatarContainer: {
-      marginLeft: 12,
+      marginLeft: spacing.xs,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    avatarTrigger: {
+      borderRadius: 999,
+      position: 'relative',
+    },
+    avatarTriggerPressed: {
+      opacity: 0.88,
+      transform: [{ scale: 0.96 }],
+    },
+    avatarSettingsBadge: {
+      position: 'absolute',
+      right: -3,
+      bottom: -3,
+      width: 15,
+      height: 15,
+      borderRadius: 999,
+      backgroundColor: colors.primary,
+      borderWidth: 1,
+      borderColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    menuOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(4, 9, 19, 0.35)',
+      justifyContent: 'flex-start',
+      alignItems: 'flex-start',
+    },
+    profileMenu: {
+      marginTop: 98,
+      marginLeft: 14,
+      width: 280,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      paddingVertical: 8,
+      paddingHorizontal: 8,
+      shadowColor: colors.text,
+      shadowOpacity: 0.16,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 10,
+    },
+    profileMenuTitle: {
+      color: colors.textMuted,
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.3,
+      paddingHorizontal: 8,
+      paddingBottom: 6,
+      textTransform: 'uppercase',
+    },
+    menuSectionLabel: {
+      color: colors.textMuted,
+      fontSize: 12,
+      fontWeight: '700',
+      paddingHorizontal: 8,
+      paddingTop: 4,
+      paddingBottom: 6,
+    },
+    menuChipsRow: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingHorizontal: 8,
+      paddingBottom: 6,
+    },
+    menuChip: {
+      flex: 1,
+      minHeight: 34,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    menuChipSelected: {
+      borderColor: colors.primaryBorderOnLight,
+      backgroundColor: `${colors.primary}22`,
+    },
+    menuChipText: {
+      color: colors.text,
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    menuChipTextSelected: {
+      color: colors.text,
+    },
+    menuNote: {
+      color: colors.textMuted,
+      fontSize: 12,
+      paddingHorizontal: 8,
+      paddingTop: 2,
+      paddingBottom: 6,
+    },
+    menuButtonWrap: {
+      paddingHorizontal: 8,
+      paddingBottom: 8,
+    },
+    menuItem: {
+      minHeight: 40,
+      borderRadius: 10,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
     },
-    themeToggleBtn: {
-      width: 34,
-      height: 34,
-      aspectRatio: 1,
-      borderRadius: 17,
+    menuLogoutButton: {
+      marginTop: 4,
       borderWidth: 1,
-      borderColor: colors.glassStroke,
-      backgroundColor: 'transparent',
-      overflow: 'hidden',
-      alignItems: 'center',
+      borderColor: `${colors.danger}55`,
+      backgroundColor: `${colors.danger}14`,
       justifyContent: 'center',
-      padding: 0,
     },
-    themeToggleGlassBg: {
-      ...StyleSheet.absoluteFillObject,
-      borderRadius: 17,
+    menuItemText: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '700',
     },
-    themeToggleGlassSheen: {
-      ...StyleSheet.absoluteFillObject,
-      borderRadius: 17,
+    logoutText: {
+      color: colors.danger,
+      fontSize: 14,
+      fontWeight: '700',
     },
     navAvatar: {
       width: '100%',
@@ -595,10 +889,6 @@ function createStyles(colors: ThemeColors) {
       fontSize: 12,
       fontWeight: '700',
     },
-    logoutBtn: {
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-    },
     centered: {
       flex: 1,
       justifyContent: 'center',
@@ -615,6 +905,8 @@ function createStyles(colors: ThemeColors) {
       fontWeight: '600',
     },
     listContent: {
+      paddingTop: spacing.md,
+      paddingHorizontal: spacing.md,
       paddingBottom: 124,
     },
     listFooterAttribution: {
