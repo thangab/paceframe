@@ -13,6 +13,7 @@ import { StravaActivity } from '@/types/strava';
 import { radius, spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { formatDistanceMeters, formatDuration, formatPace } from '@/lib/format';
+import { usePreferencesStore } from '@/store/preferencesStore';
 
 type Props = {
   activity: StravaActivity;
@@ -31,6 +32,7 @@ export function ActivityCard({
 }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const distanceUnit = usePreferencesStore((s) => s.distanceUnit);
   const overlayOpacity = useRef(new Animated.Value(selected ? 0 : 1)).current;
   const logoOpacity = useRef(new Animated.Value(selected ? 0 : 0.5)).current;
 
@@ -48,9 +50,9 @@ export function ActivityCard({
   }, [logoOpacity, overlayOpacity, selected]);
 
   const distanceText = normalizeDistance(
-    formatDistanceMeters(activity.distance),
+    formatDistanceMeters(activity.distance, distanceUnit),
   );
-  const secondaryMetric = getSecondaryMetric(activity);
+  const secondaryMetric = getSecondaryMetric(activity, distanceUnit);
   const timeText = formatDuration(activity.moving_time);
   const fallbackMetrics = getFallbackMetrics(activity, timeText);
   const whenText = formatWhen(activity.start_date);
@@ -221,25 +223,33 @@ function activityTypeIcon(
   return 'dumbbell';
 }
 
-function getSecondaryMetric(activity: StravaActivity) {
+function getSecondaryMetric(
+  activity: StravaActivity,
+  distanceUnit: 'km' | 'mi',
+) {
   if (isRideActivity(activity.type)) {
-    const kmh = activity.average_speed > 0 ? activity.average_speed * 3.6 : 0;
+    const speed = activity.average_speed > 0 ? activity.average_speed * 3.6 : 0;
+    const convertedSpeed = distanceUnit === 'mi' ? speed * 0.621371 : speed;
+    const speedUnit = distanceUnit === 'mi' ? 'mph' : 'km/h';
     return {
       label: 'Avg Speed',
-      value: kmh > 0 ? `${kmh.toFixed(1)} km/h` : '--.- km/h',
+      value:
+        convertedSpeed > 0
+          ? `${convertedSpeed.toFixed(1)} ${speedUnit}`
+          : `--.- ${speedUnit}`,
     };
   }
 
   if (isRunLikeActivity(activity.type)) {
     return {
       label: 'Pace',
-      value: formatPace(activity.distance, activity.moving_time),
+      value: formatPace(activity.distance, activity.moving_time, distanceUnit),
     };
   }
 
   return {
     label: 'Pace',
-    value: formatPace(activity.distance, activity.moving_time),
+    value: formatPace(activity.distance, activity.moving_time, distanceUnit),
   };
 }
 

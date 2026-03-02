@@ -55,14 +55,13 @@ import {
   buildLapPaceChartData,
 } from '@/lib/strava';
 import {
-  DistanceUnit,
-  ElevationUnit,
   formatDistanceMeters,
   formatElevationMeters,
   formatDuration,
   formatPace,
 } from '@/lib/format';
 import { useActivityStore } from '@/store/activityStore';
+import { usePreferencesStore } from '@/store/preferencesStore';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import {
   BackgroundGradient,
@@ -311,7 +310,7 @@ export default function PreviewScreen() {
   const [isCapturingOverlay, setIsCapturingOverlay] = useState(false);
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [pngTransparentOnly, setPngTransparentOnly] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [, setMessage] = useState<string | null>(null);
   const [centerGuides, setCenterGuides] = useState({
     showVertical: false,
     showHorizontal: false,
@@ -343,8 +342,8 @@ export default function PreviewScreen() {
       DEFAULT_PREVIEW_TEMPLATE_ID,
   );
   const [selectedFontId, setSelectedFontId] = useState(FONT_PRESETS[0].id);
-  const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>('km');
-  const [elevationUnit, setElevationUnit] = useState<ElevationUnit>('m');
+  const distanceUnit = usePreferencesStore((s) => s.distanceUnit);
+  const elevationUnit = usePreferencesStore((s) => s.elevationUnit);
   const [routeMode, setRouteMode] = useState<RouteMode>('trace');
   const [routeMapVariant, setRouteMapVariant] =
     useState<RouteMapVariant>('standard');
@@ -373,7 +372,6 @@ export default function PreviewScreen() {
   const [, setActiveLayer] = useState<LayerId | null>(null);
   const [activePanel, setActivePanel] = useState<PreviewPanelTab>('background');
   const [panelOpen, setPanelOpen] = useState(false);
-  const [helpPopoverOpen, setHelpPopoverOpen] = useState(false);
   const [isSquareFormat, setIsSquareFormat] = useState(false);
   const [paceChartVersion, setPaceChartVersion] =
     useState<ChartDisplayVersion>('v1');
@@ -389,7 +387,6 @@ export default function PreviewScreen() {
   const [resolvedLocationText, setResolvedLocationText] = useState('');
   const [draftReady, setDraftReady] = useState(false);
   const [isHydratingDraft, setIsHydratingDraft] = useState(false);
-  const [appCacheUsageLabel, setAppCacheUsageLabel] = useState('Cache: --');
   const [layerStyleMapByLayout, setLayerStyleMapByLayout] =
     useState<LayerStyleMapByLayout>({});
   const [sunsetPrimaryGradient, setSunsetPrimaryGradient] =
@@ -1287,8 +1284,6 @@ export default function PreviewScreen() {
     setImageOverlays([]);
     setSelectedLayoutId(nextLayoutId);
     setSelectedFontId(FONT_PRESETS[0].id);
-    setDistanceUnit('km');
-    setElevationUnit('m');
     setRouteMode('trace');
     setRouteMapVariant('standard');
     setPrimaryField('distance');
@@ -1327,8 +1322,6 @@ export default function PreviewScreen() {
     setImageOverlays(draft.imageOverlays ?? []);
     setSelectedLayoutId(draft.selectedLayoutId ?? LAYOUTS[0].id);
     setSelectedFontId(draft.selectedFontId ?? FONT_PRESETS[0].id);
-    setDistanceUnit(draft.distanceUnit ?? 'km');
-    setElevationUnit(draft.elevationUnit ?? 'm');
     setRouteMode(draft.routeMode ?? 'trace');
     setRouteMapVariant(draft.routeMapVariant ?? 'standard');
     setPrimaryField(draft.primaryField ?? 'distance');
@@ -1861,12 +1854,6 @@ export default function PreviewScreen() {
   }, [headerVisible, selectedLayer, visibleLayers.meta]);
 
   useEffect(() => {
-    if (!helpPopoverOpen) return;
-    void refreshAppCacheUsage();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [helpPopoverOpen]);
-
-  useEffect(() => {
     if (hasSubjectFree) return;
     if (selectedBlurEffectId !== 'none') {
       setSelectedBlurEffectId('none');
@@ -2000,67 +1987,6 @@ export default function PreviewScreen() {
       managedTempUrisRef.current.delete(uri);
     } catch {
       // Best effort cache cleanup only.
-    }
-  }
-
-  async function directorySizeBytes(dirUri: string): Promise<number> {
-    try {
-      const entries = await FileSystem.readDirectoryAsync(dirUri);
-      let total = 0;
-      for (const name of entries) {
-        const child = `${dirUri}${name}`;
-        const info = await FileSystem.getInfoAsync(child);
-        if (!info.exists) continue;
-        if (info.isDirectory) {
-          total += await directorySizeBytes(`${child}/`);
-        } else if (typeof info.size === 'number') {
-          total += info.size;
-        }
-      }
-      return total;
-    } catch {
-      return 0;
-    }
-  }
-
-  async function refreshAppCacheUsage() {
-    const cacheDir = FileSystem.cacheDirectory;
-    if (!cacheDir) {
-      setAppCacheUsageLabel('Cache: unavailable');
-      return;
-    }
-
-    const bytes = await directorySizeBytes(cacheDir);
-    const mb = bytes / (1024 * 1024);
-    setAppCacheUsageLabel(`Cache: ${mb.toFixed(mb >= 100 ? 0 : 1)} MB`);
-  }
-
-  async function clearAppCache() {
-    const keepUris = new Set(
-      [
-        media?.uri,
-        autoSubjectUri,
-        ...imageOverlays.map((item) => item.uri),
-      ].filter((uri): uri is string =>
-        Boolean(uri && uri.startsWith('file://')),
-      ),
-    );
-
-    try {
-      setMessage('Clearing cache...');
-      const candidates = Array.from(managedTempUrisRef.current);
-      for (const uri of candidates) {
-        if (keepUris.has(uri)) continue;
-        await cleanupTempUriIfOwned(uri);
-      }
-      await refreshAppCacheUsage();
-      setMessage('Cache cleared.');
-    } catch (err) {
-      setMessage(
-        err instanceof Error
-          ? `Could not clear cache (${err.message}).`
-          : 'Could not clear cache.',
-      );
     }
   }
 
@@ -2752,10 +2678,6 @@ export default function PreviewScreen() {
     void (media?.type === 'video' ? exportVideo() : exportAndShare());
   }
 
-  function toggleHelpPanel() {
-    setHelpPopoverOpen((prev) => !prev);
-  }
-
   return (
     <>
       <Stack.Screen
@@ -2859,22 +2781,6 @@ export default function PreviewScreen() {
                   />
                 </Pressable>
               ) : null}
-              <Pressable
-                onPress={toggleHelpPanel}
-                hitSlop={8}
-                style={[
-                  styles.headerFormatButton,
-                  helpPopoverOpen ? styles.headerHelpButtonActive : null,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel="Settings"
-              >
-                <MaterialCommunityIcons
-                  name="cog-outline"
-                  size={18}
-                  color={colors.panelText}
-                />
-              </Pressable>
             </View>
           ),
         }}
@@ -2886,7 +2792,6 @@ export default function PreviewScreen() {
           isCompactViewport={isCompactViewport}
           onCanvasTouch={() => {
             if (panelOpen) setPanelOpen(false);
-            if (helpPopoverOpen) setHelpPopoverOpen(false);
             setOutlinedLayer(null);
           }}
           canvasDisplayWidth={canvasDisplayWidth}
@@ -3013,10 +2918,6 @@ export default function PreviewScreen() {
           onToggleField={toggleField}
           headerVisible={activeHeaderVisible}
           onToggleHeaderField={toggleHeaderField}
-          distanceUnit={distanceUnit}
-          onSetDistanceUnit={setDistanceUnit}
-          elevationUnit={elevationUnit}
-          onSetElevationUnit={setElevationUnit}
           layerStyleMap={activeLayerStyleMap}
           onSetLayerStyleColor={setLayerStyleColor}
           onSetLayerStyleOpacity={setLayerStyleOpacity}
@@ -3035,19 +2936,11 @@ export default function PreviewScreen() {
           hasSubjectFree={hasSubjectFree}
           effectsEnabled={hasFilterableBackground}
           isPremium={isPremium}
-          message={message}
-          appCacheUsageLabel={appCacheUsageLabel}
-          onClearAppCache={() => {
-            void clearAppCache();
-          }}
-          onOpenPaywall={() => router.push('/paywall')}
           onQuickExport={() => {
             if (busy) return;
             triggerExport();
           }}
           quickExportBusy={busy}
-          helpPopoverOpen={helpPopoverOpen}
-          onCloseHelpPopover={() => setHelpPopoverOpen(false)}
           quickTemplateMode={templateMode}
           allowVideoBackground={!templateDisablesVideoBackground}
           showBackgroundTab={showTemplateBackgroundTab}
@@ -3111,9 +3004,6 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.primary,
       borderWidth: 1,
       borderColor: colors.borderStrong,
-    },
-    headerHelpButtonActive: {
-      borderColor: colors.primaryBorderOnLight,
     },
     centered: {
       flex: 1,
