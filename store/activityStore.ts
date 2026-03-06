@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { StravaActivity } from '@/types/strava';
 
-type ActivitySource = 'strava' | 'healthkit';
+type ActivitySource = 'strava' | 'garmin' | 'healthkit';
 
 type ActivityState = {
   activities: StravaActivity[];

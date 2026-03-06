@@ -20,6 +20,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { createThemeModeOptions } from '@/components/preview/panel/data';
 import { layout, spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { fetchGarminActivities } from '@/lib/garmin';
 import {
   fetchActivities,
   fetchActivityPhotoHighRes,
@@ -56,25 +57,56 @@ export default function ActivitiesScreen() {
   const activities = useActivityStore((s) => s.activities);
   const source = useActivityStore((s) => s.source);
   const clearActivities = useActivityStore((s) => s.clearActivities);
+  const activeSource =
+    tokens?.provider === 'garmin'
+      ? 'garmin'
+      : source === 'healthkit'
+        ? 'healthkit'
+        : 'strava';
   const selectedActivityId = useActivityStore((s) => s.selectedActivityId);
   const setActivities = useActivityStore((s) => s.setActivities);
   const updateActivity = useActivityStore((s) => s.updateActivity);
   const selectActivity = useActivityStore((s) => s.selectActivity);
-  const isHealthKitSource = source === 'healthkit';
+  const isHealthKitSource = activeSource === 'healthkit';
+  const isNonStravaSource = activeSource !== 'strava';
   const refreshColor = themeMode === 'dark' ? colors.primary : colors.textMuted;
   const hasLiveStravaSource =
-    source === 'strava' &&
+    activeSource === 'strava' &&
     Boolean(tokens?.accessToken) &&
     !(tokens?.accessToken?.startsWith('mock-') ?? false);
   const hasLoadedInitialStravaRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(false);
+  const previousSourceRef = useRef<string | null>(null);
+  const previousAuthRef = useRef<string | null>(null);
   const [isPreparingPreview, setIsPreparingPreview] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
   const [appCacheUsageLabel, setAppCacheUsageLabel] = useState('Cache: --');
   const [isClearingCache, setIsClearingCache] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const authSession =
+      `${tokens?.provider ?? 'none'}::${tokens?.garminUserId ?? 'none'}::${tokens?.athleteId ?? 'none'}`;
+    if (previousAuthRef.current && previousAuthRef.current !== authSession) {
+      setHasFinishedInitialLoad(false);
+      hasLoadedInitialStravaRef.current = false;
+      initialStravaLoadDone = false;
+      if (activeSource === 'garmin') {
+        clearActivities();
+      }
+    }
+    if (previousSourceRef.current && previousSourceRef.current !== activeSource) {
+      setHasFinishedInitialLoad(false);
+      if (activeSource !== 'strava') {
+        hasLoadedInitialStravaRef.current = false;
+      }
+      initialStravaLoadDone = false;
+    }
+    previousAuthRef.current = authSession;
+    previousSourceRef.current = activeSource;
+  }, [activeSource, clearActivities, tokens?.provider, tokens?.garminUserId, tokens?.athleteId]);
+
   const resetAndReplace = useCallback((path: '/login' | '/activities') => {
     if (router.canGoBack()) {
       router.dismissAll();
@@ -89,6 +121,7 @@ export default function ActivitiesScreen() {
     const nowSec = Math.floor(Date.now() / 1000);
     const refreshBufferSec = 120;
     const shouldRefresh =
+      tokens.provider !== 'garmin' &&
       !tokens.accessToken.startsWith('mock-') &&
       Boolean(tokens.refreshToken) &&
       tokens.expiresAt <= nowSec + refreshBufferSec;
@@ -99,6 +132,12 @@ export default function ActivitiesScreen() {
       });
       await login(activeTokens);
     }
+    console.log('[Activities] getValidTokens', {
+      provider: activeTokens.provider,
+      hasToken: Boolean(activeTokens.accessToken),
+      garminUserId: activeTokens.garminUserId ?? null,
+      expiresAt: activeTokens.expiresAt,
+    });
 
     return activeTokens;
   }, [login, tokens]);
@@ -106,25 +145,56 @@ export default function ActivitiesScreen() {
   const loadActivities = useCallback(
     async (force = false) => {
       if (loading && !force) return;
+      console.log('[Activities] loadActivities entry', {
+        activeSource,
+        force,
+        hasFinishedInitialLoad,
+        loading,
+        activitiesLength: activities.length,
+      });
 
-      if (source === 'healthkit' && activities.length > 0) {
+      if (activeSource === 'healthkit' && activities.length > 0) {
+        console.log('[Activities] load skipped', {
+          reason: 'healthkitHasData',
+          activitiesLength: activities.length,
+        });
         return;
       }
-      if (!force && source === 'strava') {
+      if (!force && activeSource !== 'strava' && hasFinishedInitialLoad) {
+        console.log('[Activities] load skipped', {
+          reason: 'nonStravaFinished',
+          activeSource,
+          hasFinishedInitialLoad,
+        });
+        return;
+      }
+      if (!force && activeSource === 'strava') {
         if (
           activities.length > 0 ||
           hasLoadedInitialStravaRef.current ||
           initialStravaLoadDone
         ) {
+          console.log('[Activities] load skipped', {
+            reason: 'stravaAlreadyLoaded',
+            activitiesLength: activities.length,
+            hasLoadedInitialStravaRef: hasLoadedInitialStravaRef.current,
+            initialStravaLoadDone,
+          });
           return;
         }
         if (initialStravaLoadInFlight) {
+          console.log('[Activities] load skipped', {
+            reason: 'stravaLoadInFlight',
+          });
           await initialStravaLoadInFlight;
           return;
         }
       }
 
       if (!tokens?.accessToken) {
+        console.log('[Activities] load skipped', {
+          reason: 'missingAccessToken',
+        });
         resetAndReplace('/login');
         return;
       }
@@ -133,17 +203,52 @@ export default function ActivitiesScreen() {
         try {
           setLoading(true);
           setError(null);
+          console.log('[Activities] Loading activities', {
+            activeSource,
+            hasToken: Boolean(tokens?.accessToken),
+            provider: tokens?.provider,
+          });
           const activeTokens = await getValidTokens();
           if (!activeTokens?.accessToken) {
+            console.warn('[Activities] No active tokens after refresh');
             resetAndReplace('/login');
             return;
           }
 
+          if (activeSource === 'garmin') {
+            console.log('[Garmin][Activities] prepare fetchGarminActivities', {
+              hasToken: Boolean(activeTokens.accessToken),
+              garminUserId: activeTokens.garminUserId ?? null,
+              refreshInFlight: Boolean(initialStravaLoadInFlight),
+            });
+            console.log(
+              '[Garmin][Activities] Fetching Garmin activities...',
+              activeTokens,
+            );
+            const rows = await fetchGarminActivities(
+              activeTokens.accessToken,
+              activeTokens.garminUserId ?? undefined,
+            );
+            console.log('[Garmin][Activities] Garmin activities fetched', {
+              count: rows.length,
+            });
+            setActivities(rows, 'garmin');
+            console.log('[Garmin][Activities] setActivities called', {
+              hasRows: rows.length > 0,
+            });
+            return;
+          }
+
+          console.log('[Strava][Activities] Fetching Strava activities...');
           const rows = await fetchActivities(activeTokens.accessToken);
+          console.log('[Strava][Activities] Strava activities fetched', {
+            count: rows.length,
+          });
           setActivities(rows, 'strava');
           hasLoadedInitialStravaRef.current = true;
           initialStravaLoadDone = true;
         } catch (err) {
+          console.error('[Activities] Load failed', err);
           setError(
             err instanceof Error ? err.message : 'Could not load activities.',
           );
@@ -153,7 +258,7 @@ export default function ActivitiesScreen() {
         }
       };
 
-      if (!force && source === 'strava') {
+      if (!force && activeSource === 'strava') {
         initialStravaLoadInFlight = runLoad();
         try {
           await initialStravaLoadInFlight;
@@ -166,11 +271,12 @@ export default function ActivitiesScreen() {
       await runLoad();
     },
     [
-      source,
+      activeSource,
       activities.length,
       tokens,
       setActivities,
       getValidTokens,
+      hasFinishedInitialLoad,
       loading,
       resetAndReplace,
     ],
@@ -272,7 +378,7 @@ export default function ActivitiesScreen() {
     target: '/preview' | '/preview?mode=templates',
   ) {
     if (!selectedActivityId) return;
-    if (isHealthKitSource) {
+    if (isNonStravaSource) {
       router.push(target);
       return;
     }

@@ -49,6 +49,7 @@ export async function exchangeCodeWithSupabase({
   const data = await response.json();
 
   return {
+    provider: 'strava',
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
     expiresAt: data.expires_at,
@@ -89,6 +90,7 @@ export async function refreshTokensWithSupabase({
 
   const data = await response.json();
   return {
+    provider: 'strava',
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
     expiresAt: data.expires_at,
@@ -242,6 +244,7 @@ export function buildHeartRateAreaChartData(
 
 export function getMockTokens(): AuthTokens {
   return {
+    provider: 'mock',
     accessToken: 'mock-access-token',
     refreshToken: 'mock-refresh-token',
     expiresAt: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30,

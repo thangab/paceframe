@@ -55,12 +55,16 @@ export type StravaActivity = {
   photoUrl?: string | null;
   laps?: StravaLap[];
   heartRateStream?: StravaHeartRatePoint[];
+  // Garmin detail stream: x = sample startTimeInSeconds (epoch seconds), y = speedMetersPerSecond
+  pace_series?: { x: number; y: number }[];
 };
 
 export type AuthTokens = {
+  provider?: 'strava' | 'garmin' | 'mock';
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
+  garminUserId?: string | null;
   athleteId?: number;
   athleteFirstName?: string | null;
   athleteProfileUrl?: string | null;
