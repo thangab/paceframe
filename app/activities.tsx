@@ -86,8 +86,7 @@ export default function ActivitiesScreen() {
   const [isClearingCache, setIsClearingCache] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    const authSession =
-      `${tokens?.provider ?? 'none'}::${tokens?.garminUserId ?? 'none'}::${tokens?.athleteId ?? 'none'}`;
+    const authSession = `${tokens?.provider ?? 'none'}::${tokens?.garminUserId ?? 'none'}::${tokens?.athleteId ?? 'none'}`;
     if (previousAuthRef.current && previousAuthRef.current !== authSession) {
       setHasFinishedInitialLoad(false);
       hasLoadedInitialStravaRef.current = false;
@@ -96,7 +95,10 @@ export default function ActivitiesScreen() {
         clearActivities();
       }
     }
-    if (previousSourceRef.current && previousSourceRef.current !== activeSource) {
+    if (
+      previousSourceRef.current &&
+      previousSourceRef.current !== activeSource
+    ) {
       setHasFinishedInitialLoad(false);
       if (activeSource !== 'strava') {
         hasLoadedInitialStravaRef.current = false;
@@ -105,7 +107,13 @@ export default function ActivitiesScreen() {
     }
     previousAuthRef.current = authSession;
     previousSourceRef.current = activeSource;
-  }, [activeSource, clearActivities, tokens?.provider, tokens?.garminUserId, tokens?.athleteId]);
+  }, [
+    activeSource,
+    clearActivities,
+    tokens?.provider,
+    tokens?.garminUserId,
+    tokens?.athleteId,
+  ]);
 
   const resetAndReplace = useCallback((path: '/login' | '/activities') => {
     if (router.canGoBack()) {

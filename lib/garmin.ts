@@ -2,8 +2,7 @@ import { StravaActivity } from '@/types/strava';
 import { supabase } from '@/lib/supabaseClient';
 
 const BACKFILL_URL = 'https://paceframe.app/api/garmin/backfill';
-const SUMMARIES_TABLE = 'garmin_activities';
-const DETAILS_TABLE = 'garmin_activity_details';
+const VIEW_WITH_DETAILS = 'garmin_activities_with_details';
 
 function toNumber(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -66,13 +65,6 @@ function normalizeActivityId(row: Record<string, unknown>): number {
 
 type PaceSeriesPoint = { x: number; y: number };
 
-type GarminActivityDetail = {
-  summary_polyline: string | null;
-  heartRateStream: StravaActivity['heartRateStream'];
-  paceSeries: PaceSeriesPoint[];
-  start_latlng: StravaActivity['start_latlng'] | null;
-};
-
 function toPaceSeriesMetersPerSecond(value: unknown): PaceSeriesPoint[] {
   if (!Array.isArray(value)) return [];
 
@@ -94,8 +86,11 @@ function toPaceSeriesMetersPerSecond(value: unknown): PaceSeriesPoint[] {
 
 function toHeartRateSeriesFromRaw(
   value: unknown,
+  startTimeSeconds?: number,
 ): StravaActivity['heartRateStream'] {
   if (!Array.isArray(value)) return [];
+  const baseTime = toNumber(startTimeSeconds);
+  const hasBaseTime = baseTime > 0;
 
   return value
     .filter(
@@ -109,47 +104,23 @@ function toHeartRateSeriesFromRaw(
       x: Number((item as { x: unknown }).x),
       y: Number((item as { y: unknown }).y),
     }))
-    .filter((point) => point.y > 0)
+    .map((point) => ({
+      x: hasBaseTime ? point.x - baseTime : point.x,
+      y: point.y,
+    }))
+    .filter((point) => point.x >= 0 && point.y > 0)
     .map((point) => ({ seconds: point.x, bpm: point.y }));
-}
-
-function normalizeDetailKey(row: Record<string, unknown>): string {
-  return toStringValue(row.summary_id).trim();
-}
-
-function buildDetailsMap(
-  rows: Record<string, unknown>[],
-): Map<string, GarminActivityDetail> {
-  const map = new Map<string, GarminActivityDetail>();
-
-  for (const row of rows) {
-    const summaryId = normalizeDetailKey(row);
-    if (!summaryId) continue;
-
-    map.set(summaryId, {
-      summary_polyline:
-        typeof row.summary_polyline === 'string'
-          ? row.summary_polyline.trim() || null
-          : null,
-      heartRateStream: toHeartRateSeriesFromRaw(row.hr_series),
-      paceSeries: toPaceSeriesMetersPerSecond(row.pace_series),
-      start_latlng: parseStartLatLng(row.start_latlng),
-    });
-  }
-
-  return map;
 }
 
 function mapRow(
   row: Record<string, unknown>,
-  detailsBySummaryId: Map<string, GarminActivityDetail>,
 ): StravaActivity {
   const movedSeconds = toNumber(
     row.moving_duration_seconds || row.duration_seconds,
   );
   const elapsedSeconds = toNumber(row.duration_seconds) || movedSeconds;
-  const detail = detailsBySummaryId.get(normalizeDetailKey(row));
-  const paceSeries = detail?.paceSeries ?? [];
+  const activityStartSeconds = toNumber(row.start_time_in_seconds);
+  const paceSeries = toPaceSeriesMetersPerSecond(row.pace_series);
 
   return {
     id: normalizeActivityId(row),
@@ -166,9 +137,14 @@ function mapRow(
     average_heartrate: toNumber(row.average_hr_bpm),
     device_name: toStringValue(row.device_name) || null,
     calories: toNumber(row.active_kilocalories),
-    map: { summary_polyline: detail?.summary_polyline ?? null },
-    start_latlng: detail?.start_latlng ?? undefined,
-    heartRateStream: detail?.heartRateStream ?? [],
+    map: {
+      summary_polyline:
+        typeof row.summary_polyline === 'string'
+          ? row.summary_polyline.trim() || null
+          : null,
+    },
+    start_latlng: parseStartLatLng(row.start_latlng),
+    heartRateStream: toHeartRateSeriesFromRaw(row.hr_series, activityStartSeconds),
     pace_series: paceSeries,
   };
 }
@@ -194,48 +170,27 @@ async function triggerBackfill(garminUserId: string): Promise<void> {
 async function fetchFromSupabase(
   garminUserId: string,
 ): Promise<StravaActivity[]> {
-  const [
-    { data: summaryRows, error: summaryError },
-    { data: detailRows, error: detailError },
-  ] = await Promise.all([
-    supabase
-      .from(SUMMARIES_TABLE)
-      .select('*')
-      .eq('garmin_user_id', garminUserId)
-      .order('start_time', { ascending: false })
-      .limit(50),
-    supabase
-      .from(DETAILS_TABLE)
-      .select('summary_id,summary_polyline,hr_series,pace_series,start_latlng')
-      .eq('garmin_user_id', garminUserId),
-  ]);
+  const { data: summaryRows, error } = await supabase
+    .from(VIEW_WITH_DETAILS)
+    .select('*')
+    .eq('garmin_user_id', garminUserId)
+    .order('start_time', { ascending: false })
+    .limit(50);
 
-  if (summaryError) {
+  if (error) {
     throw new Error(
-      summaryError.message || 'Failed to fetch Garmin summary activities.',
-    );
-  }
-  if (detailError) {
-    throw new Error(
-      detailError.message || 'Failed to fetch Garmin activity details.',
+      error.message || 'Failed to fetch Garmin activities with details.',
     );
   }
 
   const summaries = (summaryRows ?? []) as Record<string, unknown>[];
-  const details = buildDetailsMap(
-    (detailRows ?? []) as Record<string, unknown>[],
-  );
-
   console.log('[Garmin][Supabase] query', {
-    table: SUMMARIES_TABLE,
-    detailsTable: DETAILS_TABLE,
+    table: VIEW_WITH_DETAILS,
     garminUserId,
     summaryCount: summaries.length,
-    detailCount: detailRows?.length ?? 0,
-    hasDetailData: (detailRows?.length ?? 0) > 0,
   });
 
-  return summaries.map((row) => mapRow(row, details));
+  return summaries.map((row) => mapRow(row));
 }
 
 function parseStartLatLng(value: unknown): [number, number] | null {

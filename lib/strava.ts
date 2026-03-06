@@ -206,9 +206,17 @@ export type HeartRateAreaChartPoint = {
 };
 
 export function buildLapPaceChartData(
-  activity: Pick<StravaActivity, 'laps'> | null | undefined,
+  activity:
+    | Pick<StravaActivity, 'laps' | 'pace_series' | 'moving_time'>
+    | null
+    | undefined,
 ): LapPaceChartPoint[] {
-  if (!activity?.laps?.length) return [];
+  if (!activity?.laps?.length) {
+    return buildLapPaceChartDataFromPaceSeries(
+      activity?.pace_series,
+      activity?.moving_time,
+    );
+  }
 
   return activity.laps
     .map((lap, index) => {
@@ -228,6 +236,70 @@ export function buildLapPaceChartData(
       };
     })
     .filter((item): item is LapPaceChartPoint => Boolean(item));
+}
+
+function buildLapPaceChartDataFromPaceSeries(
+  paceSeries: Array<{ x: number; y: number }> | null | undefined,
+  movingTimeFallback?: number,
+): LapPaceChartPoint[] {
+  if (!paceSeries?.length) return [];
+
+  const validPoints = paceSeries
+    .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+    .filter((point) => point.y > 0)
+    .sort((a, b) => a.x - b.x);
+
+  const laps: LapPaceChartPoint[] = [];
+  for (let i = 1; i < validPoints.length; i += 1) {
+    const prev = validPoints[i - 1];
+    const current = validPoints[i];
+    const movingTimeSec = current.x - prev.x;
+    if (!Number.isFinite(movingTimeSec) || movingTimeSec <= 0) continue;
+
+    const speedMetersPerSec = Math.max(0, prev.y);
+    if (!speedMetersPerSec) continue;
+
+    const distanceMeters = speedMetersPerSec * movingTimeSec;
+    if (distanceMeters <= 0) continue;
+
+    const paceSecPerKm = computePaceSecPerKm(distanceMeters, movingTimeSec);
+    if (!paceSecPerKm) continue;
+
+    laps.push({
+      lapLabel: `Sample ${i}`,
+      paceSecPerKm,
+      paceText: formatPaceSecPerKm(paceSecPerKm),
+      distanceMeters,
+      movingTimeSec,
+      averageHeartrate: null,
+    });
+  }
+
+  if (!laps.length && movingTimeFallback && movingTimeFallback > 0) {
+    const validCount = validPoints.length;
+    if (!validCount) return [];
+
+    const sumSpeed = validPoints.reduce((acc, point) => acc + point.y, 0);
+    const averageSpeed = sumSpeed / validCount;
+    if (averageSpeed <= 0) return [];
+
+    const paceSecPerKm = 1000 / averageSpeed;
+    const distanceMeters = averageSpeed * movingTimeFallback;
+    if (distanceMeters <= 0) return [];
+
+    return [
+      {
+        lapLabel: 'Sample 1',
+        paceSecPerKm,
+        paceText: formatPaceSecPerKm(paceSecPerKm),
+        distanceMeters,
+        movingTimeSec: movingTimeFallback,
+        averageHeartrate: null,
+      },
+    ];
+  }
+
+  return laps;
 }
 
 export function buildHeartRateAreaChartData(
