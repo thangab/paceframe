@@ -70,6 +70,7 @@ type GarminActivityDetail = {
   summary_polyline: string | null;
   heartRateStream: StravaActivity['heartRateStream'];
   paceSeries: PaceSeriesPoint[];
+  start_latlng: StravaActivity['start_latlng'] | null;
 };
 
 function toPaceSeriesMetersPerSecond(value: unknown): PaceSeriesPoint[] {
@@ -87,8 +88,8 @@ function toPaceSeriesMetersPerSecond(value: unknown): PaceSeriesPoint[] {
       x: Number((item as { x: unknown }).x),
       y: Number((item as { y: unknown }).y),
     }))
-      .filter((point) => point.y > 0) // y = speedMetersPerSecond
-      .sort((a, b) => a.x - b.x);
+    .filter((point) => point.y > 0) // y = speedMetersPerSecond
+    .sort((a, b) => a.x - b.x);
 }
 
 function toHeartRateSeriesFromRaw(
@@ -132,6 +133,7 @@ function buildDetailsMap(
           : null,
       heartRateStream: toHeartRateSeriesFromRaw(row.hr_series),
       paceSeries: toPaceSeriesMetersPerSecond(row.pace_series),
+      start_latlng: parseStartLatLng(row.start_latlng),
     });
   }
 
@@ -165,6 +167,7 @@ function mapRow(
     device_name: toStringValue(row.device_name) || null,
     calories: toNumber(row.active_kilocalories),
     map: { summary_polyline: detail?.summary_polyline ?? null },
+    start_latlng: detail?.start_latlng ?? undefined,
     heartRateStream: detail?.heartRateStream ?? [],
     pace_series: paceSeries,
   };
@@ -203,7 +206,7 @@ async function fetchFromSupabase(
       .limit(50),
     supabase
       .from(DETAILS_TABLE)
-      .select('summary_id,summary_polyline,hr_series,pace_series')
+      .select('summary_id,summary_polyline,hr_series,pace_series,start_latlng')
       .eq('garmin_user_id', garminUserId),
   ]);
 
@@ -233,6 +236,18 @@ async function fetchFromSupabase(
   });
 
   return summaries.map((row) => mapRow(row, details));
+}
+
+function parseStartLatLng(value: unknown): [number, number] | null {
+  if (!Array.isArray(value) || value.length < 2) return null;
+
+  const [latRaw, lngRaw] = value;
+  const lat = Number(latRaw);
+  const lng = Number(lngRaw);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+  return [lat, lng];
 }
 
 export async function fetchGarminActivities(
