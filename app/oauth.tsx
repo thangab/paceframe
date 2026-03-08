@@ -4,8 +4,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { resetActivityLoadState } from '@/lib/activityLoadState';
 import { exchangeCodeWithSupabase } from '@/lib/strava';
 import { STRAVA_REDIRECT_URI } from '@/lib/stravaOAuth';
+import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
 
 function isStaleOAuthCodeError(message: string) {
@@ -47,7 +49,9 @@ export default function OAuthCallbackScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const login = useAuthStore((s) => s.login);
   const tokens = useAuthStore((s) => s.tokens);
+  const activeProvider = useAuthStore((s) => s.activeProvider);
   const isHydrated = useAuthStore((s) => s.isHydrated);
+  const clearActivities = useActivityStore((s) => s.clearActivities);
   const {
     code: rawCode,
     provider: rawProvider,
@@ -139,6 +143,8 @@ export default function OAuthCallbackScreen() {
               : Math.floor(Date.now() / 1000) + 60 * 60,
         })
           .then(() => {
+            clearActivities();
+            resetActivityLoadState();
             resetAndReplace('/activities');
           })
           .catch((err) => {
@@ -148,11 +154,6 @@ export default function OAuthCallbackScreen() {
           });
         return;
       }
-    }
-
-    if (tokens?.accessToken) {
-      resetAndReplace('/activities');
-      return;
     }
 
     if (oauthError) {
@@ -184,6 +185,10 @@ export default function OAuthCallbackScreen() {
     }
 
     if (!code || typeof code !== 'string') {
+      if (tokens?.accessToken || activeProvider) {
+        resetAndReplace('/activities');
+        return;
+      }
       resetAndReplace('/login');
       return;
     }
@@ -202,6 +207,8 @@ export default function OAuthCallbackScreen() {
         );
         if (cancelled) return;
         await login(tokens);
+        clearActivities();
+        resetActivityLoadState();
         resetAndReplace('/activities');
       } catch (err) {
         if (cancelled) return;
@@ -230,7 +237,9 @@ export default function OAuthCallbackScreen() {
     accessToken,
     expiresIn,
     refreshToken,
+    activeProvider,
     tokens?.accessToken,
+    clearActivities,
   ]);
 
   if (!error) {

@@ -59,8 +59,28 @@ export type StravaActivity = {
   pace_series?: { x: number; y: number }[];
 };
 
+export type AuthProvider = 'strava' | 'garmin' | 'mock';
+
 export type AuthTokens = {
-  provider?: 'strava' | 'garmin' | 'mock';
+  provider: AuthProvider;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  garminUserId?: string | null;
+  athleteId?: number;
+  athleteFirstName?: string | null;
+  athleteProfileUrl?: string | null;
+};
+
+export type AuthConnections = Partial<Record<AuthProvider, AuthTokens>>;
+
+export type PersistedAuthState = {
+  activeProvider: AuthProvider | null;
+  connections: AuthConnections;
+};
+
+export type LegacyAuthTokens = {
+  provider?: AuthProvider;
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
