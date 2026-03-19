@@ -43,8 +43,6 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const clientId = process.env.EXPO_PUBLIC_STRAVA_CLIENT_ID?.trim();
-  const garminOAuthStartUrl =
-    process.env.EXPO_PUBLIC_GARMIN_OAUTH_START_URL?.trim();
   const login = useAuthStore((s) => s.login);
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -101,50 +99,17 @@ export default function LoginScreen() {
   }
 
   async function handleGarminLogin() {
-    if (!garminOAuthStartUrl) {
-      setError('Missing EXPO_PUBLIC_GARMIN_OAUTH_START_URL in .env');
-      return;
-    }
-
     try {
       setIsBusy(true);
       setError(null);
-      const authUrl = buildGarminOAuthStartUrl({ startUrl: garminOAuthStartUrl });
-      console.log('[Garmin][Login] Starting OAuth session', { authUrl });
-      const result = await WebBrowser.openAuthSessionAsync(
+      const { authUrl, state } = await buildGarminOAuthStartUrl();
+      console.log('[Garmin][Login] Opening Garmin URL', {
         authUrl,
-        GARMIN_APP_OAUTH_REDIRECT_URI,
-      );
-      console.log('[Garmin][Login] OAuth session result', result);
-
-      if (result.type === 'success' && result.url) {
-        const parsed = Linking.parse(result.url);
-        const params = parsed.queryParams ?? {};
-        console.log('[Garmin][Login] Parsed callback URL params', params);
-        router.replace({
-          pathname: '/oauth',
-          params: Object.fromEntries(
-            Object.entries(params).map(([key, value]) => [key, String(value)]),
-          ),
-        });
-        return;
-      }
-
-      if (result.type === 'cancel') {
-        setError('Garmin authorization cancelled.');
-        return;
-      }
-
-      if (result.type === 'dismiss') {
-        setError(
-          'Garmin login closed before completion. Please complete authorization.',
-        );
-        return;
-      }
-
-      setError('Garmin login did not complete. Please try again.');
+        redirectUri: GARMIN_APP_OAUTH_REDIRECT_URI,
+        state,
+      });
+      await Linking.openURL(authUrl);
     } catch (err) {
-      console.error('[Garmin][Login] OAuth session failed', err);
       setError(err instanceof Error ? err.message : 'Garmin login failed.');
     } finally {
       setIsBusy(false);

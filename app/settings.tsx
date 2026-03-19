@@ -60,8 +60,6 @@ export default function SettingsScreen() {
   const themeMode = useThemeStore((s) => s.mode);
   const setThemeMode = useThemeStore((s) => s.setMode);
   const stravaClientId = process.env.EXPO_PUBLIC_STRAVA_CLIENT_ID?.trim();
-  const garminOAuthStartUrl =
-    process.env.EXPO_PUBLIC_GARMIN_OAUTH_START_URL?.trim();
   const distanceUnit = usePreferencesStore((s) => s.distanceUnit);
   const elevationUnit = usePreferencesStore((s) => s.elevationUnit);
   const setDistanceUnit = usePreferencesStore((s) => s.setDistanceUnit);
@@ -278,47 +276,12 @@ export default function SettingsScreen() {
       setMessage('Garmin is already connected.');
       return;
     }
-    if (!garminOAuthStartUrl) {
-      setMessage('Missing EXPO_PUBLIC_GARMIN_OAUTH_START_URL in .env');
-      return;
-    }
 
     try {
       setIsConnectingGarmin(true);
       setMessage(null);
-      const authUrl = buildGarminOAuthStartUrl({
-        startUrl: garminOAuthStartUrl,
-      });
-      const result = await WebBrowser.openAuthSessionAsync(
-        authUrl,
-        GARMIN_APP_OAUTH_REDIRECT_URI,
-      );
-
-      if (result.type === 'success' && result.url) {
-        const parsed = Linking.parse(result.url);
-        const params = parsed.queryParams ?? {};
-        router.replace({
-          pathname: '/oauth',
-          params: Object.fromEntries(
-            Object.entries(params).map(([key, value]) => [key, String(value)]),
-          ),
-        });
-        return;
-      }
-
-      if (result.type === 'cancel') {
-        setMessage('Garmin authorization cancelled.');
-        return;
-      }
-
-      if (result.type === 'dismiss') {
-        setMessage(
-          'Garmin login closed before completion. Please complete authorization.',
-        );
-        return;
-      }
-
-      setMessage('Garmin login did not complete. Please try again.');
+      const { authUrl } = await buildGarminOAuthStartUrl();
+      await Linking.openURL(authUrl);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Garmin login failed.');
     } finally {
@@ -402,10 +365,6 @@ export default function SettingsScreen() {
   }
 
   function reconnectGarmin() {
-    if (!garminOAuthStartUrl) {
-      setMessage('Missing EXPO_PUBLIC_GARMIN_OAUTH_START_URL in .env');
-      return;
-    }
     Alert.alert(
       'Reconnect Garmin',
       'This will replace the current active connection with Garmin.',
@@ -418,42 +377,8 @@ export default function SettingsScreen() {
               try {
                 setIsConnectingGarmin(true);
                 setMessage(null);
-                const authUrl = buildGarminOAuthStartUrl({
-                  startUrl: garminOAuthStartUrl,
-                });
-                const result = await WebBrowser.openAuthSessionAsync(
-                  authUrl,
-                  GARMIN_APP_OAUTH_REDIRECT_URI,
-                );
-
-                if (result.type === 'success' && result.url) {
-                  const parsed = Linking.parse(result.url);
-                  const params = parsed.queryParams ?? {};
-                  router.replace({
-                    pathname: '/oauth',
-                    params: Object.fromEntries(
-                      Object.entries(params).map(([key, value]) => [
-                        key,
-                        String(value),
-                      ]),
-                    ),
-                  });
-                  return;
-                }
-
-                if (result.type === 'cancel') {
-                  setMessage('Garmin authorization cancelled.');
-                  return;
-                }
-
-                if (result.type === 'dismiss') {
-                  setMessage(
-                    'Garmin login closed before completion. Please complete authorization.',
-                  );
-                  return;
-                }
-
-                setMessage('Garmin login did not complete. Please try again.');
+                const { authUrl } = await buildGarminOAuthStartUrl();
+                await Linking.openURL(authUrl);
               } catch (err) {
                 setMessage(
                   err instanceof Error ? err.message : 'Garmin login failed.',
