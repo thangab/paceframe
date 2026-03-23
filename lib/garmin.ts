@@ -2,7 +2,15 @@ import { StravaActivity } from '@/types/strava';
 import { supabase } from '@/lib/supabaseClient';
 
 const BACKFILL_URL = 'https://paceframe.app/api/garmin/backfill';
+const DEREGISTRATION_URL = 'https://paceframe.app/api/garmin/deregistration';
+const PERMISSIONS_URL = 'https://paceframe.app/api/garmin/permissions';
 const VIEW_WITH_DETAILS = 'garmin_activities_with_details';
+
+type GarminPermissionsResponse = {
+  success?: boolean;
+  error?: string;
+  permissions?: string[];
+};
 
 function toNumber(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -165,6 +173,67 @@ async function triggerBackfill(garminUserId: string): Promise<void> {
     const message = await response.text();
     throw new Error(message || 'Backfill request failed.');
   }
+}
+
+export async function deregisterGarminUser(
+  garminUserId: string,
+): Promise<void> {
+  const normalizedGarminUserId = garminUserId.trim();
+  if (!normalizedGarminUserId) {
+    throw new Error('Missing garminUserId.');
+  }
+
+  const response = await fetch(DEREGISTRATION_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ garmin_user_id: normalizedGarminUserId }),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as
+      | { error?: string }
+      | null;
+    const fallbackMessage = await response.text().catch(() => '');
+    throw new Error(
+      payload?.error || fallbackMessage || 'Garmin deregistration failed.',
+    );
+  }
+}
+
+export async function syncGarminPermissions(
+  garminUserId: string,
+): Promise<string[]> {
+  const normalizedGarminUserId = garminUserId.trim();
+  if (!normalizedGarminUserId) {
+    throw new Error('Missing garminUserId.');
+  }
+
+  const url = new URL(PERMISSIONS_URL);
+  url.searchParams.set('garmin_user_id', normalizedGarminUserId);
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+    cache: 'no-store',
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | GarminPermissionsResponse
+    | null;
+
+  if (!response.ok || payload?.success === false) {
+    throw new Error(
+      payload?.error || 'Failed to fetch Garmin permissions.',
+    );
+  }
+
+  return Array.isArray(payload?.permissions) ? payload.permissions : [];
 }
 
 async function fetchFromSupabase(

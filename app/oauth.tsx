@@ -5,6 +5,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { resetActivityLoadState } from '@/lib/activityLoadState';
+import { syncGarminPermissions } from '@/lib/garmin';
 import { exchangeCodeWithSupabase } from '@/lib/strava';
 import { STRAVA_REDIRECT_URI } from '@/lib/stravaOAuth';
 import { useActivityStore } from '@/store/activityStore';
@@ -48,6 +49,7 @@ export default function OAuthCallbackScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const login = useAuthStore((s) => s.login);
+  const logout = useAuthStore((s) => s.logout);
   const tokens = useAuthStore((s) => s.tokens);
   const activeProvider = useAuthStore((s) => s.activeProvider);
   const isHydrated = useAuthStore((s) => s.isHydrated);
@@ -131,27 +133,39 @@ export default function OAuthCallbackScreen() {
           setError('Garmin login succeeded, but no access token was returned.');
           return;
         }
+        const normalizedGarminUserId = userId?.trim();
+        if (!normalizedGarminUserId) {
+          setError('Garmin login succeeded, but no user ID was returned.');
+          return;
+        }
 
-        void login({
-          provider: 'garmin',
-          accessToken,
-          refreshToken: refreshToken ?? '',
-          garminUserId: userId ?? null,
-          expiresAt:
-            Number.isFinite(accessTokenExpiresIn) && accessTokenExpiresIn > 0
-              ? Math.floor(Date.now() / 1000) + accessTokenExpiresIn
-              : Math.floor(Date.now() / 1000) + 60 * 60,
-        })
-          .then(() => {
+        void (async () => {
+          try {
+            await login({
+              provider: 'garmin',
+              accessToken,
+              refreshToken: refreshToken ?? '',
+              garminUserId: normalizedGarminUserId,
+              expiresAt:
+                Number.isFinite(accessTokenExpiresIn) && accessTokenExpiresIn > 0
+                  ? Math.floor(Date.now() / 1000) + accessTokenExpiresIn
+                  : Math.floor(Date.now() / 1000) + 60 * 60,
+            });
+            try {
+              await syncGarminPermissions(normalizedGarminUserId);
+            } catch (permissionError) {
+              await logout();
+              throw permissionError;
+            }
             clearActivities();
             resetActivityLoadState();
             resetAndReplace('/activities');
-          })
-          .catch((err) => {
+          } catch (err) {
             setError(
               err instanceof Error ? err.message : 'Garmin login failed.',
             );
-          });
+          }
+        })();
         return;
       }
     }
@@ -228,6 +242,7 @@ export default function OAuthCallbackScreen() {
     code,
     isHydrated,
     login,
+    logout,
     oauthError,
     oauthErrorDescription,
     provider,

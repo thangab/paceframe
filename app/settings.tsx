@@ -21,6 +21,7 @@ import {
   buildGarminOAuthStartUrl,
   GARMIN_APP_OAUTH_REDIRECT_URI,
 } from '@/lib/garminOAuth';
+import { deregisterGarminUser } from '@/lib/garmin';
 import { importActivitiesFromHealthKit } from '@/lib/healthkit';
 import { getMockTokens } from '@/lib/strava';
 import { buildStravaMobileAuthorizeUrl } from '@/lib/stravaOAuth';
@@ -70,6 +71,7 @@ export default function SettingsScreen() {
   const [isConnectingStrava, setIsConnectingStrava] = useState(false);
   const [isConnectingGarmin, setIsConnectingGarmin] = useState(false);
   const [isImportingHealth, setIsImportingHealth] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const isGarminConnected = Boolean(connections.garmin?.accessToken);
   const isStravaConnected =
     Boolean(connections.strava?.accessToken) &&
@@ -200,6 +202,35 @@ export default function SettingsScreen() {
     resetAndReplace('/login');
   }
 
+  async function performDeleteAccount() {
+    if (isDeletingAccount) return;
+
+    try {
+      setIsDeletingAccount(true);
+      setMessage(
+        isGarminConnected
+          ? 'Deleting account and deregistering Garmin connection...'
+          : 'Deleting account...',
+      );
+
+      const garminUserId = connections.garmin?.garminUserId?.trim();
+      if (isGarminConnected) {
+        if (!garminUserId) {
+          throw new Error('Missing Garmin user ID for deregistration.');
+        }
+        await deregisterGarminUser(garminUserId);
+      }
+
+      await performLogout();
+    } catch (err) {
+      setMessage(
+        err instanceof Error ? err.message : 'Account deletion failed.',
+      );
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  }
+
   async function activateProvider(provider: 'strava' | 'garmin' | 'mock') {
     await setActiveProvider(provider);
     clearActivities();
@@ -223,14 +254,16 @@ export default function SettingsScreen() {
   function handleDeleteAccount() {
     Alert.alert(
       'Delete account',
-      'This will remove your local PaceFrame session and clear loaded activities on this device.',
+      isGarminConnected
+        ? 'This will deregister your Garmin connection and remove your local PaceFrame session from this device.'
+        : 'This will remove your local PaceFrame session and clear loaded activities on this device.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete account',
           style: 'destructive',
           onPress: () => {
-            void performLogout();
+            void performDeleteAccount();
           },
         },
       ],
@@ -503,12 +536,12 @@ export default function SettingsScreen() {
           label: 'Disconnect',
           onPress: () => disconnectProvider('Strava'),
           variant: 'secondary',
-          disabled: isConnectingStrava,
+          disabled: isConnectingStrava || isDeletingAccount,
         },
         {
           label: 'Reconnect',
           onPress: reconnectStrava,
-          disabled: isConnectingStrava,
+          disabled: isConnectingStrava || isDeletingAccount,
         },
       ]
     : [
@@ -530,26 +563,26 @@ export default function SettingsScreen() {
                   void activateProvider('garmin');
                 },
                 variant: 'secondary' as const,
-                disabled: isConnectingGarmin,
+                disabled: isConnectingGarmin || isDeletingAccount,
               },
             ]),
         {
           label: 'Disconnect',
           onPress: () => disconnectProvider('Garmin'),
           variant: 'secondary',
-          disabled: isConnectingGarmin,
+          disabled: isConnectingGarmin || isDeletingAccount,
         },
         {
           label: 'Reconnect',
           onPress: reconnectGarmin,
-          disabled: isConnectingGarmin,
+          disabled: isConnectingGarmin || isDeletingAccount,
         },
       ]
     : [
         {
           label: 'Connect',
           onPress: handleGarminConnect,
-          disabled: isConnectingGarmin,
+          disabled: isConnectingGarmin || isDeletingAccount,
         },
       ];
 
@@ -736,6 +769,7 @@ export default function SettingsScreen() {
           icon="logout"
           onPress={handleLogout}
           variant="secondary"
+          disabled={isDeletingAccount}
         />
       </View>
 
@@ -746,6 +780,7 @@ export default function SettingsScreen() {
             icon="delete-outline"
             onPress={handleDeleteAccount}
             variant="danger"
+            disabled={isDeletingAccount}
           />
         </View>
       ) : null}
