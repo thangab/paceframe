@@ -22,7 +22,8 @@
         "NSPhotoLibraryAddUsageDescription": "PaceFrame needs access to your photo library to save exported images.",
         "NSCameraUsageDescription": "PaceFrame needs camera access so you can capture media.",
         "NSHealthShareUsageDescription": "PaceFrame reads your workouts to generate visuals from your activity data.",
-        "NSHealthUpdateUsageDescription": "PaceFrame may write workout-related metadata when you choose to save your generated content."
+        "NSHealthUpdateUsageDescription": "PaceFrame may write workout-related metadata when you choose to save your generated content.",
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
@@ -57,6 +58,7 @@
           "photosPermission": "PaceFrame needs media library access to save exported images."
         }
       ],
+      "expo-notifications",
       "expo-video",
       "expo-audio"
     ],
