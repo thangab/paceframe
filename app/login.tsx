@@ -16,6 +16,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LoginHeroCarousel from '@/components/login/LoginHeroCarousel';
 import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import {
+  buildGarminOAuthStartUrl,
+  GARMIN_APP_OAUTH_REDIRECT_URI,
+} from '@/lib/garminOAuth';
 import { importActivitiesFromHealthKit } from '@/lib/healthkit';
 import { getMockTokens } from '@/lib/strava';
 import { buildStravaMobileAuthorizeUrl } from '@/lib/stravaOAuth';
@@ -23,6 +27,7 @@ import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
 
 const STRAVA_BUTTON_ORANGE = require('../assets/strava/btn-strava-orange.png');
+const GARMIN_TAG_BLACK = require('../assets/garmin/garmin-tag-black.png');
 
 const HERO_TEMPLATE_SOURCES = [
   require('../assets/login/template1.jpg'),
@@ -88,6 +93,24 @@ export default function LoginScreen() {
       resetAndReplace('/activities');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Mock login failed.');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleGarminLogin() {
+    try {
+      setIsBusy(true);
+      setError(null);
+      const { authUrl, state } = await buildGarminOAuthStartUrl();
+      console.log('[Garmin][Login] Opening Garmin URL', {
+        authUrl,
+        redirectUri: GARMIN_APP_OAUTH_REDIRECT_URI,
+        state,
+      });
+      await Linking.openURL(authUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Garmin login failed.');
     } finally {
       setIsBusy(false);
     }
@@ -164,6 +187,25 @@ export default function LoginScreen() {
         ) : null}
 
         <View style={styles.actions}>
+          <Pressable
+            onPress={handleGarminLogin}
+            disabled={isBusy}
+            accessibilityRole="button"
+            accessibilityLabel="Connect with Garmin"
+            style={({ pressed }) => [
+              styles.garminButton,
+              pressed && !isBusy ? styles.pressed : null,
+              isBusy ? styles.disabled : null,
+            ]}
+          >
+            <Text style={styles.garminButtonText}>Connect with</Text>
+            <Image
+              source={GARMIN_TAG_BLACK}
+              resizeMode="contain"
+              style={styles.garminTagImage}
+            />
+          </Pressable>
+
           <Pressable
             onPress={handleLogin}
             disabled={isBusy}
@@ -310,6 +352,30 @@ function createStyles(colors: ThemeColors) {
     stravaButtonImage: {
       width: '100%',
       height: 56,
+    },
+    garminButton: {
+      width: '72%',
+      margin: 'auto',
+      borderRadius: 8,
+      backgroundColor: colors.solidBlack,
+      height: 64,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 0,
+    },
+    garminButtonText: {
+      color: colors.solidWhite,
+      fontSize: 16,
+      lineHeight: 20,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+    },
+    garminTagImage: {
+      height: 48,
+      width: 120,
+      margin: 0,
+      padding: 0,
     },
     demoCard: {
       borderRadius: 8,

@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router, Stack } from 'expo-router';
-import * as FileSystem from 'expo-file-system/legacy';
 import {
   ActivityIndicator,
   FlatList,
   Image,
-  Modal,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -16,10 +14,15 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ActivityCard } from '@/components/ActivityCard';
-import { PrimaryButton } from '@/components/PrimaryButton';
-import { createThemeModeOptions } from '@/components/preview/panel/data';
 import { layout, spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import {
+  getInitialStravaLoadDone,
+  getInitialStravaLoadInFlight,
+  setInitialStravaLoadDone,
+  setInitialStravaLoadInFlight,
+} from '@/lib/activityLoadState';
+import { fetchGarminActivities } from '@/lib/garmin';
 import {
   fetchActivities,
   fetchActivityPhotoHighRes,
@@ -28,12 +31,7 @@ import {
 } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
-import { usePreferencesStore } from '@/store/preferencesStore';
-import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { useThemeStore } from '@/store/themeStore';
-
-let initialStravaLoadDone = false;
-let initialStravaLoadInFlight: Promise<void> | null = null;
 
 export default function ActivitiesScreen() {
   const colors = useThemeColors();
@@ -44,37 +42,70 @@ export default function ActivitiesScreen() {
     ? 5
     : layout.floatingBottomOffset;
   const themeMode = useThemeStore((s) => s.mode);
-  const setThemeMode = useThemeStore((s) => s.setMode);
-  const distanceUnit = usePreferencesStore((s) => s.distanceUnit);
-  const elevationUnit = usePreferencesStore((s) => s.elevationUnit);
-  const setDistanceUnit = usePreferencesStore((s) => s.setDistanceUnit);
-  const setElevationUnit = usePreferencesStore((s) => s.setElevationUnit);
   const tokens = useAuthStore((s) => s.tokens);
+  const activeProvider = useAuthStore((s) => s.activeProvider);
+  const connections = useAuthStore((s) => s.connections);
   const login = useAuthStore((s) => s.login);
-  const logout = useAuthStore((s) => s.logout);
-  const isPremium = useSubscriptionStore((s) => s.isPremium);
   const activities = useActivityStore((s) => s.activities);
   const source = useActivityStore((s) => s.source);
   const clearActivities = useActivityStore((s) => s.clearActivities);
+  const activeSource =
+    source === 'healthkit'
+      ? 'healthkit'
+      : activeProvider === 'garmin'
+      ? 'garmin'
+      : 'strava';
   const selectedActivityId = useActivityStore((s) => s.selectedActivityId);
   const setActivities = useActivityStore((s) => s.setActivities);
   const updateActivity = useActivityStore((s) => s.updateActivity);
   const selectActivity = useActivityStore((s) => s.selectActivity);
-  const isHealthKitSource = source === 'healthkit';
+  const isHealthKitSource = activeSource === 'healthkit';
+  const isNonStravaSource = activeSource !== 'strava';
   const refreshColor = themeMode === 'dark' ? colors.primary : colors.textMuted;
   const hasLiveStravaSource =
-    source === 'strava' &&
+    activeSource === 'strava' &&
     Boolean(tokens?.accessToken) &&
     !(tokens?.accessToken?.startsWith('mock-') ?? false);
+  const athleteProfileUrl =
+    connections.strava?.athleteProfileUrl ?? tokens?.athleteProfileUrl ?? null;
   const hasLoadedInitialStravaRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(false);
+  const previousSourceRef = useRef<string | null>(null);
+  const previousAuthRef = useRef<string | null>(null);
   const [isPreparingPreview, setIsPreparingPreview] = useState(false);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
-  const [appCacheUsageLabel, setAppCacheUsageLabel] = useState('Cache: --');
-  const [isClearingCache, setIsClearingCache] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const authSession = `${activeProvider ?? 'none'}::${connections.garmin?.garminUserId ?? 'none'}::${connections.strava?.athleteId ?? 'none'}::${connections.mock?.athleteId ?? 'none'}`;
+    if (previousAuthRef.current && previousAuthRef.current !== authSession) {
+      setHasFinishedInitialLoad(false);
+      hasLoadedInitialStravaRef.current = false;
+      setInitialStravaLoadDone(false);
+      if (activeSource === 'garmin') {
+        clearActivities();
+      }
+    }
+    if (
+      previousSourceRef.current &&
+      previousSourceRef.current !== activeSource
+    ) {
+      setHasFinishedInitialLoad(false);
+      if (activeSource !== 'strava') {
+        hasLoadedInitialStravaRef.current = false;
+      }
+      setInitialStravaLoadDone(false);
+    }
+    previousAuthRef.current = authSession;
+    previousSourceRef.current = activeSource;
+  }, [
+    activeSource,
+    activeProvider,
+    clearActivities,
+    connections.garmin?.garminUserId,
+    connections.mock?.athleteId,
+    connections.strava?.athleteId,
+  ]);
+
   const resetAndReplace = useCallback((path: '/login' | '/activities') => {
     if (router.canGoBack()) {
       router.dismissAll();
@@ -89,6 +120,7 @@ export default function ActivitiesScreen() {
     const nowSec = Math.floor(Date.now() / 1000);
     const refreshBufferSec = 120;
     const shouldRefresh =
+      tokens.provider !== 'garmin' &&
       !tokens.accessToken.startsWith('mock-') &&
       Boolean(tokens.refreshToken) &&
       tokens.expiresAt <= nowSec + refreshBufferSec;
@@ -99,6 +131,12 @@ export default function ActivitiesScreen() {
       });
       await login(activeTokens);
     }
+    console.log('[Activities] getValidTokens', {
+      provider: activeTokens.provider,
+      hasToken: Boolean(activeTokens.accessToken),
+      garminUserId: activeTokens.garminUserId ?? null,
+      expiresAt: activeTokens.expiresAt,
+    });
 
     return activeTokens;
   }, [login, tokens]);
@@ -106,25 +144,57 @@ export default function ActivitiesScreen() {
   const loadActivities = useCallback(
     async (force = false) => {
       if (loading && !force) return;
+      console.log('[Activities] loadActivities entry', {
+        activeSource,
+        force,
+        hasFinishedInitialLoad,
+        loading,
+        activitiesLength: activities.length,
+      });
 
-      if (source === 'healthkit' && activities.length > 0) {
+      if (activeSource === 'healthkit' && activities.length > 0) {
+        console.log('[Activities] load skipped', {
+          reason: 'healthkitHasData',
+          activitiesLength: activities.length,
+        });
         return;
       }
-      if (!force && source === 'strava') {
+      if (!force && activeSource !== 'strava' && hasFinishedInitialLoad) {
+        console.log('[Activities] load skipped', {
+          reason: 'nonStravaFinished',
+          activeSource,
+          hasFinishedInitialLoad,
+        });
+        return;
+      }
+      if (!force && activeSource === 'strava') {
         if (
           activities.length > 0 ||
           hasLoadedInitialStravaRef.current ||
-          initialStravaLoadDone
+          getInitialStravaLoadDone()
         ) {
+          console.log('[Activities] load skipped', {
+            reason: 'stravaAlreadyLoaded',
+            activitiesLength: activities.length,
+            hasLoadedInitialStravaRef: hasLoadedInitialStravaRef.current,
+            initialStravaLoadDone: getInitialStravaLoadDone(),
+          });
           return;
         }
+        const initialStravaLoadInFlight = getInitialStravaLoadInFlight();
         if (initialStravaLoadInFlight) {
+          console.log('[Activities] load skipped', {
+            reason: 'stravaLoadInFlight',
+          });
           await initialStravaLoadInFlight;
           return;
         }
       }
 
-      if (!tokens?.accessToken) {
+      if (!tokens?.accessToken && activeSource !== 'healthkit') {
+        console.log('[Activities] load skipped', {
+          reason: 'missingAccessToken',
+        });
         resetAndReplace('/login');
         return;
       }
@@ -133,17 +203,52 @@ export default function ActivitiesScreen() {
         try {
           setLoading(true);
           setError(null);
+          console.log('[Activities] Loading activities', {
+            activeSource,
+            hasToken: Boolean(tokens?.accessToken),
+            provider: tokens?.provider,
+          });
           const activeTokens = await getValidTokens();
           if (!activeTokens?.accessToken) {
+            console.warn('[Activities] No active tokens after refresh');
             resetAndReplace('/login');
             return;
           }
 
+          if (activeSource === 'garmin') {
+            console.log('[Garmin][Activities] prepare fetchGarminActivities', {
+              hasToken: Boolean(activeTokens.accessToken),
+              garminUserId: activeTokens.garminUserId ?? null,
+              refreshInFlight: Boolean(getInitialStravaLoadInFlight()),
+            });
+            console.log(
+              '[Garmin][Activities] Fetching Garmin activities...',
+              activeTokens,
+            );
+            const rows = await fetchGarminActivities(
+              activeTokens.accessToken,
+              activeTokens.garminUserId ?? undefined,
+            );
+            console.log('[Garmin][Activities] Garmin activities fetched', {
+              count: rows.length,
+            });
+            setActivities(rows, 'garmin');
+            console.log('[Garmin][Activities] setActivities called', {
+              hasRows: rows.length > 0,
+            });
+            return;
+          }
+
+          console.log('[Strava][Activities] Fetching Strava activities...');
           const rows = await fetchActivities(activeTokens.accessToken);
+          console.log('[Strava][Activities] Strava activities fetched', {
+            count: rows.length,
+          });
           setActivities(rows, 'strava');
           hasLoadedInitialStravaRef.current = true;
-          initialStravaLoadDone = true;
+          setInitialStravaLoadDone(true);
         } catch (err) {
+          console.error('[Activities] Load failed', err);
           setError(
             err instanceof Error ? err.message : 'Could not load activities.',
           );
@@ -153,12 +258,13 @@ export default function ActivitiesScreen() {
         }
       };
 
-      if (!force && source === 'strava') {
-        initialStravaLoadInFlight = runLoad();
+      if (!force && activeSource === 'strava') {
+        setInitialStravaLoadInFlight(runLoad());
         try {
+          const initialStravaLoadInFlight = getInitialStravaLoadInFlight();
           await initialStravaLoadInFlight;
         } finally {
-          initialStravaLoadInFlight = null;
+          setInitialStravaLoadInFlight(null);
         }
         return;
       }
@@ -166,11 +272,12 @@ export default function ActivitiesScreen() {
       await runLoad();
     },
     [
-      source,
+      activeSource,
       activities.length,
       tokens,
       setActivities,
       getValidTokens,
+      hasFinishedInitialLoad,
       loading,
       resetAndReplace,
     ],
@@ -180,99 +287,11 @@ export default function ActivitiesScreen() {
     void loadActivities();
   }, [loadActivities]);
 
-  async function handleLogout() {
-    setIsProfileMenuOpen(false);
-    await logout();
-    initialStravaLoadDone = false;
-    initialStravaLoadInFlight = null;
-    hasLoadedInitialStravaRef.current = false;
-    clearActivities();
-    resetAndReplace('/login');
-  }
-
-  const directorySizeBytes = useCallback(
-    async (dirUri: string): Promise<number> => {
-      try {
-        const entries = await FileSystem.readDirectoryAsync(dirUri);
-        let total = 0;
-        for (const name of entries) {
-          const child = `${dirUri}${name}`;
-          const info = await FileSystem.getInfoAsync(child);
-          if (!info.exists) continue;
-          if (info.isDirectory) {
-            total += await directorySizeBytes(`${child}/`);
-          } else if (typeof info.size === 'number') {
-            total += info.size;
-          }
-        }
-        return total;
-      } catch {
-        return 0;
-      }
-    },
-    [],
-  );
-
-  const refreshAppCacheUsage = useCallback(async () => {
-    const cacheDir = FileSystem.cacheDirectory;
-    if (!cacheDir) {
-      setAppCacheUsageLabel('Cache: unavailable');
-      return;
-    }
-
-    const bytes = await directorySizeBytes(cacheDir);
-    const mb = bytes / (1024 * 1024);
-    setAppCacheUsageLabel(`Cache: ${mb.toFixed(mb >= 100 ? 0 : 1)} MB`);
-  }, [directorySizeBytes]);
-
-  async function clearDirectory(dirUri: string) {
-    const entries = await FileSystem.readDirectoryAsync(dirUri);
-    for (const name of entries) {
-      const child = `${dirUri}${name}`;
-      const info = await FileSystem.getInfoAsync(child);
-      if (!info.exists) continue;
-      if (info.isDirectory) {
-        await clearDirectory(`${child}/`);
-      }
-      await FileSystem.deleteAsync(child, { idempotent: true });
-    }
-  }
-
-  async function clearAppCache() {
-    if (isClearingCache) return;
-    const cacheDir = FileSystem.cacheDirectory;
-    if (!cacheDir) {
-      setSettingsMessage('Cache unavailable.');
-      return;
-    }
-
-    try {
-      setIsClearingCache(true);
-      setSettingsMessage('Clearing cache...');
-      await clearDirectory(cacheDir);
-      await refreshAppCacheUsage();
-      setSettingsMessage('Cache cleared.');
-    } catch (err) {
-      setSettingsMessage(
-        err instanceof Error
-          ? `Could not clear cache (${err.message}).`
-          : 'Could not clear cache.',
-      );
-    } finally {
-      setIsClearingCache(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!isProfileMenuOpen) return;
-    void refreshAppCacheUsage();
-  }, [isProfileMenuOpen, refreshAppCacheUsage]);
-
   async function handleOpenPreview(
     target: '/preview' | '/preview?mode=templates',
   ) {
     if (!selectedActivityId) return;
-    if (isHealthKitSource) {
+    if (isNonStravaSource) {
       router.push(target);
       return;
     }
@@ -350,18 +369,18 @@ export default function ActivitiesScreen() {
           headerLeft: () => (
             <View style={styles.navAvatarContainer}>
               <Pressable
-                onPress={() => setIsProfileMenuOpen(true)}
+                onPress={() => router.push('/settings')}
                 style={({ pressed }) => [
                   styles.avatarTrigger,
                   pressed ? styles.avatarTriggerPressed : null,
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel="Open profile menu"
+                accessibilityLabel="Open settings"
               >
                 <View style={styles.navAvatarWrap}>
-                  {tokens?.athleteProfileUrl ? (
+                  {athleteProfileUrl ? (
                     <Image
-                      source={{ uri: tokens.athleteProfileUrl }}
+                      source={{ uri: athleteProfileUrl }}
                       style={styles.navAvatar}
                     />
                   ) : (
@@ -386,135 +405,6 @@ export default function ActivitiesScreen() {
           ),
         }}
       />
-      <Modal
-        visible={isProfileMenuOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsProfileMenuOpen(false)}
-      >
-        <Pressable
-          style={styles.menuOverlay}
-          onPress={() => setIsProfileMenuOpen(false)}
-        >
-          <Pressable style={styles.profileMenu} onPress={() => {}}>
-            <Text style={styles.profileMenuTitle}>Settings</Text>
-            <Text style={styles.menuSectionLabel}>Theme</Text>
-            <View style={styles.menuChipsRow}>
-              {createThemeModeOptions().map((item) => {
-                const selected = item.id === themeMode;
-                return (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => {
-                      void setThemeMode(item.id);
-                    }}
-                    style={[
-                      styles.menuChip,
-                      selected ? styles.menuChipSelected : null,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.menuChipText,
-                        selected ? styles.menuChipTextSelected : null,
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={styles.menuSectionLabel}>Units</Text>
-            <View style={styles.menuChipsRow}>
-              {[
-                { id: 'metric', label: 'Metric' },
-                { id: 'imperial', label: 'Imperial' },
-              ].map((item) => {
-                const selected =
-                  item.id === 'metric'
-                    ? distanceUnit === 'km' && elevationUnit === 'm'
-                    : distanceUnit === 'mi' && elevationUnit === 'ft';
-                return (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => {
-                      if (item.id === 'metric') {
-                        void Promise.all([
-                          setDistanceUnit('km'),
-                          setElevationUnit('m'),
-                        ]);
-                        return;
-                      }
-                      void Promise.all([
-                        setDistanceUnit('mi'),
-                        setElevationUnit('ft'),
-                      ]);
-                    }}
-                    style={[
-                      styles.menuChip,
-                      selected ? styles.menuChipSelected : null,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.menuChipText,
-                        selected ? styles.menuChipTextSelected : null,
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={styles.menuNote}>{appCacheUsageLabel}</Text>
-            {settingsMessage ? (
-              <Text style={styles.menuNote}>{settingsMessage}</Text>
-            ) : null}
-            <View style={styles.menuButtonWrap}>
-              <PrimaryButton
-                label="Clear cache"
-                icon="broom"
-                onPress={() => {
-                  void clearAppCache();
-                }}
-                disabled={isClearingCache}
-                variant="secondary"
-                colorScheme="panel"
-                compact
-              />
-            </View>
-            {!isPremium ? (
-              <View style={styles.menuButtonWrap}>
-                <PrimaryButton
-                  label="Unlock Premium Layouts"
-                  onPress={() => {
-                    setIsProfileMenuOpen(false);
-                    router.push('/paywall');
-                  }}
-                  variant="secondary"
-                  compact
-                />
-              </View>
-            ) : null}
-            <Pressable
-              onPress={handleLogout}
-              style={[styles.menuItem, styles.menuLogoutButton]}
-              accessibilityRole="button"
-              accessibilityLabel="Logout"
-            >
-              <MaterialCommunityIcons
-                name="logout"
-                size={18}
-                color={colors.danger}
-                style={{ transform: [{ scaleX: -1 }] }}
-              />
-              <Text style={styles.logoutText}>Logout</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
       <View style={styles.container}>
         <LinearGradient
           pointerEvents="none"
@@ -734,112 +624,6 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.surface,
       alignItems: 'center',
       justifyContent: 'center',
-    },
-    menuOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(4, 9, 19, 0.35)',
-      justifyContent: 'flex-start',
-      alignItems: 'flex-start',
-    },
-    profileMenu: {
-      marginTop: 98,
-      marginLeft: 14,
-      width: 280,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-      paddingVertical: 8,
-      paddingHorizontal: 8,
-      shadowColor: colors.text,
-      shadowOpacity: 0.16,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 8 },
-      elevation: 10,
-    },
-    profileMenuTitle: {
-      color: colors.textMuted,
-      fontSize: 12,
-      fontWeight: '700',
-      letterSpacing: 0.3,
-      paddingHorizontal: 8,
-      paddingBottom: 6,
-      textTransform: 'uppercase',
-    },
-    menuSectionLabel: {
-      color: colors.textMuted,
-      fontSize: 12,
-      fontWeight: '700',
-      paddingHorizontal: 8,
-      paddingTop: 4,
-      paddingBottom: 6,
-    },
-    menuChipsRow: {
-      flexDirection: 'row',
-      gap: 8,
-      paddingHorizontal: 8,
-      paddingBottom: 6,
-    },
-    menuChip: {
-      flex: 1,
-      minHeight: 34,
-      borderRadius: 999,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surfaceAlt,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-    },
-    menuChipSelected: {
-      borderColor: colors.primaryBorderOnLight,
-      backgroundColor: `${colors.primary}22`,
-    },
-    menuChipText: {
-      color: colors.text,
-      fontSize: 12,
-      fontWeight: '700',
-    },
-    menuChipTextSelected: {
-      color: colors.text,
-    },
-    menuNote: {
-      color: colors.textMuted,
-      fontSize: 12,
-      paddingHorizontal: 8,
-      paddingTop: 2,
-      paddingBottom: 6,
-    },
-    menuButtonWrap: {
-      paddingHorizontal: 8,
-      paddingBottom: 8,
-    },
-    menuItem: {
-      minHeight: 40,
-      borderRadius: 10,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-    },
-    menuLogoutButton: {
-      marginTop: 4,
-      borderWidth: 1,
-      borderColor: `${colors.danger}55`,
-      backgroundColor: `${colors.danger}14`,
-      justifyContent: 'center',
-    },
-    menuItemText: {
-      color: colors.text,
-      fontSize: 14,
-      fontWeight: '700',
-    },
-    logoutText: {
-      color: colors.danger,
-      fontSize: 14,
-      fontWeight: '700',
     },
     navAvatar: {
       width: '100%',

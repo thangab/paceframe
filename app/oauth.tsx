@@ -4,8 +4,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { resetActivityLoadState } from '@/lib/activityLoadState';
+import { syncGarminPermissions } from '@/lib/garmin';
 import { exchangeCodeWithSupabase } from '@/lib/strava';
 import { STRAVA_REDIRECT_URI } from '@/lib/stravaOAuth';
+import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
 
 function isStaleOAuthCodeError(message: string) {
@@ -46,26 +49,54 @@ export default function OAuthCallbackScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const login = useAuthStore((s) => s.login);
+  const logout = useAuthStore((s) => s.logout);
   const tokens = useAuthStore((s) => s.tokens);
+  const activeProvider = useAuthStore((s) => s.activeProvider);
   const isHydrated = useAuthStore((s) => s.isHydrated);
+  const clearActivities = useActivityStore((s) => s.clearActivities);
   const {
     code: rawCode,
+    provider: rawProvider,
+    status: rawStatus,
+    user_id: rawUserId,
+    access_token: rawAccessToken,
+    refresh_token: rawRefreshToken,
+    expires_in: rawExpiresIn,
     error: rawError,
     error_description: rawErrorDescription,
     scope: rawScope,
   } = useLocalSearchParams<{
     code?: string | string[];
+    provider?: string | string[];
+    status?: string | string[];
+    user_id?: string | string[];
+    access_token?: string | string[];
+    refresh_token?: string | string[];
+    expires_in?: string | string[];
     error?: string | string[];
     error_description?: string | string[];
     scope?: string | string[];
   }>();
   const code = Array.isArray(rawCode) ? rawCode[0] : rawCode;
+  const provider = Array.isArray(rawProvider) ? rawProvider[0] : rawProvider;
+  const status = Array.isArray(rawStatus) ? rawStatus[0] : rawStatus;
+  const userId = Array.isArray(rawUserId) ? rawUserId[0] : rawUserId;
+  const accessToken = Array.isArray(rawAccessToken)
+    ? rawAccessToken[0]
+    : rawAccessToken;
+  const refreshToken = Array.isArray(rawRefreshToken)
+    ? rawRefreshToken[0]
+    : rawRefreshToken;
+  const expiresIn = Array.isArray(rawExpiresIn)
+    ? rawExpiresIn[0]
+    : rawExpiresIn;
   const oauthError = Array.isArray(rawError) ? rawError[0] : rawError;
   const oauthErrorDescription = Array.isArray(rawErrorDescription)
     ? rawErrorDescription[0]
     : rawErrorDescription;
   const scope = Array.isArray(rawScope) ? rawScope[0] : rawScope;
   const handledCodeRef = useRef<string | null>(null);
+  const handledGarminRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   function resetAndReplace(path: '/activities' | '/login') {
@@ -78,9 +109,65 @@ export default function OAuthCallbackScreen() {
   useEffect(() => {
     if (!isHydrated) return;
 
-    if (tokens?.accessToken) {
-      resetAndReplace('/activities');
-      return;
+    if (provider === 'garmin') {
+      if (status === 'error' || oauthError) {
+        if (/access_denied/i.test(oauthError ?? '')) {
+          setError(
+            'Garmin authorization was cancelled. Please allow access to continue.',
+          );
+          return;
+        }
+        setError(
+          oauthErrorDescription
+            ? `${oauthError ?? 'garmin_oauth_error'}: ${oauthErrorDescription}`
+            : 'Garmin login failed.',
+        );
+        return;
+      }
+
+      if (status === 'success') {
+        if (handledGarminRef.current) return;
+        handledGarminRef.current = true;
+        const accessTokenExpiresIn = Number(expiresIn);
+        if (!accessToken) {
+          setError('Garmin login succeeded, but no access token was returned.');
+          return;
+        }
+        const normalizedGarminUserId = userId?.trim();
+        if (!normalizedGarminUserId) {
+          setError('Garmin login succeeded, but no user ID was returned.');
+          return;
+        }
+
+        void (async () => {
+          try {
+            await login({
+              provider: 'garmin',
+              accessToken,
+              refreshToken: refreshToken ?? '',
+              garminUserId: normalizedGarminUserId,
+              expiresAt:
+                Number.isFinite(accessTokenExpiresIn) && accessTokenExpiresIn > 0
+                  ? Math.floor(Date.now() / 1000) + accessTokenExpiresIn
+                  : Math.floor(Date.now() / 1000) + 60 * 60,
+            });
+            try {
+              await syncGarminPermissions(normalizedGarminUserId);
+            } catch (permissionError) {
+              await logout();
+              throw permissionError;
+            }
+            clearActivities();
+            resetActivityLoadState();
+            resetAndReplace('/activities');
+          } catch (err) {
+            setError(
+              err instanceof Error ? err.message : 'Garmin login failed.',
+            );
+          }
+        })();
+        return;
+      }
     }
 
     if (oauthError) {
@@ -112,6 +199,10 @@ export default function OAuthCallbackScreen() {
     }
 
     if (!code || typeof code !== 'string') {
+      if (tokens?.accessToken || activeProvider) {
+        resetAndReplace('/activities');
+        return;
+      }
       resetAndReplace('/login');
       return;
     }
@@ -130,6 +221,8 @@ export default function OAuthCallbackScreen() {
         );
         if (cancelled) return;
         await login(tokens);
+        clearActivities();
+        resetActivityLoadState();
         resetAndReplace('/activities');
       } catch (err) {
         if (cancelled) return;
@@ -149,10 +242,19 @@ export default function OAuthCallbackScreen() {
     code,
     isHydrated,
     login,
+    logout,
     oauthError,
     oauthErrorDescription,
+    provider,
+    userId,
     scope,
+    status,
+    accessToken,
+    expiresIn,
+    refreshToken,
+    activeProvider,
     tokens?.accessToken,
+    clearActivities,
   ]);
 
   if (!error) {
