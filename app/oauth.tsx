@@ -5,7 +5,11 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { resetActivityLoadState } from '@/lib/activityLoadState';
-import { syncGarminPermissions } from '@/lib/garmin';
+import {
+  hasHistoricalDataExportPermission,
+  syncGarminPermissions,
+  triggerGarminBackfill,
+} from '@/lib/garmin';
 import { exchangeCodeWithSupabase } from '@/lib/strava';
 import { STRAVA_REDIRECT_URI } from '@/lib/stravaOAuth';
 import { useActivityStore } from '@/store/activityStore';
@@ -152,7 +156,12 @@ export default function OAuthCallbackScreen() {
                   : Math.floor(Date.now() / 1000) + 60 * 60,
             });
             try {
-              await syncGarminPermissions(normalizedGarminUserId);
+              const permissions = await syncGarminPermissions(
+                normalizedGarminUserId,
+              );
+              if (hasHistoricalDataExportPermission(permissions)) {
+                await triggerGarminBackfill(normalizedGarminUserId);
+              }
             } catch (permissionError) {
               await logout();
               throw permissionError;

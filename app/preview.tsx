@@ -147,6 +147,7 @@ export default function PreviewScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const activity = useActivityStore((s) => s.selectedActivity());
+  const activitySource = useActivityStore((s) => s.source);
   const isPremium = useSubscriptionStore((s) => s.isPremium);
   const [busy, setBusy] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
@@ -2681,6 +2682,8 @@ export default function PreviewScreen() {
           setSelectedLayer={selectLayer}
           baseLayerZ={baseLayerZ}
           activityName={activity.name}
+          activitySource={activitySource}
+          deviceName={activity.device_name?.trim() || null}
           dateText={dateText}
           locationText={locationText}
           headerVisible={activeHeaderVisible}

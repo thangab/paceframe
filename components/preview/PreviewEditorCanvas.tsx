@@ -123,6 +123,8 @@ type Props = {
   setSelectedLayer: (next: LayerId) => void;
   baseLayerZ: (id: LayerId) => number;
   activityName: string;
+  activitySource: 'strava' | 'garmin' | 'healthkit';
+  deviceName: string | null;
   dateText: string;
   locationText: string;
   headerVisible: HeaderVisibility;
@@ -264,6 +266,8 @@ export function PreviewEditorCanvas({
   setSelectedLayer,
   baseLayerZ,
   activityName,
+  activitySource,
+  deviceName,
   dateText,
   locationText,
   headerVisible,
@@ -705,6 +709,8 @@ export function PreviewEditorCanvas({
   const usesSunsetHeader =
     template.layout === 'sunset-hero' || template.layout === 'morning-glass';
   const usesLayoutHeader = usesSunsetHeader || template.layout === 'split-bold';
+  const fixedDeviceName =
+    activitySource === 'garmin' ? deviceName?.trim() || null : null;
   const hasHeaderContent =
     (headerVisible.title && activityName.length > 0) ||
     (headerVisible.date && dateText.length > 0) ||
@@ -2936,7 +2942,20 @@ export function PreviewEditorCanvas({
               )
             : null}
 
-          {!isPremium ? <Text style={styles.watermark}>PACEFRAME</Text> : null}
+          {fixedDeviceName ? (
+            <Text
+              style={styles.deviceAttribution}
+              selectable={false}
+              numberOfLines={1}
+            >
+              {fixedDeviceName}
+            </Text>
+          ) : null}
+          {!isPremium ? (
+            <Text style={styles.watermark} selectable={false}>
+              PACEFRAME
+            </Text>
+          ) : null}
         </View>
       </Animated.View>
     </View>
@@ -3279,6 +3298,17 @@ function createStyles(colors: ThemeColors) {
       color: colors.watermarkOnImage,
       fontWeight: '800',
       letterSpacing: 1,
+      zIndex: 5000,
+      elevation: 5000,
+    },
+    deviceAttribution: {
+      position: 'absolute',
+      left: 14,
+      bottom: 16,
+      maxWidth: '70%',
+      color: colors.watermarkOnImage,
+      fontWeight: '800',
+      letterSpacing: 0.6,
       zIndex: 5000,
       elevation: 5000,
     },

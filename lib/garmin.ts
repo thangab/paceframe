@@ -12,6 +12,8 @@ type GarminPermissionsResponse = {
   permissions?: string[];
 };
 
+const HISTORICAL_DATA_EXPORT_PERMISSION = 'HISTORICAL_DATA_EXPORT';
+
 function toNumber(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   return 0;
@@ -157,7 +159,9 @@ function mapRow(
   };
 }
 
-async function triggerBackfill(garminUserId: string): Promise<void> {
+export async function triggerGarminBackfill(
+  garminUserId: string,
+): Promise<void> {
   const body = JSON.stringify({ garmin_user_id: garminUserId });
   const response = await fetch(BACKFILL_URL, {
     method: 'POST',
@@ -173,6 +177,15 @@ async function triggerBackfill(garminUserId: string): Promise<void> {
     const message = await response.text();
     throw new Error(message || 'Backfill request failed.');
   }
+}
+
+export function hasHistoricalDataExportPermission(
+  permissions: string[],
+): boolean {
+  return permissions.some(
+    (permission) =>
+      permission.trim().toUpperCase() === HISTORICAL_DATA_EXPORT_PERMISSION,
+  );
 }
 
 export async function deregisterGarminUser(
@@ -286,10 +299,5 @@ export async function fetchGarminActivities(
     throw new Error('Missing garminUserId.');
   }
 
-  const [activities] = await Promise.all([
-    fetchFromSupabase(normalizedGarminUserId),
-    triggerBackfill(normalizedGarminUserId),
-  ]);
-
-  return activities;
+  return fetchFromSupabase(normalizedGarminUserId);
 }
