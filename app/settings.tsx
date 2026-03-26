@@ -189,9 +189,6 @@ export default function SettingsScreen() {
   );
 
   const resetAndReplace = useCallback((path: '/activities' | '/login') => {
-    if (router.canGoBack()) {
-      router.dismissAll();
-    }
     router.replace(path);
   }, []);
 

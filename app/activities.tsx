@@ -107,9 +107,6 @@ export default function ActivitiesScreen() {
   ]);
 
   const resetAndReplace = useCallback((path: '/login' | '/activities') => {
-    if (router.canGoBack()) {
-      router.dismissAll();
-    }
     router.replace(path);
   }, []);
 

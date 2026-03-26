@@ -104,9 +104,6 @@ export default function OAuthCallbackScreen() {
   const [error, setError] = useState<string | null>(null);
 
   function resetAndReplace(path: '/activities' | '/login') {
-    if (router.canGoBack()) {
-      router.dismissAll();
-    }
     router.replace(path);
   }
 
