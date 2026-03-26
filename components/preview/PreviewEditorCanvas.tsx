@@ -710,7 +710,7 @@ export function PreviewEditorCanvas({
     template.layout === 'sunset-hero' || template.layout === 'morning-glass';
   const usesLayoutHeader = usesSunsetHeader || template.layout === 'split-bold';
   const fixedDeviceName =
-    activitySource === 'garmin' ? deviceName?.trim() || null : null;
+    activitySource === 'garmin' ? deviceName?.trim() || 'Garmin' : null;
   const hasHeaderContent =
     (headerVisible.title && activityName.length > 0) ||
     (headerVisible.date && dateText.length > 0) ||
