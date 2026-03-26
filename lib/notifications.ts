@@ -10,8 +10,8 @@ type PushRegistrationPayload = {
   expo_push_token: string;
   platform: string;
   active_provider: AuthProvider | null;
-  garmin_user_id: string | null;
-  strava_athlete_id: number | null;
+  garmin_user_id?: string;
+  strava_athlete_id?: number;
 };
 
 function getProjectId() {
@@ -65,13 +65,21 @@ export async function registerPushTokenWithBackend(params: {
     return;
   }
 
+  const garminUserId = params.connections.garmin?.garminUserId?.trim();
+  const stravaAthleteId = params.connections.strava?.athleteId;
   const payload: PushRegistrationPayload = {
     expo_push_token: params.expoPushToken,
     platform: Platform.OS,
     active_provider: params.activeProvider,
-    garmin_user_id: params.connections.garmin?.garminUserId ?? null,
-    strava_athlete_id: params.connections.strava?.athleteId ?? null,
   };
+
+  if (garminUserId) {
+    payload.garmin_user_id = garminUserId;
+  }
+
+  if (typeof stravaAthleteId === 'number') {
+    payload.strava_athlete_id = stravaAthleteId;
+  }
 
   const response = await fetch(PUSH_REGISTRATION_URL, {
     method: 'POST',

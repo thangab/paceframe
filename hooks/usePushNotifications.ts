@@ -47,11 +47,15 @@ export function usePushNotifications() {
     if (!isHydrated) return;
 
     const garminUserId = connections.garmin?.garminUserId?.trim();
+    const stravaAthleteId = connections.strava?.athleteId ?? null;
     const isGarminConnected = Boolean(
       connections.garmin?.accessToken && garminUserId,
     );
+    const isStravaConnected = Boolean(
+      connections.strava?.accessToken && stravaAthleteId,
+    );
 
-    if (!isGarminConnected) {
+    if (!isGarminConnected && !isStravaConnected) {
       lastSyncedKeyRef.current = null;
       return;
     }
@@ -65,8 +69,9 @@ export function usePushNotifications() {
 
         const syncKey = [
           expoPushToken,
-          activeProvider === 'garmin' ? 'garmin' : 'other',
+          activeProvider ?? 'none',
           garminUserId,
+          stravaAthleteId,
         ].join('::');
 
         if (lastSyncedKeyRef.current === syncKey) {

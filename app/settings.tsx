@@ -770,7 +770,7 @@ export default function SettingsScreen() {
         />
       </View>
 
-      {isGarminConnected || isStravaConnected ? (
+      {isGarminActive ? (
         <View style={styles.deleteWrap}>
           <PrimaryButton
             label="Delete account"
