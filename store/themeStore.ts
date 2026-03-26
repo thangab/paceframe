@@ -13,7 +13,7 @@ type ThemeState = {
 const THEME_MODE_KEY = 'paceframe.theme.mode';
 
 export const useThemeStore = create<ThemeState>((set) => ({
-  mode: 'light',
+  mode: 'dark',
   isHydrated: false,
   hydrate: async () => {
     try {
