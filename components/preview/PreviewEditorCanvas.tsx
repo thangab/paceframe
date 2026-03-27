@@ -737,6 +737,8 @@ export function PreviewEditorCanvas({
         return Math.round(430 * canvasScaleY);
       case 'morning-glass':
         return Math.round(452 * canvasScaleY);
+      case 'mile-ring':
+        return Math.round(118 * canvasScaleY);
       case 'split-bold': {
         const estimatedStatsHeight = Math.max(
           120,
@@ -803,7 +805,10 @@ export function PreviewEditorCanvas({
     }
   })();
   const defaultRouteY = (() => {
-    if (template.layout === 'sunset-hero') {
+    if (
+      template.layout === 'sunset-hero' ||
+      template.layout === 'mile-ring'
+    ) {
       return Math.max(
         0,
         Math.round((canvasDisplayHeight - routeLayerHeightDisplay) / 2),
@@ -812,7 +817,10 @@ export function PreviewEditorCanvas({
     return routeInitialYDisplay;
   })();
   const defaultRouteX = (() => {
-    if (template.layout === 'sunset-hero') {
+    if (
+      template.layout === 'sunset-hero' ||
+      template.layout === 'mile-ring'
+    ) {
       return Math.max(
         0,
         Math.round((canvasDisplayWidth - routeLayerWidthDisplay) / 2),

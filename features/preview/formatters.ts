@@ -156,6 +156,7 @@ export function getDynamicStatsWidth(template: StatsLayout, visibleCount: number
 export function getLayoutMetricLimit(template: StatsLayout) {
   switch (template.layout) {
     case 'sunset-hero':
+    case 'mile-ring':
       return 5;
     case 'morning-glass':
       return 6;

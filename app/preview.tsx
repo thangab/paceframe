@@ -1100,6 +1100,18 @@ export default function PreviewScreen() {
       };
     }
 
+    if (layout === 'mile-ring') {
+      return {
+        distance: true,
+        time: statsFieldAvailability.time,
+        pace: statsFieldAvailability.pace,
+        elev: statsFieldAvailability.elev,
+        cadence: false,
+        calories: statsFieldAvailability.calories,
+        avgHr: false,
+      };
+    }
+
     return DEFAULT_VISIBLE_FIELDS;
   }
 
@@ -2149,7 +2161,11 @@ export default function PreviewScreen() {
       return;
     }
     setSelectedLayoutId(next.id);
-    if (next.layout === 'sunset-hero' || next.layout === 'morning-glass') {
+    if (
+      next.layout === 'sunset-hero' ||
+      next.layout === 'morning-glass' ||
+      next.layout === 'mile-ring'
+    ) {
       setVisible(getDefaultVisibleFieldsForLayout(next.layout));
     }
     if (

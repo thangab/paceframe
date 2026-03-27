@@ -255,6 +255,67 @@ export function StatsLayerContent({
     );
   }
 
+  if (template.layout === 'mile-ring') {
+    const orbitMetrics = metrics
+      .filter((metric) => metric.id !== 'distance')
+      .slice(0, 4)
+      .map((metric) => formatMileRingMetric(metric.id, metric.value));
+    const splitIndex = Math.ceil(orbitMetrics.length / 2);
+    const topArcText = orbitMetrics.slice(0, splitIndex).join(' • ');
+    const bottomArcText = orbitMetrics.slice(splitIndex).join(' • ');
+
+    return (
+      <View style={styles.mileRingWrap}>
+        <View style={styles.mileRingBody}>
+          {topArcText ? (
+            <ArcMetricText
+              value={topArcText}
+              fontPreset={fontPreset}
+              centerAngle={270}
+              spanDeg={104}
+              orientation="top"
+              color={layerTextColor}
+            />
+          ) : null}
+
+          {bottomArcText ? (
+            <ArcMetricText
+              value={bottomArcText}
+              fontPreset={fontPreset}
+              centerAngle={90}
+              spanDeg={112}
+              orientation="bottom"
+              color={layerTextColor}
+            />
+          ) : null}
+
+          <View
+            style={[
+              styles.mileRingCircle,
+              layerTextColor ? { borderColor: layerTextColor } : null,
+            ]}
+          >
+            {metrics[0] ? (
+              <View style={styles.mileRingPrimaryInline}>
+                <ValueWithUnit
+                  value={metrics[0].value}
+                  fontPreset={fontPreset}
+                  valueStyle={styles.mileRingPrimaryValue}
+                  unitStyle={styles.mileRingPrimaryUnit}
+                  textStyleOverride={textColorOverride}
+                  unitStyleOverride={textColorOverride}
+                  numberOfLines={1}
+                  autoFit
+                  minimumFontScale={0.74}
+                />
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   const layoutKind = resolveLayoutKind(template.layout);
 
   return (
@@ -605,6 +666,93 @@ function splitBoldLabel(metricId: string) {
     default:
       return metricId.toUpperCase();
   }
+}
+
+function formatMileRingMetric(metricId: string, value: string) {
+  const normalized = value.trim().toUpperCase();
+  if (metricId === 'calories') {
+    return normalized.endsWith('CAL') ? normalized : `${normalized} CAL`;
+  }
+  return normalized;
+}
+
+function ArcMetricText({
+  value,
+  fontPreset,
+  centerAngle,
+  spanDeg,
+  orientation,
+  color,
+}: {
+  value: string;
+  fontPreset: FontPreset;
+  centerAngle: number;
+  spanDeg: number;
+  orientation: 'top' | 'bottom';
+  color?: string;
+}) {
+  const content = value.replace(/\s+/g, '\u00A0');
+  const chars = Array.from(content);
+  const center = 160;
+  const radius = orientation === 'top' ? 150 : 148;
+  const charWidth = 17;
+  const charHeight = 24;
+  const weights = chars.map((char) => {
+    if (char === '\u00A0') return 0.42;
+    if (char === '•') return 0.58;
+    if (/[0-9]/.test(char)) return 0.96;
+    return 0.88;
+  });
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  const totalSpan = Math.max(0, spanDeg);
+  let cursor = -totalSpan / 2;
+
+  return (
+    <View pointerEvents="none" style={styles.mileRingArcLayer}>
+      {chars.map((char, index) => {
+        const weight = weights[index] ?? 1;
+        const charSpan =
+          totalWeight > 0 ? (weight / totalWeight) * totalSpan : 0;
+        const angleOffset = cursor + charSpan / 2;
+        const angle =
+          orientation === 'top'
+            ? centerAngle + angleOffset
+            : centerAngle - angleOffset;
+        cursor += charSpan;
+        const theta = (angle * Math.PI) / 180;
+        const x = center + radius * Math.cos(theta);
+        const y = center + radius * Math.sin(theta);
+        const rotation = orientation === 'top' ? angle + 90 : angle - 90;
+
+        return (
+          <View
+            key={`${char}-${index}-${angle}`}
+            style={[
+              styles.mileRingArcCharWrap,
+              {
+                left: x - charWidth / 2,
+                top: y - charHeight / 2,
+                width: charWidth,
+                height: charHeight,
+                transform: [{ rotate: `${rotation}deg` }],
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.mileRingArcChar,
+                color ? { color } : null,
+                char === '•' ? styles.mileRingArcBullet : null,
+                { fontFamily: fontPreset.family },
+              ]}
+            >
+              {char}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
 }
 
 export function PrimaryStatLayerContent({
@@ -1205,6 +1353,76 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     textAlign: 'left',
     paddingLeft: 2,
+  },
+  mileRingWrap: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  mileRingArcValue: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textAlign: 'center',
+  },
+  mileRingBody: {
+    width: 320,
+    minHeight: 320,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  mileRingArcLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 320,
+    height: 320,
+    zIndex: 2,
+  },
+  mileRingArcCharWrap: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mileRingArcChar: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: -0.15,
+    textAlign: 'center',
+  },
+  mileRingArcBullet: {
+    letterSpacing: -0.4,
+  },
+  mileRingCircle: {
+    width: 276,
+    height: 276,
+    borderRadius: 999,
+    borderWidth: 1.4,
+    borderColor: 'rgba(255,255,255,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.06)',
+  },
+  mileRingPrimaryInline: {
+    width: '74%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mileRingPrimaryValue: {
+    color: '#FFFFFF',
+    fontSize: 82,
+    lineHeight: 90,
+    letterSpacing: -3,
+    textAlign: 'center',
+  },
+  mileRingPrimaryUnit: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: 1.6,
   },
   splitBoldMetric: {
     marginBottom: 4,

@@ -24,7 +24,8 @@ export type StatsLayoutKind =
   | 'panel-grid'
   | 'sunset-hero'
   | 'morning-glass'
-  | 'split-bold';
+  | 'split-bold'
+  | 'mile-ring';
 export type BaseLayerId =
   | 'meta'
   | 'stats'

@@ -57,6 +57,8 @@ export function getLayoutPreviewHeight(layout: StatsLayoutKind) {
     case 'sunset-hero':
     case 'morning-glass':
       return 190;
+    case 'mile-ring':
+      return 246;
     case 'split-bold':
       return 228;
     case 'vertical':
