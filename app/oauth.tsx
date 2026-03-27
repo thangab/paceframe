@@ -10,7 +10,10 @@ import {
   syncGarminPermissions,
   triggerGarminBackfill,
 } from '@/lib/garmin';
-import { exchangeCodeWithSupabase } from '@/lib/strava';
+import {
+  exchangeCodeWithSupabase,
+  syncStravaActivitiesWithSupabase,
+} from '@/lib/strava';
 import { STRAVA_REDIRECT_URI } from '@/lib/stravaOAuth';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
@@ -227,6 +230,12 @@ export default function OAuthCallbackScreen() {
         );
         if (cancelled) return;
         await login(tokens);
+        if (tokens.athleteId) {
+          await syncStravaActivitiesWithSupabase({
+            athleteId: tokens.athleteId,
+            limit: 30,
+          });
+        }
         clearActivities();
         resetActivityLoadState();
         resetAndReplace('/activities');

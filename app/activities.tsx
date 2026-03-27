@@ -24,9 +24,7 @@ import {
 } from '@/lib/activityLoadState';
 import { fetchGarminActivities } from '@/lib/garmin';
 import {
-  fetchActivities,
-  fetchActivityPhotoHighRes,
-  fetchActivityStreams,
+  fetchActivitiesFromSupabase,
   refreshTokensWithSupabase,
 } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
@@ -57,10 +55,8 @@ export default function ActivitiesScreen() {
       : 'strava';
   const selectedActivityId = useActivityStore((s) => s.selectedActivityId);
   const setActivities = useActivityStore((s) => s.setActivities);
-  const updateActivity = useActivityStore((s) => s.updateActivity);
   const selectActivity = useActivityStore((s) => s.selectActivity);
   const isHealthKitSource = activeSource === 'healthkit';
-  const isNonStravaSource = activeSource !== 'strava';
   const refreshColor = themeMode === 'dark' ? colors.primary : colors.textMuted;
   const hasLiveStravaSource =
     activeSource === 'strava' &&
@@ -237,7 +233,13 @@ export default function ActivitiesScreen() {
           }
 
           console.log('[Strava][Activities] Fetching Strava activities...');
-          const rows = await fetchActivities(activeTokens.accessToken);
+          const stravaAthleteId =
+            activeTokens.athleteId ?? connections.strava?.athleteId ?? null;
+          if (!stravaAthleteId) {
+            throw new Error('Missing Strava athlete ID.');
+          }
+
+          const rows = await fetchActivitiesFromSupabase(stravaAthleteId);
           console.log('[Strava][Activities] Strava activities fetched', {
             count: rows.length,
           });
@@ -271,6 +273,7 @@ export default function ActivitiesScreen() {
     [
       activeSource,
       activities.length,
+      connections.strava?.athleteId,
       tokens,
       setActivities,
       getValidTokens,
@@ -288,61 +291,10 @@ export default function ActivitiesScreen() {
     target: '/preview' | '/preview?mode=templates',
   ) {
     if (!selectedActivityId) return;
-    if (isNonStravaSource) {
-      router.push(target);
-      return;
-    }
-
-    try {
-      setIsPreparingPreview(true);
-      setError(null);
-      const activeTokens = await getValidTokens();
-      if (!activeTokens?.accessToken) {
-        resetAndReplace('/login');
-        return;
-      }
-
-      const selected = activities.find(
-        (item) => item.id === selectedActivityId,
-      );
-      const hasLoadedStreams =
-        selected?.laps !== undefined && selected?.heartRateStream !== undefined;
-      const hasHighResPhoto = Boolean(
-        selected?.photoUrl && /\/(1024|2048)(?:\?|$)/.test(selected.photoUrl),
-      );
-
-      if (!hasLoadedStreams || !hasHighResPhoto) {
-        const [streams, photoUrl] = await Promise.all([
-          hasLoadedStreams
-            ? Promise.resolve({
-                laps: selected?.laps ?? [],
-                heartRateStream: selected?.heartRateStream ?? [],
-              })
-            : fetchActivityStreams(
-                activeTokens.accessToken,
-                selectedActivityId,
-              ),
-          hasHighResPhoto
-            ? Promise.resolve(selected?.photoUrl ?? null)
-            : fetchActivityPhotoHighRes(
-                activeTokens.accessToken,
-                selectedActivityId,
-              ),
-        ]);
-        updateActivity(selectedActivityId, {
-          ...streams,
-          ...(photoUrl ? { photoUrl } : {}),
-        });
-      }
-
-      router.push(target);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Could not prepare activity data.',
-      );
-    } finally {
-      setIsPreparingPreview(false);
-    }
+    setIsPreparingPreview(true);
+    setError(null);
+    router.push(target);
+    setIsPreparingPreview(false);
   }
 
   return (

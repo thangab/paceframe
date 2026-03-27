@@ -4,9 +4,12 @@ import {
   StravaHeartRatePoint,
   StravaLap,
 } from '@/types/strava';
-import { mockActivities } from '@/lib/mockData';
+import { supabase } from '@/lib/supabaseClient';
 
-const STRAVA_BASE = 'https://www.strava.com/api/v3';
+const STRAVA_ACTIVITIES_TABLE = 'strava_activities';
+const STRAVA_SYNC_URL =
+  process.env.EXPO_PUBLIC_STRAVA_SYNC_URL?.trim() ||
+  'https://paceframe.app/api/strava/sync';
 
 export type ExchangeCodeParams = {
   code: string;
@@ -16,6 +19,138 @@ export type ExchangeCodeParams = {
 type RefreshTokensParams = {
   refreshToken: string;
 };
+
+type SyncStravaActivitiesParams = {
+  athleteId: number;
+  limit?: number;
+};
+
+type StravaActivityRow = {
+  activity_id: number;
+  athlete_id: number;
+  name: string;
+  distance: number;
+  moving_time: number;
+  elapsed_time: number;
+  total_elevation_gain: number;
+  type: string;
+  start_date: string;
+  timezone?: string | null;
+  average_speed: number;
+  average_cadence?: number | null;
+  average_heartrate?: number | null;
+  kilojoules?: number | null;
+  calories?: number | null;
+  location_city?: string | null;
+  location_state?: string | null;
+  location_country?: string | null;
+  device_name?: string | null;
+  summary_polyline?: string | null;
+  start_latlng?: unknown;
+  end_latlng?: unknown;
+  photo_url?: string | null;
+  photos?: unknown;
+  laps?: unknown;
+  heart_rate_stream?: unknown;
+};
+
+function toLatLng(value: unknown): [number, number] | null {
+  if (!Array.isArray(value) || value.length < 2) return null;
+
+  const lat = Number(value[0]);
+  const lng = Number(value[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+  return [lat, lng];
+}
+
+function toLaps(value: unknown): StravaLap[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  const laps: StravaLap[] = [];
+  value.forEach((item) => {
+    if (!item || typeof item !== 'object') return;
+    const lap = item as Record<string, unknown>;
+    const distance = Number(lap.distance ?? 0);
+    const moving_time = Number(lap.moving_time ?? 0);
+    const elapsed_time = Number(lap.elapsed_time ?? moving_time);
+    if (!Number.isFinite(distance) || !Number.isFinite(moving_time)) return;
+
+    const normalizedLap: StravaLap = {
+      name: typeof lap.name === 'string' ? lap.name : null,
+      lap_index: typeof lap.lap_index === 'number' ? lap.lap_index : 0,
+      distance,
+      moving_time,
+      elapsed_time: Number.isFinite(elapsed_time) ? elapsed_time : moving_time,
+      average_speed:
+        typeof lap.average_speed === 'number' ? lap.average_speed : null,
+      average_heartrate:
+        typeof lap.average_heartrate === 'number'
+          ? lap.average_heartrate
+          : null,
+      max_heartrate:
+        typeof lap.max_heartrate === 'number' ? lap.max_heartrate : null,
+    };
+    if (typeof lap.id === 'number') {
+      normalizedLap.id = lap.id;
+    }
+    laps.push(normalizedLap);
+  });
+
+  return laps;
+}
+
+function toHeartRateStream(value: unknown): StravaHeartRatePoint[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const point = item as Record<string, unknown>;
+      const seconds = Number(point.seconds ?? 0);
+      const bpm = Number(point.bpm ?? 0);
+      if (!Number.isFinite(seconds) || !Number.isFinite(bpm)) return null;
+      return { seconds, bpm };
+    })
+    .filter((item): item is StravaHeartRatePoint => Boolean(item));
+}
+
+function mapSupabaseRow(row: StravaActivityRow): StravaActivity {
+  return {
+    id: Number(row.activity_id),
+    name: row.name,
+    distance: Number(row.distance ?? 0),
+    moving_time: Number(row.moving_time ?? 0),
+    elapsed_time: Number(row.elapsed_time ?? 0),
+    total_elevation_gain: Number(row.total_elevation_gain ?? 0),
+    type: row.type,
+    start_date: row.start_date,
+    timezone: row.timezone ?? null,
+    average_speed: Number(row.average_speed ?? 0),
+    average_cadence:
+      typeof row.average_cadence === 'number' ? row.average_cadence : null,
+    average_heartrate:
+      typeof row.average_heartrate === 'number' ? row.average_heartrate : null,
+    kilojoules: typeof row.kilojoules === 'number' ? row.kilojoules : null,
+    calories: typeof row.calories === 'number' ? row.calories : null,
+    location_city: row.location_city ?? null,
+    location_state: row.location_state ?? null,
+    location_country: row.location_country ?? null,
+    device_name: row.device_name ?? null,
+    map: {
+      summary_polyline: row.summary_polyline ?? null,
+    },
+    photos:
+      row.photos && typeof row.photos === 'object'
+        ? (row.photos as StravaActivity['photos'])
+        : undefined,
+    photoUrl: row.photo_url ?? null,
+    start_latlng: toLatLng(row.start_latlng),
+    end_latlng: toLatLng(row.end_latlng),
+    laps: toLaps(row.laps),
+    heartRateStream: toHeartRateStream(row.heart_rate_stream),
+  };
+}
 
 export async function exchangeCodeWithSupabase({
   code,
@@ -101,93 +236,54 @@ export async function refreshTokensWithSupabase({
   };
 }
 
-export async function fetchActivities(
-  accessToken: string,
-): Promise<StravaActivity[]> {
-  if (accessToken.startsWith('mock-')) {
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    return mockActivities;
-  }
-
-  const response = await fetch(`${STRAVA_BASE}/athlete/activities?per_page=5`, {
+export async function syncStravaActivitiesWithSupabase({
+  athleteId,
+  limit = 7,
+}: SyncStravaActivitiesParams): Promise<{ synced: number }> {
+  const response = await fetch(STRAVA_SYNC_URL, {
+    method: 'POST',
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
     },
+    body: JSON.stringify({ athlete_id: athleteId, limit }),
+    cache: 'no-store',
   });
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || 'Failed to fetch activities.');
+    throw new Error(message || 'Failed to sync Strava activities.');
   }
 
-  const activities = (await response.json()) as StravaActivity[];
-  const activitiesWithPhotos = await Promise.all(
-    activities.map(async (activity) => {
-      const details = await fetchActivityDetails(accessToken, activity.id);
-      return {
-        ...activity,
-        calories:
-          typeof details.calories === 'number'
-            ? details.calories
-            : activity.calories,
-        photoUrl: details.photoUrl ?? extractActivityPhotoUrl(activity),
-      };
-    }),
+  const payload = (await response.json()) as {
+    synced?: number;
+    success?: boolean;
+    error?: string;
+  };
+  if (payload.success === false) {
+    throw new Error(payload.error || 'Failed to sync Strava activities.');
+  }
+  return { synced: payload.synced ?? 0 };
+}
+
+export async function fetchActivitiesFromSupabase(
+  athleteId: number,
+  limit = 50,
+): Promise<StravaActivity[]> {
+  const { data, error } = await supabase
+    .from(STRAVA_ACTIVITIES_TABLE)
+    .select('*')
+    .eq('athlete_id', athleteId)
+    .order('start_date', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(error.message || 'Failed to fetch Strava activities.');
+  }
+
+  return ((data ?? []) as StravaActivityRow[]).map((row) =>
+    mapSupabaseRow(row),
   );
-
-  return activitiesWithPhotos;
-}
-
-export async function fetchActivityStreams(
-  accessToken: string,
-  activityId: number,
-): Promise<Pick<StravaActivity, 'laps' | 'heartRateStream'>> {
-  const [laps, heartRateStream] = await Promise.all([
-    fetchActivityLaps(accessToken, activityId),
-    fetchActivityHeartRateStream(accessToken, activityId),
-  ]);
-
-  return { laps, heartRateStream };
-}
-
-export async function fetchActivityPhotoHighRes(
-  accessToken: string,
-  activityId: number,
-): Promise<string | null> {
-  try {
-    const response = await fetch(
-      `${STRAVA_BASE}/activities/${activityId}/photos?size=2048`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      },
-    );
-
-    if (!response.ok) return null;
-    const photos = (await response.json()) as {
-      urls?: Record<string, string>;
-    }[];
-    const first = photos[0];
-    if (!first?.urls) return null;
-
-    const directBest =
-      first.urls['2048'] ?? first.urls['1024'] ?? first.urls['600'];
-    if (directBest) return directBest;
-
-    const numericBest = Object.entries(first.urls)
-      .filter(([key, value]) => Number.isFinite(Number(key)) && Boolean(value))
-      .sort((a, b) => Number(b[0]) - Number(a[0]))[0]?.[1];
-    if (numericBest) return numericBest;
-
-    return (
-      first.urls['100'] ??
-      Object.values(first.urls).find((value) => typeof value === 'string') ??
-      null
-    );
-  } catch {
-    return null;
-  }
 }
 
 export type LapPaceChartPoint = {
@@ -239,7 +335,7 @@ export function buildLapPaceChartData(
 }
 
 function buildLapPaceChartDataFromPaceSeries(
-  paceSeries: Array<{ x: number; y: number }> | null | undefined,
+  paceSeries: { x: number; y: number }[] | null | undefined,
   movingTimeFallback?: number,
 ): LapPaceChartPoint[] {
   if (!paceSeries?.length) return [];
@@ -323,162 +419,6 @@ export function getMockTokens(): AuthTokens {
     athleteId: 999999,
     athleteFirstName: 'Runner',
   };
-}
-
-function extractActivityPhotoUrl(activity: StravaActivity): string | null {
-  const urls = activity.photos?.primary?.urls;
-  if (!urls) return null;
-
-  const directBest = urls['2048'] ?? urls['1024'] ?? urls['600'];
-  if (directBest) return directBest;
-
-  const numericBest = Object.entries(urls)
-    .filter(([key, value]) => Number.isFinite(Number(key)) && Boolean(value))
-    .sort((a, b) => Number(b[0]) - Number(a[0]))[0]?.[1];
-  if (numericBest) return numericBest;
-
-  return (
-    urls['100'] ??
-    Object.values(urls).find((value) => typeof value === 'string') ??
-    null
-  );
-}
-
-async function fetchActivityDetails(
-  accessToken: string,
-  activityId: number,
-): Promise<Pick<StravaActivity, 'calories' | 'photoUrl'>> {
-  try {
-    const response = await fetch(`${STRAVA_BASE}/activities/${activityId}`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (!response.ok) return { calories: null, photoUrl: null };
-    const details = (await response.json()) as StravaActivity;
-    return {
-      calories: typeof details.calories === 'number' ? details.calories : null,
-      photoUrl: extractActivityPhotoUrl(details),
-    };
-  } catch {
-    return { calories: null, photoUrl: null };
-  }
-}
-
-async function fetchActivityLaps(
-  accessToken: string,
-  activityId: number,
-): Promise<StravaLap[]> {
-  try {
-    const response = await fetch(
-      `${STRAVA_BASE}/activities/${activityId}/laps`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      },
-    );
-
-    if (!response.ok) return [];
-    const laps = (await response.json()) as {
-      id?: number;
-      name?: string | null;
-      distance?: number;
-      moving_time?: number;
-      elapsed_time?: number;
-      average_speed?: number | null;
-      average_heartrate?: number | null;
-      max_heartrate?: number | null;
-      lap_index?: number;
-      split?: number;
-    }[];
-
-    const normalized: StravaLap[] = [];
-    laps.forEach((lap, index) => {
-      const distance = lap.distance ?? 0;
-      const moving_time = lap.moving_time ?? 0;
-      const elapsed_time = lap.elapsed_time ?? moving_time;
-      if (distance <= 0 || moving_time <= 0) return;
-
-      normalized.push({
-        id: lap.id,
-        name: lap.name ?? null,
-        lap_index:
-          typeof lap.lap_index === 'number'
-            ? lap.lap_index
-            : typeof lap.split === 'number'
-              ? lap.split
-              : index + 1,
-        distance,
-        moving_time,
-        elapsed_time,
-        average_speed:
-          typeof lap.average_speed === 'number' ? lap.average_speed : null,
-        average_heartrate:
-          typeof lap.average_heartrate === 'number'
-            ? lap.average_heartrate
-            : null,
-        max_heartrate:
-          typeof lap.max_heartrate === 'number' ? lap.max_heartrate : null,
-      });
-    });
-
-    return normalized;
-  } catch {
-    return [];
-  }
-}
-
-async function fetchActivityHeartRateStream(
-  accessToken: string,
-  activityId: number,
-): Promise<StravaHeartRatePoint[]> {
-  try {
-    const response = await fetch(
-      `${STRAVA_BASE}/activities/${activityId}/streams?keys=time,heartrate&key_by_type=true`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      },
-    );
-
-    if (!response.ok) return [];
-
-    const streams = (await response.json()) as {
-      time?: { data?: number[] };
-      heartrate?: { data?: number[] };
-    };
-
-    const time = streams.time?.data ?? [];
-    const heartrate = streams.heartrate?.data ?? [];
-    const pointsCount = Math.min(time.length, heartrate.length);
-
-    if (!pointsCount) return [];
-
-    const points: StravaHeartRatePoint[] = [];
-    for (let i = 0; i < pointsCount; i += 1) {
-      const seconds = time[i];
-      const bpm = heartrate[i];
-      if (
-        typeof seconds !== 'number' ||
-        !Number.isFinite(seconds) ||
-        typeof bpm !== 'number' ||
-        !Number.isFinite(bpm)
-      ) {
-        continue;
-      }
-      points.push({
-        seconds: Math.max(0, Math.round(seconds)),
-        bpm: Math.round(bpm),
-      });
-    }
-
-    return points;
-  } catch {
-    return [];
-  }
 }
 
 function computePaceSecPerKm(
