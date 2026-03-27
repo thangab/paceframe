@@ -9,6 +9,7 @@ import {
   hasHistoricalDataExportPermission,
   syncGarminPermissions,
   triggerGarminBackfill,
+  waitForGarminActivities,
 } from '@/lib/garmin';
 import {
   exchangeCodeWithSupabase,
@@ -105,6 +106,7 @@ export default function OAuthCallbackScreen() {
   const handledCodeRef = useRef<string | null>(null);
   const handledGarminRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState('Loading...');
 
   function resetAndReplace(path: '/activities' | '/login') {
     router.replace(path);
@@ -145,6 +147,7 @@ export default function OAuthCallbackScreen() {
 
         void (async () => {
           try {
+            setLoadingMessage('Connecting Garmin...');
             await login({
               provider: 'garmin',
               accessToken,
@@ -156,11 +159,14 @@ export default function OAuthCallbackScreen() {
                   : Math.floor(Date.now() / 1000) + 60 * 60,
             });
             try {
+              setLoadingMessage('Checking Garmin permissions...');
               const permissions = await syncGarminPermissions(
                 normalizedGarminUserId,
               );
               if (hasHistoricalDataExportPermission(permissions)) {
+                setLoadingMessage('Importing Garmin activities...');
                 await triggerGarminBackfill(normalizedGarminUserId);
+                await waitForGarminActivities(normalizedGarminUserId);
               }
             } catch (permissionError) {
               await logout();
@@ -221,6 +227,7 @@ export default function OAuthCallbackScreen() {
     let cancelled = false;
     void (async () => {
       try {
+        setLoadingMessage('Connecting Strava...');
         const tokens = await withTimeout(
           exchangeCodeWithSupabase({
             code,
@@ -231,6 +238,7 @@ export default function OAuthCallbackScreen() {
         if (cancelled) return;
         await login(tokens);
         if (tokens.athleteId) {
+          setLoadingMessage('Syncing Strava activities...');
           await syncStravaActivitiesWithSupabase({
             athleteId: tokens.athleteId,
             limit: 30,
@@ -280,7 +288,7 @@ export default function OAuthCallbackScreen() {
           color={colors.primary}
           style={styles.loader}
         />
-        <Text style={styles.title}>Loading...</Text>
+        <Text style={styles.title}>{loadingMessage}</Text>
       </View>
     );
   }
