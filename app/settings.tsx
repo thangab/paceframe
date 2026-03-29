@@ -1,6 +1,5 @@
 import { ReactNode, useCallback, useMemo, useState } from 'react';
 import * as Linking from 'expo-linking';
-import * as WebBrowser from 'expo-web-browser';
 import { router, useFocusEffect } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import {
@@ -19,7 +18,6 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { resetActivityLoadState } from '@/lib/activityLoadState';
 import {
   buildGarminOAuthStartUrl,
-  GARMIN_APP_OAUTH_REDIRECT_URI,
 } from '@/lib/garminOAuth';
 import { deregisterGarminUser } from '@/lib/garmin';
 import { importActivitiesFromHealthKit } from '@/lib/healthkit';

@@ -1,4 +1,5 @@
 import type { StatsLayout } from '@/types/preview';
+import { getLayoutMetricLimit as getConfiguredLayoutMetricLimit } from '@/lib/previewLayouts';
 
 export function splitMetricValueUnit(text: string): {
   value: string;
@@ -154,15 +155,5 @@ export function getDynamicStatsWidth(template: StatsLayout, visibleCount: number
 }
 
 export function getLayoutMetricLimit(template: StatsLayout) {
-  switch (template.layout) {
-    case 'sunset-hero':
-    case 'mile-ring':
-      return 5;
-    case 'morning-glass':
-      return 6;
-    case 'split-bold':
-      return 6;
-    default:
-      return 4;
-  }
+  return getConfiguredLayoutMetricLimit(template);
 }

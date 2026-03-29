@@ -3,27 +3,23 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
+  type Metric,
+  renderCustomLayout,
+  renderCustomPrimary,
+} from '@/components/preview/layouts/customRenderers';
+import {
   FieldId,
   FontPreset,
   StatsLayout,
   StatsLayoutKind,
+  StatsVisibleFields,
 } from '@/types/preview';
-
-type VisibleFields = {
-  distance: boolean;
-  time: boolean;
-  pace: boolean;
-  elev: boolean;
-  cadence: boolean;
-  calories: boolean;
-  avgHr: boolean;
-};
 
 type Props = {
   template: StatsLayout;
   isCompactViewport?: boolean;
   fontPreset: FontPreset;
-  visible: VisibleFields;
+  visible: StatsVisibleFields;
   layerTextColor?: string;
   sunsetPrimaryGradient?: [string, string, string];
   primaryInSeparateLayer?: boolean;
@@ -42,6 +38,20 @@ const TEXT_SHADOW_STYLE = {
   textShadowRadius: 2,
 } as const;
 
+function createRendererHelpers() {
+  return {
+    styles,
+    ValueWithUnit,
+    GradientValueWithUnit,
+    InlineMetric,
+    SplitBoldPrimaryValue,
+    metricIcon,
+    metricIconColor,
+    splitBoldLabel,
+    isDefaultSunsetHeroColor,
+  };
+}
+
 export function StatsLayerContent({
   template,
   isCompactViewport = false,
@@ -59,9 +69,6 @@ export function StatsLayerContent({
   avgHeartRateText,
 }: Props) {
   const textColorOverride = layerTextColor ? { color: layerTextColor } : null;
-  const useSunsetSolidPrimaryColor = layerTextColor
-    ? !isDefaultSunsetHeroColor(layerTextColor)
-    : false;
   const metrics = [
     visible.distance
       ? { id: 'distance', label: 'Distance', value: distanceText }
@@ -78,242 +85,25 @@ export function StatsLayerContent({
     visible.avgHr
       ? { id: 'avgHr', label: 'Avg HR', value: avgHeartRateText }
       : null,
-  ].filter(Boolean) as { id: string; label: string; value: string }[];
+  ].filter(Boolean) as Metric[];
+  const rendererHelpers = createRendererHelpers();
 
-  if (template.layout === 'sunset-hero') {
-    return (
-      <View style={styles.sunsetWrap}>
-        {!primaryInSeparateLayer && metrics[0] ? (
-          <View style={styles.morningDistanceWrap}>
-            <GradientValueWithUnit
-              value={metrics[0].value}
-              fontPreset={fontPreset}
-              valueStyleOverride={textColorOverride}
-              disableGradient={useSunsetSolidPrimaryColor}
-              gradientColors={sunsetPrimaryGradient}
-            />
-          </View>
-        ) : null}
-
-        <View style={styles.sunsetGrid}>
-          {(primaryInSeparateLayer ? metrics : metrics.slice(1))
-            .slice(0, 4)
-            .map((metric) => (
-              <View key={metric.id} style={styles.sunsetCard}>
-                <Text
-                  style={[
-                    styles.sunsetCardLabel,
-                    textColorOverride,
-                    { fontFamily: fontPreset.family },
-                  ]}
-                >
-                  {metric.label.toUpperCase()}
-                </Text>
-                <ValueWithUnit
-                  value={metric.value}
-                  fontPreset={fontPreset}
-                  valueStyle={
-                    isCompactViewport
-                      ? styles.sunsetCardValueCompact
-                      : styles.sunsetCardValueDesktop
-                  }
-                  unitStyle={
-                    isCompactViewport
-                      ? styles.sunsetCardUnitCompact
-                      : styles.sunsetCardUnitDesktop
-                  }
-                  textStyleOverride={textColorOverride}
-                  unitStyleOverride={textColorOverride}
-                  numberOfLines={1}
-                  autoFit={isCompactViewport}
-                  minimumFontScale={isCompactViewport ? 0.74 : 0.96}
-                />
-              </View>
-            ))}
-        </View>
-      </View>
-    );
-  }
-
-  if (template.layout === 'morning-glass') {
-    const source = primaryInSeparateLayer ? metrics : metrics.slice(1);
-    const topRow = source.slice(0, Math.min(3, source.length));
-    const bottomRow = source.slice(3, 6);
-
-    return (
-      <View
-        style={[
-          styles.morningWrap,
-          primaryInSeparateLayer && styles.morningWrapSecondaryOnly,
-        ]}
-      >
-        {!primaryInSeparateLayer && metrics[0] ? (
-          <View style={styles.morningDistanceWrap}>
-            <ValueWithUnit
-              value={metrics[0].value}
-              fontPreset={fontPreset}
-              valueStyle={styles.morningDistanceValue}
-              unitStyle={styles.morningDistanceUnit}
-              textStyleOverride={textColorOverride}
-              unitStyleOverride={textColorOverride}
-              numberOfLines={1}
-              autoFit
-              minimumFontScale={0.78}
-            />
-          </View>
-        ) : null}
-
-        {topRow.length > 0 ? (
-          <View style={styles.morningTopRow}>
-            {topRow.map((metric) => (
-              <View key={metric.id} style={styles.morningTopCard}>
-                <InlineMetric
-                  icon={metricIcon(metric.id)}
-                  value={metric.value}
-                  fontPreset={fontPreset}
-                  iconColor={layerTextColor ?? metricIconColor(metric.id)}
-                  iconSize={22}
-                  textStyle={styles.morningCardValue}
-                  unitStyle={styles.morningCardUnit}
-                  textStyleOverride={textColorOverride}
-                  unitStyleOverride={textColorOverride}
-                />
-              </View>
-            ))}
-          </View>
-        ) : null}
-
-        {bottomRow.length > 0 ? (
-          <View style={styles.morningBottomRow}>
-            {bottomRow.map((metric) => (
-              <View key={metric.id} style={styles.morningBottomCard}>
-                <InlineMetric
-                  icon={metricIcon(metric.id)}
-                  value={metric.value}
-                  fontPreset={fontPreset}
-                  iconColor={layerTextColor ?? metricIconColor(metric.id)}
-                  iconSize={22}
-                  textStyle={styles.morningCardValue}
-                  unitStyle={styles.morningCardUnit}
-                  textStyleOverride={textColorOverride}
-                  unitStyleOverride={textColorOverride}
-                />
-              </View>
-            ))}
-          </View>
-        ) : null}
-      </View>
-    );
-  }
-
-  if (template.layout === 'split-bold') {
-    const secondary = primaryInSeparateLayer ? metrics : metrics.slice(1);
-
-    return (
-      <View
-        style={[
-          styles.splitBoldWrap,
-          primaryInSeparateLayer && styles.splitBoldWrapSecondaryOnly,
-        ]}
-      >
-        {!primaryInSeparateLayer ? (
-          <View style={styles.splitBoldLeft}>
-            <SplitBoldPrimaryValue
-              value={metrics[0]?.value ?? '--'}
-              fontPreset={fontPreset}
-              textStyleOverride={textColorOverride}
-            />
-          </View>
-        ) : null}
-        <View style={styles.splitBoldRight}>
-          {secondary.slice(0, 5).map((metric) => (
-            <View key={metric.id} style={styles.splitBoldMetric}>
-              <Text
-                style={[
-                  styles.splitBoldMetricLabel,
-                  textColorOverride,
-                  { fontFamily: fontPreset.family },
-                ]}
-              >
-                {splitBoldLabel(metric.id)}
-              </Text>
-              <ValueWithUnit
-                value={metric.value}
-                fontPreset={fontPreset}
-                valueStyle={styles.splitBoldMetricValue}
-                unitStyle={styles.splitBoldMetricUnit}
-                textStyleOverride={textColorOverride}
-                unitStyleOverride={textColorOverride}
-                numberOfLines={1}
-                autoFit
-                minimumFontScale={0.94}
-              />
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  }
-
-  if (template.layout === 'mile-ring') {
-    const orbitMetrics = metrics
-      .filter((metric) => metric.id !== 'distance')
-      .slice(0, 4)
-      .map((metric) => formatMileRingMetric(metric.id, metric.value));
-    const splitIndex = Math.ceil(orbitMetrics.length / 2);
-    const topArcText = orbitMetrics.slice(0, splitIndex).join(' • ');
-    const bottomArcText = orbitMetrics.slice(splitIndex).join(' • ');
-
-    return (
-      <View style={styles.mileRingWrap}>
-        <View style={styles.mileRingBody}>
-          {topArcText ? (
-            <ArcMetricText
-              value={topArcText}
-              fontPreset={fontPreset}
-              centerAngle={270}
-              spanDeg={104}
-              orientation="top"
-              color={layerTextColor}
-            />
-          ) : null}
-
-          {bottomArcText ? (
-            <ArcMetricText
-              value={bottomArcText}
-              fontPreset={fontPreset}
-              centerAngle={90}
-              spanDeg={112}
-              orientation="bottom"
-              color={layerTextColor}
-            />
-          ) : null}
-
-          <View
-            style={[
-              styles.mileRingCircle,
-              layerTextColor ? { borderColor: layerTextColor } : null,
-            ]}
-          >
-            {metrics[0] ? (
-              <View style={styles.mileRingPrimaryInline}>
-                <ValueWithUnit
-                  value={metrics[0].value}
-                  fontPreset={fontPreset}
-                  valueStyle={styles.mileRingPrimaryValue}
-                  unitStyle={styles.mileRingPrimaryUnit}
-                  textStyleOverride={textColorOverride}
-                  unitStyleOverride={textColorOverride}
-                  numberOfLines={1}
-                  autoFit
-                  minimumFontScale={0.74}
-                />
-              </View>
-            ) : null}
-          </View>
-        </View>
-      </View>
-    );
+  const customLayout = renderCustomLayout(
+    template.layout,
+    {
+      template,
+      metrics,
+      fontPreset,
+      isCompactViewport,
+      layerTextColor,
+      textColorOverride,
+      sunsetPrimaryGradient,
+      primaryInSeparateLayer,
+    },
+    rendererHelpers,
+  );
+  if (customLayout) {
+    return customLayout;
   }
 
   const layoutKind = resolveLayoutKind(template.layout);
@@ -668,97 +458,10 @@ function splitBoldLabel(metricId: string) {
   }
 }
 
-function formatMileRingMetric(metricId: string, value: string) {
-  const normalized = value.trim().toUpperCase();
-  if (metricId === 'calories') {
-    return normalized.endsWith('CAL') ? normalized : `${normalized} CAL`;
-  }
-  return normalized;
-}
-
-function ArcMetricText({
-  value,
-  fontPreset,
-  centerAngle,
-  spanDeg,
-  orientation,
-  color,
-}: {
-  value: string;
-  fontPreset: FontPreset;
-  centerAngle: number;
-  spanDeg: number;
-  orientation: 'top' | 'bottom';
-  color?: string;
-}) {
-  const content = value.replace(/\s+/g, '\u00A0');
-  const chars = Array.from(content);
-  const center = 160;
-  const radius = orientation === 'top' ? 150 : 148;
-  const charWidth = 17;
-  const charHeight = 24;
-  const weights = chars.map((char) => {
-    if (char === '\u00A0') return 0.42;
-    if (char === '•') return 0.58;
-    if (/[0-9]/.test(char)) return 0.96;
-    return 0.88;
-  });
-  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
-  const totalSpan = Math.max(0, spanDeg);
-  let cursor = -totalSpan / 2;
-
-  return (
-    <View pointerEvents="none" style={styles.mileRingArcLayer}>
-      {chars.map((char, index) => {
-        const weight = weights[index] ?? 1;
-        const charSpan =
-          totalWeight > 0 ? (weight / totalWeight) * totalSpan : 0;
-        const angleOffset = cursor + charSpan / 2;
-        const angle =
-          orientation === 'top'
-            ? centerAngle + angleOffset
-            : centerAngle - angleOffset;
-        cursor += charSpan;
-        const theta = (angle * Math.PI) / 180;
-        const x = center + radius * Math.cos(theta);
-        const y = center + radius * Math.sin(theta);
-        const rotation = orientation === 'top' ? angle + 90 : angle - 90;
-
-        return (
-          <View
-            key={`${char}-${index}-${angle}`}
-            style={[
-              styles.mileRingArcCharWrap,
-              {
-                left: x - charWidth / 2,
-                top: y - charHeight / 2,
-                width: charWidth,
-                height: charHeight,
-                transform: [{ rotate: `${rotation}deg` }],
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.mileRingArcChar,
-                color ? { color } : null,
-                char === '•' ? styles.mileRingArcBullet : null,
-                { fontFamily: fontPreset.family },
-              ]}
-            >
-              {char}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 export function PrimaryStatLayerContent({
   template,
   fontPreset,
-  primaryField,
+  primaryField: _primaryField,
   value,
   layerTextColor,
   sunsetPrimaryGradient,
@@ -771,52 +474,21 @@ export function PrimaryStatLayerContent({
   sunsetPrimaryGradient?: [string, string, string];
 }) {
   const textColorOverride = layerTextColor ? { color: layerTextColor } : null;
-  const useSunsetSolidPrimaryColor = layerTextColor
-    ? !isDefaultSunsetHeroColor(layerTextColor)
-    : false;
-  if (template.layout === 'sunset-hero') {
-    return (
-      <View style={styles.morningDistanceWrap}>
-        <GradientValueWithUnit
-          value={value}
-          fontPreset={fontPreset}
-          valueStyleOverride={textColorOverride}
-          unitStyle={textColorOverride}
-          disableGradient={useSunsetSolidPrimaryColor}
-          gradientColors={sunsetPrimaryGradient}
-        />
-      </View>
-    );
-  }
-
-  if (template.layout === 'morning-glass') {
-    return (
-      <View style={styles.morningDistanceWrap}>
-        <ValueWithUnit
-          value={value}
-          fontPreset={fontPreset}
-          valueStyle={styles.morningDistanceValue}
-          unitStyle={styles.morningDistanceUnit}
-          textStyleOverride={textColorOverride}
-          unitStyleOverride={textColorOverride}
-          numberOfLines={1}
-          autoFit
-          minimumFontScale={0.78}
-        />
-      </View>
-    );
-  }
-
-  if (template.layout === 'split-bold') {
-    return (
-      <View style={styles.splitBoldPrimaryOnly}>
-        <SplitBoldPrimaryValue
-          value={value}
-          fontPreset={fontPreset}
-          textStyleOverride={textColorOverride}
-        />
-      </View>
-    );
+  const rendererHelpers = createRendererHelpers();
+  const customPrimary = renderCustomPrimary(
+    template.layout,
+    {
+      template,
+      fontPreset,
+      value,
+      layerTextColor,
+      textColorOverride,
+      sunsetPrimaryGradient,
+    },
+    rendererHelpers,
+  );
+  if (customPrimary) {
+    return customPrimary;
   }
 
   return null;

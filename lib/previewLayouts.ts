@@ -1,10 +1,25 @@
-import { StatsLayout } from '@/types/preview';
+import {
+  StatsLayout,
+  StatsVisibleFields,
+} from '@/types/preview';
+
+const DEFAULT_LAYOUT_VISIBLE_FIELDS: StatsVisibleFields = {
+  distance: true,
+  time: true,
+  pace: true,
+  elev: true,
+  cadence: false,
+  calories: false,
+  avgHr: false,
+};
 
 export const PREVIEW_LAYOUTS: StatsLayout[] = [
   {
     id: 'hero',
     name: 'Hero',
     layout: 'hero',
+    previewHeight: 190,
+    metricLimit: 4,
     x: 16,
     y: 435,
     width: 288,
@@ -18,6 +33,8 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     name: 'Vertical',
     layout: 'vertical',
     premium: false,
+    previewHeight: 244,
+    metricLimit: 4,
     x: 70,
     y: 336,
     width: 300,
@@ -31,6 +48,8 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     name: 'Compact',
     layout: 'compact',
     premium: false,
+    previewHeight: 132,
+    metricLimit: 4,
     x: 20,
     y: 480,
     width: 280,
@@ -44,6 +63,8 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     name: 'Columns',
     layout: 'columns',
     premium: false,
+    previewHeight: 146,
+    metricLimit: 4,
     x: 12,
     y: 490,
     width: 350,
@@ -57,6 +78,8 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     name: 'Grid 2x2',
     layout: 'grid-2x2',
     premium: false,
+    previewHeight: 186,
+    metricLimit: 4,
     x: 18,
     y: 420,
     width: 284,
@@ -70,6 +93,18 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     name: 'Mile Ring',
     layout: 'mile-ring',
     premium: false,
+    previewHeight: 246,
+    metricLimit: 5,
+    defaultVisibleFields: {
+      distance: true,
+      time: true,
+      pace: true,
+      elev: true,
+      cadence: false,
+      calories: true,
+      avgHr: false,
+    },
+    resetTransformsOnSelect: true,
     x: 20,
     y: 132,
     width: 320,
@@ -83,6 +118,8 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     name: 'Glass Row',
     layout: 'glass-row',
     premium: false,
+    previewHeight: 190,
+    metricLimit: 4,
     x: 16,
     y: 420,
     width: 328,
@@ -95,6 +132,8 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     id: 'soft-stack',
     name: 'Soft Stack',
     layout: 'soft-stack',
+    previewHeight: 244,
+    metricLimit: 4,
     x: 36,
     y: 300,
     width: 288,
@@ -108,6 +147,8 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     name: 'Pill Inline',
     layout: 'pill-inline',
     premium: false,
+    previewHeight: 132,
+    metricLimit: 4,
     x: 24,
     y: 496,
     width: 312,
@@ -121,6 +162,8 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     name: 'Card Columns',
     layout: 'card-columns',
     premium: false,
+    previewHeight: 146,
+    metricLimit: 4,
     x: 14,
     y: 468,
     width: 332,
@@ -134,6 +177,8 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     name: 'Panel Grid',
     layout: 'panel-grid',
     premium: false,
+    previewHeight: 186,
+    metricLimit: 4,
     x: 24,
     y: 402,
     width: 312,
@@ -147,6 +192,19 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     name: 'Sunset Hero',
     layout: 'sunset-hero',
     premium: false,
+    previewHeight: 190,
+    metricLimit: 5,
+    supportsPrimaryLayer: true,
+    resetTransformsOnSelect: true,
+    defaultVisibleFields: {
+      distance: true,
+      time: true,
+      pace: true,
+      elev: true,
+      cadence: false,
+      calories: false,
+      avgHr: true,
+    },
     x: 20,
     y: 220,
     width: 320,
@@ -160,6 +218,20 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     name: 'Morning Glass',
     layout: 'morning-glass',
     premium: false,
+    previewHeight: 190,
+    metricLimit: 6,
+    supportsPrimaryLayer: true,
+    resetTransformsOnSelect: true,
+    defaultVisibleFieldOrder: [
+      'distance',
+      'time',
+      'pace',
+      'elev',
+      'avgHr',
+      'calories',
+      'cadence',
+    ],
+    defaultVisibleFieldCount: 6,
     x: 12,
     y: 286,
     width: 336,
@@ -173,6 +245,10 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     name: 'Split Bold',
     layout: 'split-bold',
     premium: false,
+    previewHeight: 228,
+    metricLimit: 6,
+    supportsPrimaryLayer: true,
+    resetTransformsOnSelect: true,
     x: 24,
     y: 210,
     width: 212,
@@ -182,3 +258,67 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     radius: 0,
   },
 ];
+
+export function getLayoutMetricLimit(layout: StatsLayout) {
+  return layout.metricLimit ?? 4;
+}
+
+export function getLayoutPreviewHeight(layout: StatsLayout) {
+  return layout.previewHeight ?? 186;
+}
+
+export function layoutSupportsPrimaryLayer(layout: StatsLayout) {
+  return Boolean(layout.supportsPrimaryLayer);
+}
+
+export function shouldResetTransformsOnLayoutSelect(layout: StatsLayout) {
+  return Boolean(layout.resetTransformsOnSelect);
+}
+
+export function getDefaultVisibleFieldsForLayout(
+  layout: StatsLayout,
+  availability: StatsVisibleFields,
+  fallback: StatsVisibleFields = DEFAULT_LAYOUT_VISIBLE_FIELDS,
+): StatsVisibleFields {
+  if (layout.defaultVisibleFields) {
+    return {
+      distance:
+        layout.defaultVisibleFields.distance === true &&
+        availability.distance,
+      time: layout.defaultVisibleFields.time === true && availability.time,
+      pace: layout.defaultVisibleFields.pace === true && availability.pace,
+      elev: layout.defaultVisibleFields.elev === true && availability.elev,
+      cadence:
+        layout.defaultVisibleFields.cadence === true && availability.cadence,
+      calories:
+        layout.defaultVisibleFields.calories === true && availability.calories,
+      avgHr: layout.defaultVisibleFields.avgHr === true && availability.avgHr,
+    };
+  }
+
+  if (layout.defaultVisibleFieldOrder?.length) {
+    const maxCount = Math.max(
+      1,
+      Math.min(
+        layout.defaultVisibleFieldCount ?? layout.defaultVisibleFieldOrder.length,
+        layout.defaultVisibleFieldOrder.length,
+      ),
+    );
+    const selected = new Set(
+      layout.defaultVisibleFieldOrder
+        .filter((field) => availability[field])
+        .slice(0, maxCount),
+    );
+    return {
+      distance: selected.has('distance'),
+      time: selected.has('time'),
+      pace: selected.has('pace'),
+      elev: selected.has('elev'),
+      cadence: selected.has('cadence'),
+      calories: selected.has('calories'),
+      avgHr: selected.has('avgHr'),
+    };
+  }
+
+  return fallback;
+}

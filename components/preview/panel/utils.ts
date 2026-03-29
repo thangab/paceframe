@@ -1,4 +1,5 @@
-import type { StatsLayoutKind } from '@/types/preview';
+import type { StatsLayout } from '@/types/preview';
+import { getLayoutPreviewHeight as getConfiguredLayoutPreviewHeight } from '@/lib/previewLayouts';
 
 export function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -50,29 +51,6 @@ export function isSameSunsetPrimaryGradient(
   return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 }
 
-export function getLayoutPreviewHeight(layout: StatsLayoutKind) {
-  switch (layout) {
-    case 'hero':
-    case 'glass-row':
-    case 'sunset-hero':
-    case 'morning-glass':
-      return 190;
-    case 'mile-ring':
-      return 246;
-    case 'split-bold':
-      return 228;
-    case 'vertical':
-    case 'soft-stack':
-      return 244;
-    case 'compact':
-    case 'pill-inline':
-      return 132;
-    case 'columns':
-    case 'card-columns':
-      return 146;
-    case 'grid-2x2':
-    case 'panel-grid':
-    default:
-      return 186;
-  }
+export function getLayoutPreviewHeight(layout: StatsLayout) {
+  return getConfiguredLayoutPreviewHeight(layout);
 }

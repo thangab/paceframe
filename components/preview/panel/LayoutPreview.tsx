@@ -14,7 +14,7 @@ type Props = {
 export function LayoutPreview({ template, colors }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const rawWidth = template.width;
-  const rawHeight = getLayoutPreviewHeight(template.layout);
+  const rawHeight = getLayoutPreviewHeight(template);
   const scale = Math.min(92 / rawWidth, 52 / rawHeight);
   const previewLayerTextColor =
     template.layout === 'split-bold' ? 'rgba(255,255,255,0.6)' : undefined;
