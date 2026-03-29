@@ -39,6 +39,7 @@ export function ActivityCard({
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const distanceUnit = usePreferencesStore((s) => s.distanceUnit);
+  const cardPhotoUri = activity.photoThumbUrl ?? activity.photoUrl ?? null;
   const [mapSnapshotUri, setMapSnapshotUri] = useState<string | null>(null);
   const overlayOpacity = useRef(new Animated.Value(selected ? 0 : 1)).current;
   const logoOpacity = useRef(new Animated.Value(selected ? 0 : 0.5)).current;
@@ -50,7 +51,7 @@ export function ActivityCard({
     let cancelled = false;
 
     async function loadMapSnapshot() {
-      if (activity.photoUrl || !mapSnapshotPolyline || Platform.OS !== 'ios') {
+      if (cardPhotoUri || !mapSnapshotPolyline || Platform.OS !== 'ios') {
         setMapSnapshotUri(null);
         return;
       }
@@ -84,7 +85,7 @@ export function ActivityCard({
     return () => {
       cancelled = true;
     };
-  }, [activity.photoUrl, colors.primary, mapSnapshotPolyline]);
+  }, [cardPhotoUri, colors.primary, mapSnapshotPolyline]);
 
   useEffect(() => {
     Animated.timing(overlayOpacity, {
@@ -129,10 +130,10 @@ export function ActivityCard({
       ]}
     >
       <View style={styles.row}>
-        {activity.photoUrl ? (
+        {cardPhotoUri ? (
           <View style={styles.thumbnailWrap}>
             <Image
-              source={{ uri: activity.photoUrl }}
+              source={{ uri: cardPhotoUri }}
               style={styles.thumbnail}
               resizeMode="cover"
             />

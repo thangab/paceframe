@@ -24,8 +24,10 @@ import {
 } from '@/lib/activityLoadState';
 import { fetchGarminActivities } from '@/lib/garmin';
 import {
+  fetchActivityFromSupabase,
   fetchActivitiesFromSupabase,
   refreshTokensWithSupabase,
+  syncStravaActivityDetailsWithSupabase,
 } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
@@ -56,6 +58,7 @@ export default function ActivitiesScreen() {
   const selectedActivityId = useActivityStore((s) => s.selectedActivityId);
   const setActivities = useActivityStore((s) => s.setActivities);
   const selectActivity = useActivityStore((s) => s.selectActivity);
+  const updateActivity = useActivityStore((s) => s.updateActivity);
   const isHealthKitSource = activeSource === 'healthkit';
   const refreshColor = themeMode === 'dark' ? colors.primary : colors.textMuted;
   const hasLiveStravaSource =
@@ -70,6 +73,7 @@ export default function ActivitiesScreen() {
   const previousSourceRef = useRef<string | null>(null);
   const previousAuthRef = useRef<string | null>(null);
   const [isPreparingPreview, setIsPreparingPreview] = useState(false);
+  const [preparingPreviewMessage, setPreparingPreviewMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const authSession = `${activeProvider ?? 'none'}::${connections.garmin?.garminUserId ?? 'none'}::${connections.strava?.athleteId ?? 'none'}::${connections.mock?.athleteId ?? 'none'}`;
@@ -293,8 +297,43 @@ export default function ActivitiesScreen() {
     if (!selectedActivityId) return;
     setIsPreparingPreview(true);
     setError(null);
-    router.push(target);
-    setIsPreparingPreview(false);
+    setPreparingPreviewMessage(
+      activeSource === 'strava'
+        ? 'Syncing Strava details...'
+        : 'Preparing preview...',
+    );
+    try {
+      if (activeSource === 'strava') {
+        const activeTokens = await getValidTokens();
+        const stravaAthleteId =
+          activeTokens?.athleteId ?? connections.strava?.athleteId ?? null;
+        if (!stravaAthleteId) {
+          throw new Error('Missing Strava athlete ID.');
+        }
+
+        await syncStravaActivityDetailsWithSupabase({
+          athleteId: stravaAthleteId,
+          activityId: selectedActivityId,
+        });
+
+        const freshActivity = await fetchActivityFromSupabase(
+          stravaAthleteId,
+          selectedActivityId,
+        );
+        if (freshActivity) {
+          updateActivity(selectedActivityId, freshActivity);
+        }
+      }
+
+      router.push(target);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not prepare preview.',
+      );
+    } finally {
+      setIsPreparingPreview(false);
+      setPreparingPreviewMessage('');
+    }
   }
 
   return (
@@ -431,12 +470,18 @@ export default function ActivitiesScreen() {
             disabled={!selectedActivityId || isPreparingPreview}
           >
             <View style={styles.generateBtnContent}>
-              <MaterialCommunityIcons
-                name="view-dashboard-outline"
-                size={17}
-                color="#111500"
-              />
-              <Text style={styles.templatesBtnText}>Pick a Style</Text>
+              {isPreparingPreview ? (
+                <ActivityIndicator size="small" color="#111500" />
+              ) : (
+                <MaterialCommunityIcons
+                  name="view-dashboard-outline"
+                  size={17}
+                  color="#111500"
+                />
+              )}
+              <Text style={styles.templatesBtnText}>
+                {isPreparingPreview ? 'Preparing...' : 'Pick a Style'}
+              </Text>
             </View>
           </Pressable>
           <Pressable
@@ -452,15 +497,34 @@ export default function ActivitiesScreen() {
             disabled={!selectedActivityId || isPreparingPreview}
           >
             <View style={styles.generateBtnContent}>
-              <MaterialCommunityIcons
-                name="brush-variant"
-                size={18}
-                color="#E6EDF8"
-              />
-              <Text style={styles.generateBtnText}>Build Your Own</Text>
+              {isPreparingPreview ? (
+                <ActivityIndicator size="small" color="#E6EDF8" />
+              ) : (
+                <MaterialCommunityIcons
+                  name="brush-variant"
+                  size={18}
+                  color="#E6EDF8"
+                />
+              )}
+              <Text style={styles.generateBtnText}>
+                {isPreparingPreview ? 'Preparing...' : 'Build Your Own'}
+              </Text>
             </View>
           </Pressable>
         </View>
+        {isPreparingPreview ? (
+          <View
+            style={[
+              styles.preparingPreviewBadge,
+              { bottom: floatingBottomOffset + 76 },
+            ]}
+          >
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={styles.preparingPreviewText}>
+              {preparingPreviewMessage}
+            </Text>
+          </View>
+        ) : null}
       </View>
     </>
   );
@@ -710,6 +774,31 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
+    },
+    preparingPreviewBadge: {
+      position: 'absolute',
+      left: spacing.md,
+      right: spacing.md,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      shadowColor: colors.text,
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4,
+    },
+    preparingPreviewText: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '700',
     },
   });
 }

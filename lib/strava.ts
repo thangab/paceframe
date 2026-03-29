@@ -25,6 +25,11 @@ type SyncStravaActivitiesParams = {
   limit?: number;
 };
 
+type SyncStravaActivityDetailsParams = {
+  athleteId: number;
+  activityId: number;
+};
+
 type StravaActivityRow = {
   activity_id: number;
   athlete_id: number;
@@ -49,6 +54,7 @@ type StravaActivityRow = {
   start_latlng?: unknown;
   end_latlng?: unknown;
   photo_url?: string | null;
+  photo_thumb_url?: string | null;
   photos?: unknown;
   laps?: unknown;
   heart_rate_stream?: unknown;
@@ -145,6 +151,7 @@ function mapSupabaseRow(row: StravaActivityRow): StravaActivity {
         ? (row.photos as StravaActivity['photos'])
         : undefined,
     photoUrl: row.photo_url ?? null,
+    photoThumbUrl: row.photo_thumb_url ?? null,
     start_latlng: toLatLng(row.start_latlng),
     end_latlng: toLatLng(row.end_latlng),
     laps: toLaps(row.laps),
@@ -238,7 +245,7 @@ export async function refreshTokensWithSupabase({
 
 export async function syncStravaActivitiesWithSupabase({
   athleteId,
-  limit = 7,
+  limit = 5,
 }: SyncStravaActivitiesParams): Promise<{ synced: number }> {
   const response = await fetch(STRAVA_SYNC_URL, {
     method: 'POST',
@@ -266,6 +273,36 @@ export async function syncStravaActivitiesWithSupabase({
   return { synced: payload.synced ?? 0 };
 }
 
+export async function syncStravaActivityDetailsWithSupabase({
+  athleteId,
+  activityId,
+}: SyncStravaActivityDetailsParams): Promise<{ synced: number }> {
+  const response = await fetch(STRAVA_SYNC_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ athlete_id: athleteId, activity_id: activityId }),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || 'Failed to sync Strava activity details.');
+  }
+
+  const payload = (await response.json()) as {
+    synced?: number;
+    success?: boolean;
+    error?: string;
+  };
+  if (payload.success === false) {
+    throw new Error(payload.error || 'Failed to sync Strava activity details.');
+  }
+  return { synced: payload.synced ?? 0 };
+}
+
 export async function fetchActivitiesFromSupabase(
   athleteId: number,
   limit = 50,
@@ -284,6 +321,25 @@ export async function fetchActivitiesFromSupabase(
   return ((data ?? []) as StravaActivityRow[]).map((row) =>
     mapSupabaseRow(row),
   );
+}
+
+export async function fetchActivityFromSupabase(
+  athleteId: number,
+  activityId: number,
+): Promise<StravaActivity | null> {
+  const { data, error } = await supabase
+    .from(STRAVA_ACTIVITIES_TABLE)
+    .select('*')
+    .eq('athlete_id', athleteId)
+    .eq('activity_id', activityId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to fetch Strava activity.');
+  }
+
+  if (!data) return null;
+  return mapSupabaseRow(data as StravaActivityRow);
 }
 
 export type LapPaceChartPoint = {

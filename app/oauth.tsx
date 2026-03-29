@@ -154,7 +154,8 @@ export default function OAuthCallbackScreen() {
               refreshToken: refreshToken ?? '',
               garminUserId: normalizedGarminUserId,
               expiresAt:
-                Number.isFinite(accessTokenExpiresIn) && accessTokenExpiresIn > 0
+                Number.isFinite(accessTokenExpiresIn) &&
+                accessTokenExpiresIn > 0
                   ? Math.floor(Date.now() / 1000) + accessTokenExpiresIn
                   : Math.floor(Date.now() / 1000) + 60 * 60,
             });
@@ -241,7 +242,7 @@ export default function OAuthCallbackScreen() {
           setLoadingMessage('Syncing Strava activities...');
           await syncStravaActivitiesWithSupabase({
             athleteId: tokens.athleteId,
-            limit: 30,
+            limit: 5,
           });
         }
         clearActivities();
