@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type {
   FontPreset,
   StatsLayout,
@@ -56,6 +57,8 @@ const CUSTOM_LAYOUT_RENDERERS: Partial<
   'morning-glass': renderMorningGlassLayout,
   'split-bold': renderSplitBoldLayout,
   'mile-ring': renderMileRingLayout,
+  'signal-board': renderSignalBoardLayout,
+  'social-pill': renderSocialPillLayout,
 };
 
 const CUSTOM_PRIMARY_LAYOUT_RENDERERS: Partial<
@@ -70,6 +73,7 @@ const CUSTOM_PRIMARY_LAYOUT_RENDERERS: Partial<
   'sunset-hero': renderSunsetHeroPrimary,
   'morning-glass': renderMorningGlassPrimary,
   'split-bold': renderSplitBoldPrimary,
+  'social-pill': renderSocialPillPrimary,
 };
 
 export function renderCustomLayout(
@@ -376,6 +380,145 @@ function renderMileRingLayout(
   );
 }
 
+function renderSignalBoardLayout(
+  {
+    metrics,
+    fontPreset,
+    textColorOverride,
+    layerTextColor,
+  }: CustomLayoutRenderProps,
+  { styles, ValueWithUnit }: CustomRendererHelpers,
+) {
+  const distanceMetric = metrics.find((metric) => metric.id === 'distance') ?? null;
+  const sideMetrics = metrics
+    .filter((metric) => metric.id === 'time' || metric.id === 'pace')
+    .slice(0, 2);
+  const railMetrics = metrics
+    .filter(
+      (metric) =>
+        metric.id !== 'distance' &&
+        !sideMetrics.some((sideMetric) => sideMetric.id === metric.id),
+    )
+    .slice(0, 3);
+
+  return (
+    <View style={styles.signalBoardWrap}>
+      <View style={styles.signalBoardTop}>
+        <View style={styles.signalBoardHero}>
+          <Text
+            style={[
+              styles.signalBoardEyebrow,
+              textColorOverride,
+              { fontFamily: fontPreset.family },
+            ]}
+          >
+            SESSION
+          </Text>
+          {distanceMetric ? (
+            <ValueWithUnit
+              value={distanceMetric.value}
+              fontPreset={fontPreset}
+              valueStyle={styles.signalBoardHeroValue}
+              unitStyle={styles.signalBoardHeroUnit}
+              textStyleOverride={textColorOverride}
+              unitStyleOverride={textColorOverride}
+              numberOfLines={1}
+              autoFit={false}
+              minimumFontScale={0.76}
+            />
+          ) : null}
+        </View>
+
+        <View style={styles.signalBoardStack}>
+          {sideMetrics.map((metric) => (
+            <View key={metric.id} style={styles.signalBoardMiniCard}>
+              <Text
+                style={[
+                  styles.signalBoardMiniLabel,
+                  textColorOverride,
+                  { fontFamily: fontPreset.family },
+                ]}
+              >
+                {metric.label.toUpperCase()}
+              </Text>
+              <ValueWithUnit
+                value={metric.value}
+                fontPreset={fontPreset}
+                valueStyle={styles.signalBoardMiniValue}
+                unitStyle={styles.signalBoardMiniUnit}
+                textStyleOverride={textColorOverride}
+                unitStyleOverride={textColorOverride}
+                numberOfLines={1}
+                autoFit={false}
+                minimumFontScale={0.82}
+              />
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {railMetrics.length ? (
+        <View style={styles.signalBoardRail}>
+          {railMetrics.map((metric, index) => (
+            <View
+              key={metric.id}
+              style={[
+                styles.signalBoardRailItem,
+                index < railMetrics.length - 1 && styles.signalBoardRailDivider,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.signalBoardRailLabel,
+                  textColorOverride,
+                  { fontFamily: fontPreset.family },
+                ]}
+              >
+                {metric.label.toUpperCase()}
+              </Text>
+              <ValueWithUnit
+                value={metric.value}
+                fontPreset={fontPreset}
+                valueStyle={styles.signalBoardRailValue}
+                unitStyle={styles.signalBoardRailUnit}
+                textStyleOverride={textColorOverride}
+                unitStyleOverride={textColorOverride}
+                numberOfLines={1}
+                autoFit
+                minimumFontScale={0.84}
+              />
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function renderSocialPillLayout(
+  {
+    metrics,
+    fontPreset,
+    textColorOverride,
+    primaryInSeparateLayer,
+    layerTextColor,
+  }: CustomLayoutRenderProps,
+  { styles, ValueWithUnit }: CustomRendererHelpers,
+) {
+  if (primaryInSeparateLayer || !metrics[0]) {
+    return <></>;
+  }
+
+  return renderSocialPillBadge({
+    value: metrics[0].value,
+    fontPreset,
+    textColorOverride,
+    layerTextColor,
+    styles,
+    ValueWithUnit,
+  });
+}
+
 function renderSunsetHeroPrimary(
   {
     fontPreset,
@@ -405,6 +548,25 @@ function renderSunsetHeroPrimary(
       />
     </View>
   );
+}
+
+function renderSocialPillPrimary(
+  {
+    fontPreset,
+    value,
+    textColorOverride,
+    layerTextColor,
+  }: CustomPrimaryRenderProps,
+  { styles, ValueWithUnit }: CustomRendererHelpers,
+) {
+  return renderSocialPillBadge({
+    value,
+    fontPreset,
+    textColorOverride,
+    layerTextColor,
+    styles,
+    ValueWithUnit,
+  });
 }
 
 function renderMorningGlassPrimary(
@@ -439,6 +601,52 @@ function renderSplitBoldPrimary(
         fontPreset={fontPreset}
         textStyleOverride={textColorOverride}
       />
+    </View>
+  );
+}
+
+function renderSocialPillBadge({
+  value,
+  fontPreset,
+  textColorOverride,
+  layerTextColor,
+  styles,
+  ValueWithUnit,
+}: {
+  value: string;
+  fontPreset: FontPreset;
+  textColorOverride: { color: string } | null;
+  layerTextColor?: string;
+  styles: any;
+  ValueWithUnit: (props: any) => React.JSX.Element;
+}) {
+  const foregroundColor = layerTextColor ?? '#FFFFFF';
+
+  return (
+    <View style={styles.socialPillWrap}>
+      <View style={styles.socialPillBubble}>
+        <View style={styles.socialPillIconWrap}>
+          <MaterialCommunityIcons
+            name="heart"
+            size={26}
+            color={foregroundColor}
+          />
+        </View>
+        <View style={styles.socialPillValueWrap}>
+          <ValueWithUnit
+            value={value}
+            fontPreset={fontPreset}
+            valueStyle={styles.socialPillValue}
+            unitStyle={styles.socialPillUnit}
+            textStyleOverride={textColorOverride}
+            unitStyleOverride={textColorOverride}
+            numberOfLines={1}
+            autoFit={false}
+            minimumFontScale={0.9}
+          />
+        </View>
+      </View>
+      <View style={styles.socialPillTail} />
     </View>
   );
 }

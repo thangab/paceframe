@@ -85,17 +85,17 @@ export default function LoginScreen() {
     }
   }
 
-  // async function handleMockLogin() {
-  //   try {
-  //     setIsBusy(true);
-  //     await login(getMockTokens());
-  //     resetAndReplace('/activities');
-  //   } catch (err) {
-  //     showError(err instanceof Error ? err.message : 'Mock login failed.');
-  //   } finally {
-  //     setIsBusy(false);
-  //   }
-  // }
+  async function handleMockLogin() {
+    try {
+      setIsBusy(true);
+      await login(getMockTokens());
+      resetAndReplace('/activities');
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Mock login failed.');
+    } finally {
+      setIsBusy(false);
+    }
+  }
 
   async function handleGarminLogin() {
     try {
@@ -212,7 +212,7 @@ export default function LoginScreen() {
             />
           </Pressable>
 
-          {/* <Pressable
+          <Pressable
             onPress={handleMockLogin}
             disabled={isBusy}
             style={({ pressed }) => [
@@ -239,7 +239,7 @@ export default function LoginScreen() {
               size={18}
               color={colors.textMuted}
             />
-          </Pressable> */}
+          </Pressable>
 
           {Platform.OS === 'ios' ? (
             <Pressable

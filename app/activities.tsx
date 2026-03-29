@@ -23,6 +23,7 @@ import {
   setInitialStravaLoadInFlight,
 } from '@/lib/activityLoadState';
 import { fetchGarminActivities } from '@/lib/garmin';
+import { mockActivities } from '@/lib/mockData';
 import {
   fetchActivityFromSupabase,
   fetchActivitiesFromSupabase,
@@ -52,6 +53,8 @@ export default function ActivitiesScreen() {
   const activeSource =
     source === 'healthkit'
       ? 'healthkit'
+      : activeProvider === 'mock'
+      ? 'mock'
       : activeProvider === 'garmin'
       ? 'garmin'
       : 'strava';
@@ -209,6 +212,11 @@ export default function ActivitiesScreen() {
           if (!activeTokens?.accessToken) {
             console.warn('[Activities] No active tokens after refresh');
             resetAndReplace('/login');
+            return;
+          }
+
+          if (activeSource === 'mock') {
+            setActivities(mockActivities, 'strava');
             return;
           }
 

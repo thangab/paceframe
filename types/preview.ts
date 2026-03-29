@@ -26,7 +26,9 @@ export type StatsLayoutKind =
   | 'sunset-hero'
   | 'morning-glass'
   | 'split-bold'
-  | 'mile-ring';
+  | 'mile-ring'
+  | 'signal-board'
+  | 'social-pill';
 export type BaseLayerId =
   | 'meta'
   | 'stats'
