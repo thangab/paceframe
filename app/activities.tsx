@@ -23,11 +23,12 @@ import {
   setInitialStravaLoadInFlight,
 } from '@/lib/activityLoadState';
 import { fetchGarminActivities } from '@/lib/garmin';
+import { mockActivities } from '@/lib/mockData';
 import {
-  fetchActivities,
-  fetchActivityPhotoHighRes,
-  fetchActivityStreams,
+  fetchActivityFromSupabase,
+  fetchActivitiesFromSupabase,
   refreshTokensWithSupabase,
+  syncStravaActivityDetailsWithSupabase,
 } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
@@ -52,15 +53,16 @@ export default function ActivitiesScreen() {
   const activeSource =
     source === 'healthkit'
       ? 'healthkit'
+      : activeProvider === 'mock'
+      ? 'mock'
       : activeProvider === 'garmin'
       ? 'garmin'
       : 'strava';
   const selectedActivityId = useActivityStore((s) => s.selectedActivityId);
   const setActivities = useActivityStore((s) => s.setActivities);
-  const updateActivity = useActivityStore((s) => s.updateActivity);
   const selectActivity = useActivityStore((s) => s.selectActivity);
+  const updateActivity = useActivityStore((s) => s.updateActivity);
   const isHealthKitSource = activeSource === 'healthkit';
-  const isNonStravaSource = activeSource !== 'strava';
   const refreshColor = themeMode === 'dark' ? colors.primary : colors.textMuted;
   const hasLiveStravaSource =
     activeSource === 'strava' &&
@@ -74,6 +76,7 @@ export default function ActivitiesScreen() {
   const previousSourceRef = useRef<string | null>(null);
   const previousAuthRef = useRef<string | null>(null);
   const [isPreparingPreview, setIsPreparingPreview] = useState(false);
+  const [preparingPreviewMessage, setPreparingPreviewMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const authSession = `${activeProvider ?? 'none'}::${connections.garmin?.garminUserId ?? 'none'}::${connections.strava?.athleteId ?? 'none'}::${connections.mock?.athleteId ?? 'none'}`;
@@ -107,9 +110,6 @@ export default function ActivitiesScreen() {
   ]);
 
   const resetAndReplace = useCallback((path: '/login' | '/activities') => {
-    if (router.canGoBack()) {
-      router.dismissAll();
-    }
     router.replace(path);
   }, []);
 
@@ -215,6 +215,11 @@ export default function ActivitiesScreen() {
             return;
           }
 
+          if (activeSource === 'mock') {
+            setActivities(mockActivities, 'strava');
+            return;
+          }
+
           if (activeSource === 'garmin') {
             console.log('[Garmin][Activities] prepare fetchGarminActivities', {
               hasToken: Boolean(activeTokens.accessToken),
@@ -240,7 +245,13 @@ export default function ActivitiesScreen() {
           }
 
           console.log('[Strava][Activities] Fetching Strava activities...');
-          const rows = await fetchActivities(activeTokens.accessToken);
+          const stravaAthleteId =
+            activeTokens.athleteId ?? connections.strava?.athleteId ?? null;
+          if (!stravaAthleteId) {
+            throw new Error('Missing Strava athlete ID.');
+          }
+
+          const rows = await fetchActivitiesFromSupabase(stravaAthleteId);
           console.log('[Strava][Activities] Strava activities fetched', {
             count: rows.length,
           });
@@ -274,6 +285,7 @@ export default function ActivitiesScreen() {
     [
       activeSource,
       activities.length,
+      connections.strava?.athleteId,
       tokens,
       setActivities,
       getValidTokens,
@@ -291,60 +303,44 @@ export default function ActivitiesScreen() {
     target: '/preview' | '/preview?mode=templates',
   ) {
     if (!selectedActivityId) return;
-    if (isNonStravaSource) {
-      router.push(target);
-      return;
-    }
-
+    setIsPreparingPreview(true);
+    setError(null);
+    setPreparingPreviewMessage(
+      activeSource === 'strava'
+        ? 'Syncing Strava details...'
+        : 'Preparing preview...',
+    );
     try {
-      setIsPreparingPreview(true);
-      setError(null);
-      const activeTokens = await getValidTokens();
-      if (!activeTokens?.accessToken) {
-        resetAndReplace('/login');
-        return;
-      }
+      if (activeSource === 'strava') {
+        const activeTokens = await getValidTokens();
+        const stravaAthleteId =
+          activeTokens?.athleteId ?? connections.strava?.athleteId ?? null;
+        if (!stravaAthleteId) {
+          throw new Error('Missing Strava athlete ID.');
+        }
 
-      const selected = activities.find(
-        (item) => item.id === selectedActivityId,
-      );
-      const hasLoadedStreams =
-        selected?.laps !== undefined && selected?.heartRateStream !== undefined;
-      const hasHighResPhoto = Boolean(
-        selected?.photoUrl && /\/(1024|2048)(?:\?|$)/.test(selected.photoUrl),
-      );
-
-      if (!hasLoadedStreams || !hasHighResPhoto) {
-        const [streams, photoUrl] = await Promise.all([
-          hasLoadedStreams
-            ? Promise.resolve({
-                laps: selected?.laps ?? [],
-                heartRateStream: selected?.heartRateStream ?? [],
-              })
-            : fetchActivityStreams(
-                activeTokens.accessToken,
-                selectedActivityId,
-              ),
-          hasHighResPhoto
-            ? Promise.resolve(selected?.photoUrl ?? null)
-            : fetchActivityPhotoHighRes(
-                activeTokens.accessToken,
-                selectedActivityId,
-              ),
-        ]);
-        updateActivity(selectedActivityId, {
-          ...streams,
-          ...(photoUrl ? { photoUrl } : {}),
+        await syncStravaActivityDetailsWithSupabase({
+          athleteId: stravaAthleteId,
+          activityId: selectedActivityId,
         });
+
+        const freshActivity = await fetchActivityFromSupabase(
+          stravaAthleteId,
+          selectedActivityId,
+        );
+        if (freshActivity) {
+          updateActivity(selectedActivityId, freshActivity);
+        }
       }
 
       router.push(target);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Could not prepare activity data.',
+        err instanceof Error ? err.message : 'Could not prepare preview.',
       );
     } finally {
       setIsPreparingPreview(false);
+      setPreparingPreviewMessage('');
     }
   }
 
@@ -482,12 +478,18 @@ export default function ActivitiesScreen() {
             disabled={!selectedActivityId || isPreparingPreview}
           >
             <View style={styles.generateBtnContent}>
-              <MaterialCommunityIcons
-                name="view-dashboard-outline"
-                size={17}
-                color="#111500"
-              />
-              <Text style={styles.templatesBtnText}>Pick a Style</Text>
+              {isPreparingPreview ? (
+                <ActivityIndicator size="small" color="#111500" />
+              ) : (
+                <MaterialCommunityIcons
+                  name="view-dashboard-outline"
+                  size={17}
+                  color="#111500"
+                />
+              )}
+              <Text style={styles.templatesBtnText}>
+                {isPreparingPreview ? 'Preparing...' : 'Pick a Style'}
+              </Text>
             </View>
           </Pressable>
           <Pressable
@@ -503,15 +505,34 @@ export default function ActivitiesScreen() {
             disabled={!selectedActivityId || isPreparingPreview}
           >
             <View style={styles.generateBtnContent}>
-              <MaterialCommunityIcons
-                name="brush-variant"
-                size={18}
-                color="#E6EDF8"
-              />
-              <Text style={styles.generateBtnText}>Build Your Own</Text>
+              {isPreparingPreview ? (
+                <ActivityIndicator size="small" color="#E6EDF8" />
+              ) : (
+                <MaterialCommunityIcons
+                  name="brush-variant"
+                  size={18}
+                  color="#E6EDF8"
+                />
+              )}
+              <Text style={styles.generateBtnText}>
+                {isPreparingPreview ? 'Preparing...' : 'Build Your Own'}
+              </Text>
             </View>
           </Pressable>
         </View>
+        {isPreparingPreview ? (
+          <View
+            style={[
+              styles.preparingPreviewBadge,
+              { bottom: floatingBottomOffset + 76 },
+            ]}
+          >
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={styles.preparingPreviewText}>
+              {preparingPreviewMessage}
+            </Text>
+          </View>
+        ) : null}
       </View>
     </>
   );
@@ -761,6 +782,31 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
+    },
+    preparingPreviewBadge: {
+      position: 'absolute',
+      left: spacing.md,
+      right: spacing.md,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      shadowColor: colors.text,
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4,
+    },
+    preparingPreviewText: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '700',
     },
   });
 }

@@ -37,7 +37,13 @@ import {
   STORY_HEIGHT,
   STORY_WIDTH,
 } from '@/lib/previewConfig';
-import { PREVIEW_LAYOUTS as LAYOUTS } from '@/lib/previewLayouts';
+import {
+  getDefaultVisibleFieldsForLayout as resolveDefaultVisibleFieldsForLayout,
+  getLayoutMetricLimit,
+  layoutSupportsPrimaryLayer,
+  PREVIEW_LAYOUTS as LAYOUTS,
+  shouldResetTransformsOnLayoutSelect,
+} from '@/lib/previewLayouts';
 import {
   DEFAULT_PREVIEW_TEMPLATE_ID,
   getPreviewTemplateById,
@@ -76,7 +82,6 @@ import {
   RouteMapVariant,
   RouteMode,
   StatsLayout,
-  StatsLayoutKind,
 } from '@/types/preview';
 import {
   BACKGROUND_GRADIENT_PRESETS,
@@ -101,7 +106,6 @@ import {
   ROUTE_LAYER_WIDTH,
   SUBJECT_COVERAGE_MAX_PERCENT,
   SUBJECT_COVERAGE_MIN_PERCENT,
-  SUNSET_HERO_DEFAULT_VISIBLE_FIELDS,
   SUNSET_PRIMARY_GRADIENT_PRESETS,
   StyleLayerId,
   SunsetPrimaryGradient,
@@ -111,7 +115,6 @@ import {
   formatCadence,
   formatPreviewDate,
   getDynamicStatsWidth,
-  getLayoutMetricLimit,
   splitMetricValueUnit,
 } from '@/features/preview/formatters';
 import {
@@ -147,6 +150,7 @@ export default function PreviewScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const activity = useActivityStore((s) => s.selectedActivity());
+  const activitySource = useActivityStore((s) => s.source);
   const isPremium = useSubscriptionStore((s) => s.isPremium);
   const [busy, setBusy] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
@@ -395,11 +399,8 @@ export default function PreviewScreen() {
     [activeBlurEffectId],
   );
   const supportsPrimaryLayer = useMemo(
-    () =>
-      template.layout === 'sunset-hero' ||
-      template.layout === 'morning-glass' ||
-      template.layout === 'split-bold',
-    [template.layout],
+    () => layoutSupportsPrimaryLayer(template),
+    [template],
   );
   const fontPreset = useMemo(
     () =>
@@ -1068,40 +1069,6 @@ export default function PreviewScreen() {
     return tiles;
   }, [canvasDisplayHeight, canvasDisplayWidth]);
 
-  function getDefaultVisibleFieldsForLayout(layout: StatsLayoutKind) {
-    if (layout === 'sunset-hero') {
-      return SUNSET_HERO_DEFAULT_VISIBLE_FIELDS;
-    }
-
-    if (layout === 'morning-glass') {
-      const orderedFields: FieldId[] = [
-        'distance',
-        'time',
-        'pace',
-        'elev',
-        'avgHr',
-        'calories',
-        'cadence',
-      ];
-      const availableFields = orderedFields.filter(
-        (field) => statsFieldAvailability[field],
-      );
-      const targetCount = availableFields.length >= 6 ? 6 : 4;
-      const selectedFields = new Set(availableFields.slice(0, targetCount));
-      return {
-        distance: selectedFields.has('distance'),
-        time: selectedFields.has('time'),
-        pace: selectedFields.has('pace'),
-        elev: selectedFields.has('elev'),
-        cadence: selectedFields.has('cadence'),
-        calories: selectedFields.has('calories'),
-        avgHr: selectedFields.has('avgHr'),
-      };
-    }
-
-    return DEFAULT_VISIBLE_FIELDS;
-  }
-
   const activityDraftKey = useMemo(
     () =>
       activity ? `${PREVIEW_DRAFT_KEY_PREFIX}${String(activity.id)}` : null,
@@ -1120,9 +1087,10 @@ export default function PreviewScreen() {
     const nextLayoutId = hasLayoutToKeep
       ? (templateIdToKeep as string)
       : LAYOUTS[0].id;
+    const nextLayout =
+      LAYOUTS.find((item) => item.id === nextLayoutId) ?? LAYOUTS[0];
     const nextLayoutLayout =
-      LAYOUTS.find((item) => item.id === nextLayoutId)?.layout ??
-      LAYOUTS[0].layout;
+      nextLayout.layout ?? LAYOUTS[0].layout;
     setMedia(null);
     setBackgroundGradient(null);
     setAutoSubjectUri(null);
@@ -1133,7 +1101,13 @@ export default function PreviewScreen() {
     setRouteMode('trace');
     setRouteMapVariant('standard');
     setPrimaryField('distance');
-    setVisible(getDefaultVisibleFieldsForLayout(nextLayoutLayout));
+    setVisible(
+      resolveDefaultVisibleFieldsForLayout(
+        nextLayout,
+        statsFieldAvailability,
+        DEFAULT_VISIBLE_FIELDS,
+      ),
+    );
     setHeaderVisible(DEFAULT_HEADER_VISIBLE);
     setLayerOrder(BASE_LAYER_ORDER);
     setVisibleLayers(getDefaultVisibleLayersForLayout(nextLayoutLayout));
@@ -2148,14 +2122,19 @@ export default function PreviewScreen() {
       return;
     }
     setSelectedLayoutId(next.id);
-    if (next.layout === 'sunset-hero' || next.layout === 'morning-glass') {
-      setVisible(getDefaultVisibleFieldsForLayout(next.layout));
-    }
     if (
-      next.layout === 'sunset-hero' ||
-      next.layout === 'morning-glass' ||
-      next.layout === 'split-bold'
+      next.defaultVisibleFields ||
+      next.defaultVisibleFieldOrder?.length
     ) {
+      setVisible(
+        resolveDefaultVisibleFieldsForLayout(
+          next,
+          statsFieldAvailability,
+          DEFAULT_VISIBLE_FIELDS,
+        ),
+      );
+    }
+    if (shouldResetTransformsOnLayoutSelect(next)) {
       setLayerTransforms((prev) => {
         const { stats: _stats, primary: _primary, ...rest } = prev;
         return rest;
@@ -2681,6 +2660,8 @@ export default function PreviewScreen() {
           setSelectedLayer={selectLayer}
           baseLayerZ={baseLayerZ}
           activityName={activity.name}
+          activitySource={activitySource}
+          deviceName={activity.device_name?.trim() || null}
           dateText={dateText}
           locationText={locationText}
           headerVisible={activeHeaderVisible}

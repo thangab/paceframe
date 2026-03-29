@@ -3,6 +3,7 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
 import {
+  Alert,
   Image,
   Platform,
   Pressable,
@@ -44,42 +45,41 @@ export default function LoginScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const clientId = process.env.EXPO_PUBLIC_STRAVA_CLIENT_ID?.trim();
   const login = useAuthStore((s) => s.login);
-  const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const setActivities = useActivityStore((s) => s.setActivities);
-  const shouldShowHealthSettings =
-    Platform.OS === 'ios' &&
-    Boolean(
-      error && /(healthkit|authorization|denied|permission)/i.test(error),
-    );
 
   function resetAndReplace(path: '/activities' | '/login') {
-    if (router.canGoBack()) {
-      router.dismissAll();
-    }
     router.replace(path);
   }
 
-  async function handleLogin() {
-    if (!clientId) {
-      setError('Missing EXPO_PUBLIC_STRAVA_CLIENT_ID in .env');
-      return;
-    }
-    if (!/^\d+$/.test(clientId)) {
-      setError(
-        `Invalid EXPO_PUBLIC_STRAVA_CLIENT_ID: "${clientId}". Expected numeric Strava Client ID.`,
+  function showError(message: string) {
+    if (
+      Platform.OS === 'ios' &&
+      /(healthkit|authorization|denied|permission)/i.test(message)
+    ) {
+      Alert.alert(
+        'Apple Health',
+        `${message}\n\nOpen Settings > Privacy & Security > Health > PaceFrame and turn on Workout and Workout Routes.`,
+        [{ text: 'OK', style: 'cancel' }],
       );
       return;
     }
 
+    Alert.alert('Login error', message);
+  }
+
+  async function handleLogin() {
     try {
       setIsBusy(true);
-      setError(null);
+
+      if (!clientId) {
+        throw new Error('Strava client ID is not configured.');
+      }
 
       const authUrl = buildStravaMobileAuthorizeUrl({ clientId });
       await Linking.openURL(authUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed.');
+      showError(err instanceof Error ? err.message : 'Login failed.');
     } finally {
       setIsBusy(false);
     }
@@ -88,11 +88,10 @@ export default function LoginScreen() {
   async function handleMockLogin() {
     try {
       setIsBusy(true);
-      setError(null);
       await login(getMockTokens());
       resetAndReplace('/activities');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Mock login failed.');
+      showError(err instanceof Error ? err.message : 'Mock login failed.');
     } finally {
       setIsBusy(false);
     }
@@ -101,7 +100,6 @@ export default function LoginScreen() {
   async function handleGarminLogin() {
     try {
       setIsBusy(true);
-      setError(null);
       const { authUrl, state } = await buildGarminOAuthStartUrl();
       console.log('[Garmin][Login] Opening Garmin URL', {
         authUrl,
@@ -110,7 +108,7 @@ export default function LoginScreen() {
       });
       await Linking.openURL(authUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Garmin login failed.');
+      showError(err instanceof Error ? err.message : 'Garmin login failed.');
     } finally {
       setIsBusy(false);
     }
@@ -121,10 +119,9 @@ export default function LoginScreen() {
 
     try {
       setIsBusy(true);
-      setError(null);
       const activities = await importActivitiesFromHealthKit();
       if (activities.length === 0) {
-        setError('No HealthKit workouts found.');
+        showError('No HealthKit workouts found.');
         return;
       }
       setActivities(activities, 'healthkit');
@@ -135,7 +132,9 @@ export default function LoginScreen() {
       }
       resetAndReplace('/activities');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'HealthKit import failed.');
+      showError(
+        err instanceof Error ? err.message : 'HealthKit import failed.',
+      );
     } finally {
       setIsBusy(false);
     }
@@ -172,19 +171,8 @@ export default function LoginScreen() {
       >
         <Text style={styles.title}>PaceFrame</Text>
         <Text style={styles.subtitle}>
-          Connect Strava and generate amazing cards to share in seconds.
+          Connect activities and generate amazing cards to share in seconds.
         </Text>
-
-        {error ? (
-          <View style={styles.errorBanner}>
-            <MaterialCommunityIcons
-              name="alert-circle-outline"
-              size={16}
-              color={colors.danger}
-            />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
 
         <View style={styles.actions}>
           <Pressable
@@ -274,13 +262,6 @@ export default function LoginScreen() {
             </Pressable>
           ) : null}
         </View>
-
-        {shouldShowHealthSettings ? (
-          <Text style={styles.healthHelpText}>
-            Open Settings {'>'} Privacy & Security {'>'} Health app {'>'}{' '}
-            PaceFrame and enable Workout + Workout Routes.
-          </Text>
-        ) : null}
 
         <Text style={styles.legal}>
           Your Strava login is used only to read activities. By continuing, you
@@ -437,31 +418,6 @@ function createStyles(colors: ThemeColors) {
       fontSize: 14,
       lineHeight: 18,
       fontWeight: '500',
-    },
-    errorBanner: {
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.dangerBorder,
-      backgroundColor: colors.dangerSurface,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.sm,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-      marginBottom: spacing.xs,
-    },
-    errorText: {
-      color: colors.dangerText,
-      flex: 1,
-      fontSize: 13,
-      lineHeight: 18,
-    },
-    healthHelpText: {
-      color: colors.textMuted,
-      fontSize: 12,
-      lineHeight: 18,
-      textAlign: 'center',
-      marginTop: 2,
     },
     legal: {
       marginTop: spacing.sm,

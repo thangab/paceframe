@@ -337,7 +337,8 @@ function isStatsLayout(value: string): value is StatsLayoutKind {
     value === 'panel-grid' ||
     value === 'sunset-hero' ||
     value === 'morning-glass' ||
-    value === 'split-bold'
+    value === 'split-bold' ||
+    value === 'mile-ring'
   );
 }
 

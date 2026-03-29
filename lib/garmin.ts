@@ -12,6 +12,10 @@ type GarminPermissionsResponse = {
   permissions?: string[];
 };
 
+const HISTORICAL_DATA_EXPORT_PERMISSION = 'HISTORICAL_DATA_EXPORT';
+const DEFAULT_WAIT_TIMEOUT_MS = 45_000;
+const DEFAULT_WAIT_POLL_INTERVAL_MS = 2_500;
+
 function toNumber(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   return 0;
@@ -157,7 +161,9 @@ function mapRow(
   };
 }
 
-async function triggerBackfill(garminUserId: string): Promise<void> {
+export async function triggerGarminBackfill(
+  garminUserId: string,
+): Promise<void> {
   const body = JSON.stringify({ garmin_user_id: garminUserId });
   const response = await fetch(BACKFILL_URL, {
     method: 'POST',
@@ -173,6 +179,15 @@ async function triggerBackfill(garminUserId: string): Promise<void> {
     const message = await response.text();
     throw new Error(message || 'Backfill request failed.');
   }
+}
+
+export function hasHistoricalDataExportPermission(
+  permissions: string[],
+): boolean {
+  return permissions.some(
+    (permission) =>
+      permission.trim().toUpperCase() === HISTORICAL_DATA_EXPORT_PERMISSION,
+  );
 }
 
 export async function deregisterGarminUser(
@@ -262,6 +277,35 @@ async function fetchFromSupabase(
   return summaries.map((row) => mapRow(row));
 }
 
+export async function waitForGarminActivities(
+  garminUserId: string,
+  options?: {
+    timeoutMs?: number;
+    pollIntervalMs?: number;
+  },
+): Promise<StravaActivity[]> {
+  const normalizedGarminUserId = garminUserId.trim();
+  if (!normalizedGarminUserId) {
+    throw new Error('Missing garminUserId.');
+  }
+
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
+  const pollIntervalMs =
+    options?.pollIntervalMs ?? DEFAULT_WAIT_POLL_INTERVAL_MS;
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const rows = await fetchFromSupabase(normalizedGarminUserId);
+    if (rows.length > 0) {
+      return rows;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  return fetchFromSupabase(normalizedGarminUserId);
+}
+
 function parseStartLatLng(value: unknown): [number, number] | null {
   if (!Array.isArray(value) || value.length < 2) return null;
 
@@ -286,10 +330,5 @@ export async function fetchGarminActivities(
     throw new Error('Missing garminUserId.');
   }
 
-  const [activities] = await Promise.all([
-    fetchFromSupabase(normalizedGarminUserId),
-    triggerBackfill(normalizedGarminUserId),
-  ]);
-
-  return activities;
+  return fetchFromSupabase(normalizedGarminUserId);
 }

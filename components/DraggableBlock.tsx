@@ -9,6 +9,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useThemeColors } from '@/hooks/useThemeColors';
 
+const SELECTION_ACTION_SIZE = 30;
+
 type Props = {
   initialX: number;
   initialY: number;
@@ -78,6 +80,13 @@ export function DraggableBlock({
   locked = false,
 }: Props) {
   const colors = useThemeColors();
+  const flattenedStyle = StyleSheet.flatten(style) ?? {};
+  const {
+    opacity: contentOpacity,
+    zIndex: layerZIndex,
+    elevation: layerElevation,
+    ...contentStyle
+  } = flattenedStyle;
   const tx = useSharedValue(initialX);
   const ty = useSharedValue(initialY);
   const scale = useSharedValue(initialScale);
@@ -401,12 +410,17 @@ export function DraggableBlock({
         }
       }}
       style={[
-        { position: 'absolute', left: 0, top: 0 },
-        style,
+        {
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          zIndex: layerZIndex,
+          elevation: layerElevation,
+        },
         containerAnimatedStyle,
       ]}
     >
-      <Animated.View style={contentScaleStyle}>
+      <Animated.View style={[contentStyle, { opacity: contentOpacity }, contentScaleStyle]}>
         {children}
         {selected ? (
           <View
@@ -446,7 +460,10 @@ const styles = StyleSheet.create({
   },
   selectionActionAnchor: {
     position: 'absolute',
-    transform: [{ translateX: -12 }, { translateY: -12 }],
+    transform: [
+      { translateX: -SELECTION_ACTION_SIZE / 2 },
+      { translateY: -SELECTION_ACTION_SIZE / 2 },
+    ],
     zIndex: 1001,
     elevation: 1001,
   },

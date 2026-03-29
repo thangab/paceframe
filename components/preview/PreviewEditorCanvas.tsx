@@ -123,6 +123,8 @@ type Props = {
   setSelectedLayer: (next: LayerId) => void;
   baseLayerZ: (id: LayerId) => number;
   activityName: string;
+  activitySource: 'strava' | 'garmin' | 'healthkit';
+  deviceName: string | null;
   dateText: string;
   locationText: string;
   headerVisible: HeaderVisibility;
@@ -264,6 +266,8 @@ export function PreviewEditorCanvas({
   setSelectedLayer,
   baseLayerZ,
   activityName,
+  activitySource,
+  deviceName,
   dateText,
   locationText,
   headerVisible,
@@ -702,9 +706,8 @@ export function PreviewEditorCanvas({
     skiaSubjectImage,
     useRadialBlurShader,
   ]);
-  const usesSunsetHeader =
-    template.layout === 'sunset-hero' || template.layout === 'morning-glass';
-  const usesLayoutHeader = usesSunsetHeader || template.layout === 'split-bold';
+  const fixedDeviceName =
+    activitySource === 'garmin' ? deviceName?.trim() || 'Garmin' : null;
   const hasHeaderContent =
     (headerVisible.title && activityName.length > 0) ||
     (headerVisible.date && dateText.length > 0) ||
@@ -715,7 +718,7 @@ export function PreviewEditorCanvas({
   ]
     .filter(Boolean)
     .join(' · ');
-  const defaultMetaWidth = usesLayoutHeader ? 280 : 240;
+  const defaultMetaWidth = 240;
   const splitBoldStatsCount = (() => {
     if (template.layout !== 'split-bold') return 0;
     return (
@@ -734,6 +737,8 @@ export function PreviewEditorCanvas({
         return Math.round(430 * canvasScaleY);
       case 'morning-glass':
         return Math.round(452 * canvasScaleY);
+      case 'mile-ring':
+        return Math.round(118 * canvasScaleY);
       case 'split-bold': {
         const estimatedStatsHeight = Math.max(
           120,
@@ -800,7 +805,10 @@ export function PreviewEditorCanvas({
     }
   })();
   const defaultRouteY = (() => {
-    if (template.layout === 'sunset-hero') {
+    if (
+      template.layout === 'sunset-hero' ||
+      template.layout === 'mile-ring'
+    ) {
       return Math.max(
         0,
         Math.round((canvasDisplayHeight - routeLayerHeightDisplay) / 2),
@@ -809,7 +817,10 @@ export function PreviewEditorCanvas({
     return routeInitialYDisplay;
   })();
   const defaultRouteX = (() => {
-    if (template.layout === 'sunset-hero') {
+    if (
+      template.layout === 'sunset-hero' ||
+      template.layout === 'mile-ring'
+    ) {
       return Math.max(
         0,
         Math.round((canvasDisplayWidth - routeLayerWidthDisplay) / 2),
@@ -1371,7 +1382,6 @@ export function PreviewEditorCanvas({
               selectionAction={renderLayerAction('meta')}
               style={[
                 styles.metaBlock,
-                usesLayoutHeader ? styles.metaBlockSunset : null,
                 { opacity: layerStyleSettings.meta.opacity },
                 { zIndex: baseLayerZ('meta'), elevation: baseLayerZ('meta') },
               ]}
@@ -1380,29 +1390,18 @@ export function PreviewEditorCanvas({
                 <Text
                   style={[
                     styles.metaTitle,
-                    usesLayoutHeader ? styles.metaTitleSunset : null,
                     { color: layerStyleSettings.meta.color },
                     {
                       fontFamily: fontPreset.family,
                       fontWeight: fontPreset.weightTitle,
-                      fontSize: Math.round(
-                        (usesLayoutHeader ? 24 : 18) * compactTextScale,
-                      ),
+                      fontSize: Math.round(18 * compactTextScale),
                     },
                   ]}
                 >
-                  {usesLayoutHeader ? activityName.toUpperCase() : activityName}
+                  {activityName}
                 </Text>
               ) : null}
-              {usesLayoutHeader && headerVisible.title ? (
-                <View
-                  style={[
-                    styles.metaDividerSunset,
-                    { backgroundColor: `${layerStyleSettings.meta.color}66` },
-                  ]}
-                />
-              ) : null}
-              {!usesLayoutHeader && headerMetaLine ? (
+              {headerMetaLine ? (
                 <Text
                   style={[
                     styles.metaSubtitle,
@@ -1411,22 +1410,6 @@ export function PreviewEditorCanvas({
                       fontFamily: fontPreset.family,
                       fontWeight: '400',
                       fontSize: Math.round(12 * compactTextScale),
-                    },
-                  ]}
-                >
-                  {headerMetaLine}
-                </Text>
-              ) : null}
-              {usesLayoutHeader && headerMetaLine ? (
-                <Text
-                  style={[
-                    styles.metaSubtitle,
-                    styles.metaSubtitleSunset,
-                    { color: layerStyleSettings.meta.color },
-                    {
-                      fontFamily: fontPreset.family,
-                      fontWeight: '400',
-                      fontSize: Math.round(13 * compactTextScale),
                     },
                   ]}
                 >
@@ -2515,14 +2498,6 @@ export function PreviewEditorCanvas({
                                   typeof paceValue === 'number'
                                     ? formatPaceAxisLabel(paceValue)
                                     : null;
-                                const paceLabelWidthEstimate =
-                                  (paceLabel?.length ?? 0) * 5;
-                                const centeredHorizontalLabelX = Math.max(
-                                  chartBounds.left + 2,
-                                  barLeft +
-                                    barWidth / 2 -
-                                    paceLabelWidthEstimate / 2,
-                                );
                                 const labelX = Math.min(
                                   chartBounds.right - 24,
                                   barLeft + barWidth + 6,
@@ -2936,7 +2911,20 @@ export function PreviewEditorCanvas({
               )
             : null}
 
-          {!isPremium ? <Text style={styles.watermark}>PACEFRAME</Text> : null}
+          {fixedDeviceName ? (
+            <Text
+              style={styles.deviceAttribution}
+              selectable={false}
+              numberOfLines={1}
+            >
+              {fixedDeviceName}
+            </Text>
+          ) : null}
+          {!isPremium ? (
+            <Text style={styles.watermark} selectable={false}>
+              PACEFRAME
+            </Text>
+          ) : null}
         </View>
       </Animated.View>
     </View>
@@ -3127,23 +3115,16 @@ function createStyles(colors: ThemeColors) {
       borderColor: 'transparent',
       alignItems: 'center',
     },
-    metaBlockSunset: {
-      width: 280,
-      paddingTop: 4,
-    },
     metaSubtitle: {
       color: colors.onImageText,
       fontSize: 12,
       marginTop: 2,
+      includeFontPadding: false,
       textShadowColor: colors.onImageShadow,
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
-    },
-    metaSubtitleSunset: {
-      color: colors.onImageTextMuted,
-      fontSize: 13,
-      letterSpacing: 0.2,
-      marginTop: 6,
+      alignItems: 'center',
+      alignSelf: 'center',
     },
     metaLocation: {
       color: colors.onImageText,
@@ -3159,20 +3140,10 @@ function createStyles(colors: ThemeColors) {
       fontSize: 18,
       fontWeight: '800',
       textAlign: 'center',
+      includeFontPadding: false,
       textShadowColor: colors.onImageShadowStrong,
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
-    },
-    metaTitleSunset: {
-      fontSize: 24,
-      letterSpacing: 2.2,
-      marginBottom: 6,
-    },
-    metaDividerSunset: {
-      width: '82%',
-      height: 1,
-      backgroundColor: colors.onImageDivider,
-      marginTop: 2,
     },
     routeBlock: {
       padding: 0,
@@ -3279,6 +3250,17 @@ function createStyles(colors: ThemeColors) {
       color: colors.watermarkOnImage,
       fontWeight: '800',
       letterSpacing: 1,
+      zIndex: 5000,
+      elevation: 5000,
+    },
+    deviceAttribution: {
+      position: 'absolute',
+      left: 14,
+      bottom: 16,
+      maxWidth: '70%',
+      color: colors.watermarkOnImage,
+      fontWeight: '800',
+      letterSpacing: 0.6,
       zIndex: 5000,
       elevation: 5000,
     },

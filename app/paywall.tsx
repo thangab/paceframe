@@ -59,7 +59,7 @@ export default function PaywallScreen() {
   const [weeklyPkg, setWeeklyPkg] = useState<PurchasesPackage | null>(null);
   const [annualPkg, setAnnualPkg] = useState<PurchasesPackage | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PlanKind | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [, setMessage] = useState<string | null>(null);
   const features = [
     'All premium templates',
     'No watermark on exports',

@@ -6,6 +6,7 @@ export type FieldId =
   | 'cadence'
   | 'calories'
   | 'avgHr';
+export type StatsVisibleFields = Record<FieldId, boolean>;
 export type RouteMode = 'off' | 'map' | 'trace';
 export type RouteMapVariant = 'standard' | 'dark' | 'satellite';
 export type ChartOrientation = 'vertical' | 'horizontal';
@@ -24,7 +25,10 @@ export type StatsLayoutKind =
   | 'panel-grid'
   | 'sunset-hero'
   | 'morning-glass'
-  | 'split-bold';
+  | 'split-bold'
+  | 'mile-ring'
+  | 'signal-board'
+  | 'social-pill';
 export type BaseLayerId =
   | 'meta'
   | 'stats'
@@ -39,6 +43,13 @@ export type StatsLayout = {
   name: string;
   layout: StatsLayoutKind;
   premium?: boolean;
+  previewHeight?: number;
+  metricLimit?: number;
+  supportsPrimaryLayer?: boolean;
+  resetTransformsOnSelect?: boolean;
+  defaultVisibleFields?: Partial<StatsVisibleFields>;
+  defaultVisibleFieldOrder?: FieldId[];
+  defaultVisibleFieldCount?: number;
   x: number;
   y: number;
   width: number;
