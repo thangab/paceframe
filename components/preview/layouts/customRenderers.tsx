@@ -73,7 +73,6 @@ const CUSTOM_PRIMARY_LAYOUT_RENDERERS: Partial<
   'sunset-hero': renderSunsetHeroPrimary,
   'morning-glass': renderMorningGlassPrimary,
   'split-bold': renderSplitBoldPrimary,
-  'social-pill': renderSocialPillPrimary,
 };
 
 export function renderCustomLayout(
@@ -500,17 +499,18 @@ function renderSocialPillLayout(
     metrics,
     fontPreset,
     textColorOverride,
-    primaryInSeparateLayer,
     layerTextColor,
   }: CustomLayoutRenderProps,
   { styles, ValueWithUnit }: CustomRendererHelpers,
 ) {
-  if (primaryInSeparateLayer || !metrics[0]) {
+  const visibleMetrics = metrics.slice(0, 3);
+
+  if (!visibleMetrics.length) {
     return <></>;
   }
 
-  return renderSocialPillBadge({
-    value: metrics[0].value,
+  return renderSocialPillMetrics({
+    metrics: visibleMetrics,
     fontPreset,
     textColorOverride,
     layerTextColor,
@@ -550,25 +550,6 @@ function renderSunsetHeroPrimary(
   );
 }
 
-function renderSocialPillPrimary(
-  {
-    fontPreset,
-    value,
-    textColorOverride,
-    layerTextColor,
-  }: CustomPrimaryRenderProps,
-  { styles, ValueWithUnit }: CustomRendererHelpers,
-) {
-  return renderSocialPillBadge({
-    value,
-    fontPreset,
-    textColorOverride,
-    layerTextColor,
-    styles,
-    ValueWithUnit,
-  });
-}
-
 function renderMorningGlassPrimary(
   { fontPreset, value, textColorOverride }: CustomPrimaryRenderProps,
   { styles, ValueWithUnit }: CustomRendererHelpers,
@@ -605,15 +586,38 @@ function renderSplitBoldPrimary(
   );
 }
 
-function renderSocialPillBadge({
-  value,
+function socialPillIcon(
+  metricId: string,
+): keyof typeof MaterialCommunityIcons.glyphMap {
+  switch (metricId) {
+    case 'distance':
+      return 'heart';
+    case 'time':
+      return 'clock-outline';
+    case 'pace':
+      return 'account-group-outline';
+    case 'elev':
+      return 'terrain';
+    case 'cadence':
+      return 'walk';
+    case 'calories':
+      return 'fire';
+    case 'avgHr':
+      return 'heart-pulse';
+    default:
+      return 'information-outline';
+  }
+}
+
+function renderSocialPillMetrics({
+  metrics,
   fontPreset,
   textColorOverride,
   layerTextColor,
   styles,
   ValueWithUnit,
 }: {
-  value: string;
+  metrics: Metric[];
   fontPreset: FontPreset;
   textColorOverride: { color: string } | null;
   layerTextColor?: string;
@@ -625,26 +629,30 @@ function renderSocialPillBadge({
   return (
     <View style={styles.socialPillWrap}>
       <View style={styles.socialPillBubble}>
-        <View style={styles.socialPillIconWrap}>
-          <MaterialCommunityIcons
-            name="heart"
-            size={26}
-            color={foregroundColor}
-          />
-        </View>
-        <View style={styles.socialPillValueWrap}>
-          <ValueWithUnit
-            value={value}
-            fontPreset={fontPreset}
-            valueStyle={styles.socialPillValue}
-            unitStyle={styles.socialPillUnit}
-            textStyleOverride={textColorOverride}
-            unitStyleOverride={textColorOverride}
-            numberOfLines={1}
-            autoFit={false}
-            minimumFontScale={0.9}
-          />
-        </View>
+        {metrics.map((metric) => (
+          <View key={metric.id} style={styles.socialPillMetric}>
+            <View style={styles.socialPillIconWrap}>
+              <MaterialCommunityIcons
+                name={socialPillIcon(metric.id)}
+                size={18}
+                color={foregroundColor}
+              />
+            </View>
+            <View style={styles.socialPillValueWrap}>
+              <ValueWithUnit
+                value={metric.value}
+                fontPreset={fontPreset}
+                valueStyle={styles.socialPillValue}
+                unitStyle={styles.socialPillUnit}
+                textStyleOverride={textColorOverride}
+                unitStyleOverride={textColorOverride}
+                numberOfLines={1}
+                autoFit={false}
+                minimumFontScale={1}
+              />
+            </View>
+          </View>
+        ))}
       </View>
       <View style={styles.socialPillTail} />
     </View>
