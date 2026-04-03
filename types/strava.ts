@@ -54,6 +54,7 @@ export type StravaActivity = {
   photos?: StravaActivityPhotos;
   photoUrl?: string | null;
   photoThumbUrl?: string | null;
+  detailsFetchedAt?: string | null;
   laps?: StravaLap[];
   heartRateStream?: StravaHeartRatePoint[];
   // Garmin detail stream: x = sample startTimeInSeconds (epoch seconds), y = speedMetersPerSecond

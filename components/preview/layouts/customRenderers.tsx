@@ -634,7 +634,7 @@ function renderSocialPillMetrics({
             <View style={styles.socialPillIconWrap}>
               <MaterialCommunityIcons
                 name={socialPillIcon(metric.id)}
-                size={18}
+                size={20}
                 color={foregroundColor}
               />
             </View>

@@ -59,6 +59,7 @@ export default function ActivitiesScreen() {
       ? 'garmin'
       : 'strava';
   const selectedActivityId = useActivityStore((s) => s.selectedActivityId);
+  const selectedActivity = useActivityStore((s) => s.selectedActivity());
   const setActivities = useActivityStore((s) => s.setActivities);
   const selectActivity = useActivityStore((s) => s.selectActivity);
   const updateActivity = useActivityStore((s) => s.updateActivity);
@@ -303,15 +304,18 @@ export default function ActivitiesScreen() {
     target: '/preview' | '/preview?mode=templates',
   ) {
     if (!selectedActivityId) return;
+    const shouldSyncStravaDetails =
+      activeSource === 'strava' && !selectedActivity?.detailsFetchedAt;
+
     setIsPreparingPreview(true);
     setError(null);
     setPreparingPreviewMessage(
-      activeSource === 'strava'
+      shouldSyncStravaDetails
         ? 'Syncing Strava details...'
         : 'Preparing preview...',
     );
     try {
-      if (activeSource === 'strava') {
+      if (shouldSyncStravaDetails) {
         const activeTokens = await getValidTokens();
         const stravaAthleteId =
           activeTokens?.athleteId ?? connections.strava?.athleteId ?? null;
