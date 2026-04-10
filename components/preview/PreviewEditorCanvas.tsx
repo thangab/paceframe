@@ -244,6 +244,34 @@ half4 main(float2 xy) {
 }
 `);
 
+function scatteredRandom(seed: number) {
+  const value = Math.sin(seed * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function estimateScatteredCharWidth(
+  char: string,
+  fontSize: number,
+  letterSpacing: number,
+  widthFactor: number,
+) {
+  const normalizedFactor =
+    char === ' '
+      ? 0.34
+      : /[il1'.,:;!]/.test(char)
+        ? 0.34
+        : /[I]/.test(char)
+          ? 0.42
+      : /[mwMW@#%&]/.test(char)
+          ? 0.98
+          : /[CEGS]/.test(char)
+            ? 0.82
+            : /[A-Z0-9/]/.test(char)
+              ? 0.76
+            : widthFactor;
+  return fontSize * normalizedFactor + letterSpacing;
+}
+
 export function PreviewEditorCanvas({
   exportRef,
   isSquareFormat,
@@ -2681,6 +2709,8 @@ export function PreviewEditorCanvas({
                     (resolvedTextColor === 'rgba(0,0,0,0)' ||
                       hasTransparentAccentToken) &&
                     Boolean(resolvedBackgroundColor);
+                  const usesScattered =
+                    item.renderStyle === 'scattered' && !usesCutout;
                   const plainText = item.tokens
                     .map((token) => token.text)
                     .join('');
@@ -2834,6 +2864,273 @@ export function PreviewEditorCanvas({
                               })}
                             </Group>
                           </Canvas>
+                        </View>
+                      ) : usesScattered ? (
+                        <View
+                          style={{
+                            width: blockWidth,
+                            height: blockHeight,
+                          }}
+                        >
+                          {textLines.map((line, lineIndex) => {
+                            const isLabelScatter = /label/i.test(item.id);
+                            const scatterJitterXFactor = isLabelScatter
+                              ? 0.34
+                              : 0.14;
+                            const scatterJitterYFactor = isLabelScatter
+                              ? 0.3
+                              : 0.12;
+                            const scatterRotationRange = isLabelScatter
+                              ? 20
+                              : 8;
+                            const scatterScaleMin = isLabelScatter ? 0.88 : 0.95;
+                            const scatterScaleRange = isLabelScatter ? 0.22 : 0.08;
+                            const scatterLayers = isLabelScatter
+                              ? [
+                                  {
+                                    dx: -1.6,
+                                    dy: 1.1,
+                                    color: 'rgba(255,255,255,0.05)',
+                                    shadowColor: 'rgba(255,255,255,0.12)',
+                                    shadowRadius: 5,
+                                  },
+                                  {
+                                    dx: 0.9,
+                                    dy: -0.7,
+                                    color: 'rgba(255,255,255,0.08)',
+                                    shadowColor: 'rgba(255,255,255,0.1)',
+                                    shadowRadius: 4,
+                                  },
+                                  {
+                                    dx: 0,
+                                    dy: 0,
+                                    color: 'rgba(250,252,255,0.62)',
+                                    shadowColor: 'rgba(255,255,255,0.08)',
+                                    shadowRadius: 2,
+                                  },
+                                  {
+                                    dx: 0,
+                                    dy: 0,
+                                    color: resolvedTextColor,
+                                    shadowColor: 'rgba(255,255,255,0.04)',
+                                    shadowRadius: 1,
+                                    opacity: 0.72,
+                                  },
+                                ]
+                              : [
+                                  {
+                                    dx: -1.1,
+                                    dy: 0.8,
+                                    color: 'rgba(255,255,255,0.05)',
+                                    shadowColor: 'rgba(255,255,255,0.1)',
+                                    shadowRadius: 5,
+                                  },
+                                  {
+                                    dx: 0.7,
+                                    dy: -0.5,
+                                    color: 'rgba(255,255,255,0.08)',
+                                    shadowColor: 'rgba(255,255,255,0.08)',
+                                    shadowRadius: 4,
+                                  },
+                                  {
+                                    dx: 0,
+                                    dy: 0,
+                                    color: 'rgba(250,252,255,0.72)',
+                                    shadowColor: 'rgba(255,255,255,0.08)',
+                                    shadowRadius: 2,
+                                  },
+                                  {
+                                    dx: 0,
+                                    dy: 0,
+                                    color: resolvedTextColor,
+                                    shadowColor: 'rgba(255,255,255,0.03)',
+                                    shadowRadius: 1,
+                                    opacity: 0.82,
+                                  },
+                                ];
+                            const lineWidth = Array.from(line).reduce(
+                              (sum, char) =>
+                                sum +
+                                estimateScatteredCharWidth(
+                                  char,
+                                  fontSize,
+                                  letterSpacing,
+                                  widthFactor,
+                                ),
+                              0,
+                            );
+                            const startX =
+                              resolvedTextAlign === 'right'
+                                ? blockWidth - paddingX - lineWidth
+                                : resolvedTextAlign === 'center'
+                                  ? Math.round((blockWidth - lineWidth) / 2)
+                                  : paddingX;
+                            const baseY = paddingY + lineIndex * lineHeight;
+                            let cursorX = startX;
+
+                            return Array.from(line).map((char, charIndex) => {
+                              const charWidth = estimateScatteredCharWidth(
+                                char,
+                                fontSize,
+                                letterSpacing,
+                                widthFactor,
+                              );
+                              const seedBase =
+                                item.x * 0.73 +
+                                item.y * 1.19 +
+                                lineIndex * 17.3 +
+                                charIndex * 9.7;
+                              const jitterX =
+                                (scatteredRandom(seedBase + 1) - 0.5) *
+                                fontSize *
+                                scatterJitterXFactor;
+                              const jitterY =
+                                (scatteredRandom(seedBase + 2) - 0.5) *
+                                fontSize *
+                                scatterJitterYFactor;
+                              const rotation =
+                                (scatteredRandom(seedBase + 3) - 0.5) *
+                                scatterRotationRange;
+                              const scale =
+                                scatterScaleMin +
+                                scatteredRandom(seedBase + 4) *
+                                  scatterScaleRange;
+                              const textureDriftX =
+                                (scatteredRandom(seedBase + 5) - 0.5) *
+                                fontSize *
+                                0.08;
+                              const textureDriftY =
+                                (scatteredRandom(seedBase + 6) - 0.5) *
+                                fontSize *
+                                0.08;
+                              const textureScale =
+                                0.96 + scatteredRandom(seedBase + 7) * 0.06;
+                              const textureLayers = Array.from({
+                                length: isLabelScatter ? 4 : 6,
+                              }).map((_, textureIndex) => {
+                                const textureSeed = seedBase + 20 + textureIndex * 3.17;
+                                const driftX =
+                                  (scatteredRandom(textureSeed + 1) - 0.5) *
+                                  fontSize *
+                                  (isLabelScatter ? 0.11 : 0.14);
+                                const driftY =
+                                  (scatteredRandom(textureSeed + 2) - 0.5) *
+                                  fontSize *
+                                  (isLabelScatter ? 0.09 : 0.12);
+                                const opacity =
+                                  (isLabelScatter ? 0.07 : 0.09) +
+                                  scatteredRandom(textureSeed + 3) * 0.05;
+                                const scaleLayer =
+                                  0.93 + scatteredRandom(textureSeed + 4) * 0.1;
+                                const tone =
+                                  textureIndex % 2 === 0
+                                    ? `rgba(248,252,255,${opacity.toFixed(3)})`
+                                    : `rgba(234,242,249,${(opacity * 0.9).toFixed(3)})`;
+
+                                return {
+                                  dx: driftX,
+                                  dy: driftY,
+                                  color: tone,
+                                  shadowColor: 'rgba(255,255,255,0.04)',
+                                  shadowRadius: 1,
+                                  shadowOffset: { width: 0, height: 0 },
+                                  scale: scaleLayer,
+                                  opacity: 1,
+                                };
+                              });
+                              const charLeft = cursorX + jitterX;
+                              const charTop = baseY + jitterY;
+                              cursorX += charWidth;
+
+                              if (char === ' ') {
+                                return null;
+                              }
+
+                              return (
+                                <View
+                                  key={`${item.id}-scatter-char-${lineIndex}-${charIndex}`}
+                                  style={{
+                                    position: 'absolute',
+                                    left: charLeft,
+                                    top: charTop,
+                                    width: Math.max(fontSize * 1.25, charWidth * 1.4),
+                                    height: lineHeight + fontSize * 0.4,
+                                  }}
+                                >
+                                  {[
+                                    {
+                                      dx: 1.4,
+                                      dy: 2.2,
+                                      color: 'rgba(26,34,46,0.08)',
+                                      shadowColor: 'rgba(10,14,20,0.08)',
+                                      shadowRadius: 1,
+                                      shadowOffset: { width: 0, height: 0 },
+                                      scale: 1,
+                                      opacity: 1,
+                                    },
+                                    ...scatterLayers.map((layer) => ({
+                                      ...layer,
+                                      shadowOffset: { width: 0, height: 0 },
+                                      scale: 1,
+                                      opacity: layer.opacity ?? 1,
+                                    })),
+                                    ...textureLayers,
+                                    {
+                                      dx: textureDriftX,
+                                      dy: textureDriftY,
+                                      color: 'rgba(236,243,250,0.18)',
+                                      shadowColor: 'rgba(255,255,255,0.04)',
+                                      shadowRadius: 1,
+                                      shadowOffset: { width: 0, height: 0 },
+                                      scale: textureScale,
+                                      opacity: 1,
+                                    },
+                                    {
+                                      dx: -textureDriftX * 0.7,
+                                      dy: textureDriftY * 0.55,
+                                      color: 'rgba(255,255,255,0.12)',
+                                      shadowColor: 'rgba(255,255,255,0.03)',
+                                      shadowRadius: 1,
+                                      shadowOffset: { width: 0, height: 0 },
+                                      scale: textureScale * 0.985,
+                                      opacity: 1,
+                                    },
+                                  ].map((layer, layerIndex) => (
+                                    <Text
+                                      key={`${item.id}-scatter-char-layer-${lineIndex}-${charIndex}-${layerIndex}`}
+                                      style={[
+                                        styles.templateTextValue,
+                                        {
+                                          position: 'absolute',
+                                          left: layer.dx,
+                                          top: layer.dy,
+                                          color: layer.color,
+                                          opacity: layer.opacity ?? 1,
+                                          fontSize,
+                                          lineHeight,
+                                          fontFamily: item.fontFamily,
+                                          fontWeight: item.fontWeight ?? '700',
+                                          letterSpacing:
+                                            item.letterSpacing !== undefined
+                                              ? item.letterSpacing
+                                              : 0.2,
+                                          textShadowColor: layer.shadowColor,
+                                          textShadowOffset: layer.shadowOffset,
+                                          textShadowRadius: layer.shadowRadius,
+                                          transform: [
+                                            { rotate: `${rotation}deg` },
+                                            { scale: scale * layer.scale },
+                                          ],
+                                        },
+                                      ]}
+                                    >
+                                      {char}
+                                    </Text>
+                                  ))}
+                                </View>
+                              );
+                            });
+                          })}
                         </View>
                       ) : (
                         <Text

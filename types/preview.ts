@@ -130,6 +130,7 @@ export type PreviewTemplateChartElement = {
 export type PreviewTemplateTextElement = {
   id: string;
   text: string;
+  renderStyle?: 'standard' | 'scattered';
   formatDate?: string;
   requiredDataFields?: FieldId[];
   isBehind?: boolean;
