@@ -2969,6 +2969,26 @@ export function PreviewEditorCanvas({
                             let cursorX = startX;
 
                             return Array.from(line).map((char, charIndex) => {
+                              const skyScriptBaselineSlope =
+                                item.id === 'distance-label'
+                                  ? 0.32
+                                  : item.id === 'distance-value'
+                                    ? 0.18
+                                    : item.id === 'pace-label'
+                                      ? -0.12
+                                      : item.id === 'pace-value'
+                                        ? -0.08
+                                        : 0;
+                              const skyScriptCurve =
+                                item.id === 'distance-label'
+                                  ? 0.42
+                                  : item.id === 'distance-value'
+                                    ? 0.18
+                                    : item.id === 'pace-label'
+                                      ? -0.16
+                                      : item.id === 'pace-value'
+                                        ? -0.06
+                                        : 0;
                               const charWidth = estimateScatteredCharWidth(
                                 char,
                                 fontSize,
@@ -2995,6 +3015,16 @@ export function PreviewEditorCanvas({
                                 scatterScaleMin +
                                 scatteredRandom(seedBase + 4) *
                                   scatterScaleRange;
+                              const lineCenterIndex =
+                                Math.max(0, line.length - 1) / 2;
+                              const relativeIndex = charIndex - lineCenterIndex;
+                              const baselineDriftY =
+                                relativeIndex * fontSize * 0.06 * skyScriptBaselineSlope;
+                              const curvedDriftY =
+                                (relativeIndex * relativeIndex) *
+                                fontSize *
+                                0.008 *
+                                skyScriptCurve;
                               const textureDriftX =
                                 (scatteredRandom(seedBase + 5) - 0.5) *
                                 fontSize *
@@ -3039,7 +3069,8 @@ export function PreviewEditorCanvas({
                                 };
                               });
                               const charLeft = cursorX + jitterX;
-                              const charTop = baseY + jitterY;
+                              const charTop =
+                                baseY + jitterY + baselineDriftY + curvedDriftY;
                               cursorX += charWidth;
 
                               if (char === ' ') {
