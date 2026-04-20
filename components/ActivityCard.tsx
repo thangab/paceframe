@@ -176,7 +176,7 @@ export function ActivityCard({
 
         <View style={styles.content}>
           <View style={styles.titleRow}>
-            <Text style={styles.title} numberOfLines={1}>
+            <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
               {activity.name}
             </Text>
             <View
@@ -494,12 +494,16 @@ function createStyles(colors: ThemeColors) {
     },
     titleRow: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       gap: 6,
+      minWidth: 0,
     },
     title: {
+      flex: 1,
+      minWidth: 0,
       color: colors.text,
       fontSize: 17,
+      lineHeight: 21,
       fontWeight: '800',
     },
     date: {

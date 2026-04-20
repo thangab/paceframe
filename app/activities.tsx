@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
   FlatList,
@@ -35,6 +35,9 @@ import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 
 export default function ActivitiesScreen() {
+  const { syncStatus: rawSyncStatus } = useLocalSearchParams<{
+    syncStatus?: string | string[];
+  }>();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -79,6 +82,13 @@ export default function ActivitiesScreen() {
   const [isPreparingPreview, setIsPreparingPreview] = useState(false);
   const [preparingPreviewMessage, setPreparingPreviewMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const syncStatus = Array.isArray(rawSyncStatus)
+    ? rawSyncStatus[0]
+    : rawSyncStatus;
+  const isStravaSyncPending =
+    activeSource === 'strava' &&
+    syncStatus === 'strava-pending' &&
+    activities.length === 0;
   useEffect(() => {
     const authSession = `${activeProvider ?? 'none'}::${connections.garmin?.garminUserId ?? 'none'}::${connections.strava?.athleteId ?? 'none'}::${connections.mock?.athleteId ?? 'none'}`;
     if (previousAuthRef.current && previousAuthRef.current !== authSession) {
@@ -426,6 +436,11 @@ export default function ActivitiesScreen() {
         {(loading || !hasFinishedInitialLoad) && activities.length === 0 ? (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={colors.primary} />
+            {isStravaSyncPending ? (
+              <Text style={styles.pendingSyncText}>
+                Strava connecté, synchronisation des activités en cours...
+              </Text>
+            ) : null}
           </View>
         ) : (
           <FlatList
@@ -462,7 +477,11 @@ export default function ActivitiesScreen() {
             }
             ListEmptyComponent={
               hasFinishedInitialLoad && !loading ? (
-                <Text style={styles.empty}>No activities found.</Text>
+                <Text style={styles.empty}>
+                  {isStravaSyncPending
+                    ? 'Strava connecté, synchronisation des activités en cours...'
+                    : 'No activities found.'}
+                </Text>
               ) : null
             }
           />
@@ -702,6 +721,13 @@ function createStyles(colors: ThemeColors) {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
+      gap: spacing.sm,
+    },
+    pendingSyncText: {
+      color: colors.textMuted,
+      fontSize: 14,
+      textAlign: 'center',
+      paddingHorizontal: spacing.lg,
     },
     error: {
       color: colors.danger,

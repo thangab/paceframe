@@ -108,7 +108,9 @@ export default function OAuthCallbackScreen() {
   const [error, setError] = useState<string | null>(null);
   const [loadingMessage, setLoadingMessage] = useState('Loading...');
 
-  function resetAndReplace(path: '/activities' | '/login') {
+  function resetAndReplace(
+    path: '/activities' | '/activities?syncStatus=strava-pending' | '/login',
+  ) {
     router.replace(path);
   }
 
@@ -227,9 +229,10 @@ export default function OAuthCallbackScreen() {
 
     let cancelled = false;
     void (async () => {
+      let initialStravaSyncPending = false;
       try {
         setLoadingMessage('Connecting Strava...');
-        const tokens = await withTimeout(
+        const nextTokens = await withTimeout(
           exchangeCodeWithSupabase({
             code,
             redirectUri: STRAVA_REDIRECT_URI,
@@ -237,17 +240,29 @@ export default function OAuthCallbackScreen() {
           12000,
         );
         if (cancelled) return;
-        await login(tokens);
-        if (tokens.athleteId) {
+        await login(nextTokens);
+        if (nextTokens.athleteId) {
           setLoadingMessage('Syncing Strava activities...');
-          await syncStravaActivitiesWithSupabase({
-            athleteId: tokens.athleteId,
-            limit: 5,
-          });
+          try {
+            await syncStravaActivitiesWithSupabase({
+              athleteId: nextTokens.athleteId,
+              limit: 5,
+            });
+          } catch (syncError) {
+            initialStravaSyncPending = true;
+            console.warn(
+              '[OAuth] Initial Strava sync failed after successful login',
+              syncError,
+            );
+          }
         }
         clearActivities();
         resetActivityLoadState();
-        resetAndReplace('/activities');
+        resetAndReplace(
+          initialStravaSyncPending
+            ? '/activities?syncStatus=strava-pending'
+            : '/activities',
+        );
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : 'Login failed.';
