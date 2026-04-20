@@ -25,6 +25,8 @@ export default function RootLayout() {
   usePushNotifications();
   const [fontsLoaded] = useFonts({
     Monoton: Monoton_400Regular,
+    DCCCloud: require('../assets/fonts/DCC-Cloud.otf'),
+    Autography: require('../assets/fonts/Autography.otf'),
     ...MaterialCommunityIcons.font,
   });
   const colors = useThemeColors();

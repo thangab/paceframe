@@ -55,6 +55,7 @@ type StravaActivityRow = {
   end_latlng?: unknown;
   photo_url?: string | null;
   photo_thumb_url?: string | null;
+  details_fetched_at?: string | null;
   photos?: unknown;
   laps?: unknown;
   heart_rate_stream?: unknown;
@@ -152,6 +153,7 @@ function mapSupabaseRow(row: StravaActivityRow): StravaActivity {
         : undefined,
     photoUrl: row.photo_url ?? null,
     photoThumbUrl: row.photo_thumb_url ?? null,
+    detailsFetchedAt: row.details_fetched_at ?? null,
     start_latlng: toLatLng(row.start_latlng),
     end_latlng: toLatLng(row.end_latlng),
     laps: toLaps(row.laps),
