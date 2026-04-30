@@ -9,7 +9,6 @@ import {
   hasHistoricalDataExportPermission,
   syncGarminPermissions,
   triggerGarminBackfill,
-  waitForGarminActivities,
 } from '@/lib/garmin';
 import {
   exchangeCodeWithSupabase,
@@ -109,7 +108,11 @@ export default function OAuthCallbackScreen() {
   const [loadingMessage, setLoadingMessage] = useState('Loading...');
 
   function resetAndReplace(
-    path: '/activities' | '/activities?syncStatus=strava-pending' | '/login',
+    path:
+      | '/activities'
+      | '/activities?syncStatus=strava-pending'
+      | '/activities?syncStatus=garmin-pending'
+      | '/login',
   ) {
     router.replace(path);
   }
@@ -149,6 +152,7 @@ export default function OAuthCallbackScreen() {
 
         void (async () => {
           try {
+            let initialGarminSyncPending = false;
             setLoadingMessage('Connecting Garmin...');
             await login({
               provider: 'garmin',
@@ -169,7 +173,7 @@ export default function OAuthCallbackScreen() {
               if (hasHistoricalDataExportPermission(permissions)) {
                 setLoadingMessage('Importing Garmin activities...');
                 await triggerGarminBackfill(normalizedGarminUserId);
-                await waitForGarminActivities(normalizedGarminUserId);
+                initialGarminSyncPending = true;
               }
             } catch (permissionError) {
               await logout();
@@ -177,7 +181,11 @@ export default function OAuthCallbackScreen() {
             }
             clearActivities();
             resetActivityLoadState();
-            resetAndReplace('/activities');
+            resetAndReplace(
+              initialGarminSyncPending
+                ? '/activities?syncStatus=garmin-pending'
+                : '/activities',
+            );
           } catch (err) {
             setError(
               err instanceof Error ? err.message : 'Garmin login failed.',
