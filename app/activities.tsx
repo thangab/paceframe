@@ -98,9 +98,9 @@ export default function ActivitiesScreen() {
   const showGarminSyncPending =
     activeSource === 'garmin' && garminSyncPending;
   const pendingEmptyStateMessage = isStravaSyncPending
-    ? 'Strava connecté, synchronisation des activités en cours...'
+    ? 'Strava connected, activity sync in progress...'
     : showGarminSyncPending
-      ? 'Garmin connecté, import des activités en cours...'
+      ? 'Garmin connected, activity import in progress...'
       : null;
   const pendingLoaderColor = pendingEmptyStateMessage
     ? colors.textMuted
