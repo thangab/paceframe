@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#111827"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "buildNumber": "3",
@@ -22,7 +24,9 @@
         "NSPhotoLibraryAddUsageDescription": "PaceFrame needs access to your photo library to save exported images.",
         "NSCameraUsageDescription": "PaceFrame needs camera access so you can capture media.",
         "NSHealthShareUsageDescription": "PaceFrame reads your workouts to generate visuals from your activity data.",
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -59,7 +63,9 @@
       ],
       "expo-notifications",
       "expo-video",
-      "expo-audio"
+      "expo-audio",
+      "expo-web-browser",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

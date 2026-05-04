@@ -57,7 +57,7 @@ export const DEFAULT_VISIBLE_LAYERS: Partial<Record<LayerId, boolean>> = {
   meta: true,
   stats: true,
   primary: true,
-  route: false,
+  route: true,
   chartPace: false,
   chartHr: false,
 };

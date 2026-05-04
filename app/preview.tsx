@@ -1799,6 +1799,37 @@ export default function PreviewScreen() {
     return true;
   }
 
+  async function ensureCameraPermission() {
+    setMessage(null);
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      setMessage('Camera permission is required.');
+      return false;
+    }
+    return true;
+  }
+
+  function getBackgroundCropSize() {
+    const width =
+      templateMode && selectedTemplateDefinition?.imagePickerCropSize?.width
+        ? Math.max(
+            1,
+            Math.round(selectedTemplateDefinition.imagePickerCropSize.width),
+          )
+        : 1080;
+    const height =
+      templateMode && selectedTemplateDefinition?.imagePickerCropSize?.height
+        ? Math.max(
+            1,
+            Math.round(selectedTemplateDefinition.imagePickerCropSize.height),
+          )
+        : isSquareFormat
+          ? 1080
+          : 1920;
+
+    return { width, height };
+  }
+
   function trackManagedTempUri(uri: string | null | undefined) {
     if (!uri || !isAppOwnedCacheFile(uri)) return;
     managedTempUrisRef.current.add(uri);
@@ -1893,27 +1924,12 @@ export default function PreviewScreen() {
     const allowed = await ensureMediaPermission();
     if (!allowed) return;
     try {
-      const cropWidth =
-        templateMode && selectedTemplateDefinition?.imagePickerCropSize?.width
-          ? Math.max(
-              1,
-              Math.round(selectedTemplateDefinition.imagePickerCropSize.width),
-            )
-          : 1080;
-      const cropHeight =
-        templateMode && selectedTemplateDefinition?.imagePickerCropSize?.height
-          ? Math.max(
-              1,
-              Math.round(selectedTemplateDefinition.imagePickerCropSize.height),
-            )
-          : isSquareFormat
-            ? 1080
-            : 1920;
+      const cropSize = getBackgroundCropSize();
       const cropResult = await ImageCropPicker.openPicker({
         mediaType: 'photo',
         cropping: true,
-        width: cropWidth,
-        height: cropHeight,
+        width: cropSize.width,
+        height: cropSize.height,
         compressImageQuality: 1,
         forceJpg: true,
       });
@@ -1938,6 +1954,41 @@ export default function PreviewScreen() {
       setMessage(
         err instanceof Error ? err.message : 'Could not choose image.',
       );
+    }
+  }
+
+  async function takePhotoMedia() {
+    const allowed = await ensureCameraPermission();
+    if (!allowed) return;
+    try {
+      const cropSize = getBackgroundCropSize();
+      const cropResult = await ImageCropPicker.openCamera({
+        mediaType: 'photo',
+        cropping: true,
+        width: cropSize.width,
+        height: cropSize.height,
+        compressImageQuality: 1,
+        forceJpg: true,
+      });
+
+      const asset: ImagePicker.ImagePickerAsset = {
+        uri: normalizeLocalUri(cropResult.path),
+        width: cropResult.width,
+        height: cropResult.height,
+        type: 'image',
+        fileName: cropResult.filename ?? null,
+        fileSize: cropResult.size ?? null,
+        mimeType: cropResult.mime ?? null,
+        duration: null,
+        assetId: null,
+        base64: null,
+        exif: null,
+      };
+      trackManagedTempUri(asset.uri);
+      await applyImageBackground(asset);
+    } catch (err: any) {
+      if (err?.code === 'E_PICKER_CANCELLED') return;
+      setMessage(err instanceof Error ? err.message : 'Could not take photo.');
     }
   }
 
@@ -2728,6 +2779,7 @@ export default function PreviewScreen() {
           setActivePanel={setActivePanel}
           busy={busy}
           isExtracting={isExtracting}
+          onTakePhoto={takePhotoMedia}
           onPickImage={pickImageMedia}
           onPickVideo={pickVideoMedia}
           activityPhotoUri={activityPhotoUri}
