@@ -14,6 +14,8 @@
 		3385949F2F4A770D00FF1592 /* PaceFrameHealthKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 338594972F4A770D00FF1592 /* PaceFrameHealthKit.swift */; };
 		338594A02F4A770D00FF1592 /* PaceFrameMapSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 338594992F4A770D00FF1592 /* PaceFrameMapSnapshot.swift */; };
 		338594A12F4A770D00FF1592 /* PaceFrameMapSnapshot.m in Sources */ = {isa = PBXBuildFile; fileRef = 338594982F4A770D00FF1592 /* PaceFrameMapSnapshot.m */; };
+		338594A22F4A770D00FF1592 /* PaceFrameClipboard.m in Sources */ = {isa = PBXBuildFile; fileRef = 338594A32F4A770D00FF1592 /* PaceFrameClipboard.m */; };
+		338594A42F4A770D00FF1592 /* PaceFrameClipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 338594A52F4A770D00FF1592 /* PaceFrameClipboard.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		4C92C137BFAEA4632AB5F84D /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5D38EEAE8D918BD1D809167 /* ExpoModulesProvider.swift */; };
 		837C3B4171D8282AD7B0A494 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 55F9E26F6D0E333105692F44 /* PrivacyInfo.xcprivacy */; };
@@ -33,6 +35,8 @@
 		338594992F4A770D00FF1592 /* PaceFrameMapSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaceFrameMapSnapshot.swift; sourceTree = "<group>"; };
 		3385949A2F4A770D00FF1592 /* PaceFrameVideoComposer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PaceFrameVideoComposer.m; sourceTree = "<group>"; };
 		3385949B2F4A770D00FF1592 /* PaceFrameVideoComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaceFrameVideoComposer.swift; sourceTree = "<group>"; };
+		338594A32F4A770D00FF1592 /* PaceFrameClipboard.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PaceFrameClipboard.m; sourceTree = "<group>"; };
+		338594A52F4A770D00FF1592 /* PaceFrameClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaceFrameClipboard.swift; sourceTree = "<group>"; };
 		55F9E26F6D0E333105692F44 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = PaceFrame/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		80A205EF101242D69FE581E8 /* libPods-PaceFrame.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-PaceFrame.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		9C5D66947F3B33BCFBDD8C84 /* Pods-PaceFrame.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PaceFrame.release.xcconfig"; path = "Target Support Files/Pods-PaceFrame/Pods-PaceFrame.release.xcconfig"; sourceTree = "<group>"; };
@@ -66,6 +70,8 @@
 				338594992F4A770D00FF1592 /* PaceFrameMapSnapshot.swift */,
 				3385949A2F4A770D00FF1592 /* PaceFrameVideoComposer.m */,
 				3385949B2F4A770D00FF1592 /* PaceFrameVideoComposer.swift */,
+				338594A32F4A770D00FF1592 /* PaceFrameClipboard.m */,
+				338594A52F4A770D00FF1592 /* PaceFrameClipboard.swift */,
 				338594892F4A765100FF1592 /* PaceFrame.entitlements */,
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
 				F11748442D0722820044C1D9 /* PaceFrame-Bridging-Header.h */,
@@ -364,6 +370,8 @@
 				3385949F2F4A770D00FF1592 /* PaceFrameHealthKit.swift in Sources */,
 				338594A02F4A770D00FF1592 /* PaceFrameMapSnapshot.swift in Sources */,
 				338594A12F4A770D00FF1592 /* PaceFrameMapSnapshot.m in Sources */,
+				338594A22F4A770D00FF1592 /* PaceFrameClipboard.m in Sources */,
+				338594A42F4A770D00FF1592 /* PaceFrameClipboard.swift in Sources */,
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
 				4C92C137BFAEA4632AB5F84D /* ExpoModulesProvider.swift in Sources */,
 			);

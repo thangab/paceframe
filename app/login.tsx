@@ -19,7 +19,6 @@ import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import {
   buildGarminOAuthStartUrl,
-  GARMIN_APP_OAUTH_REDIRECT_URI,
 } from '@/lib/garminOAuth';
 import { importActivitiesFromHealthKit } from '@/lib/healthkit';
 import { getMockTokens } from '@/lib/strava';
@@ -100,12 +99,7 @@ export default function LoginScreen() {
   async function handleGarminLogin() {
     try {
       setIsBusy(true);
-      const { authUrl, state } = await buildGarminOAuthStartUrl();
-      console.log('[Garmin][Login] Opening Garmin URL', {
-        authUrl,
-        redirectUri: GARMIN_APP_OAUTH_REDIRECT_URI,
-        state,
-      });
+      const { authUrl } = await buildGarminOAuthStartUrl();
       await Linking.openURL(authUrl);
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Garmin login failed.');

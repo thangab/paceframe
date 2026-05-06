@@ -7,6 +7,7 @@ type Props = {
   colors: any;
   activityPhotoUri?: string | null;
   onUseActivityPhotoBackground: () => void;
+  onTakePhoto: () => void;
   onPickImage: () => void;
   onPickVideo: () => void;
   onGenerateGradient: () => void;
@@ -23,6 +24,7 @@ export function BackgroundSection({
   colors,
   activityPhotoUri,
   onUseActivityPhotoBackground,
+  onTakePhoto,
   onPickImage,
   onPickVideo,
   onGenerateGradient,
@@ -64,22 +66,24 @@ export function BackgroundSection({
             </Pressable>
           ) : null}
           <Pressable
-            disabled
-            style={[
-              styles.premiumBtn,
-              !activityPhotoUri && styles.premiumBtnFullWidth,
-              styles.premiumBtnDisabled,
+            onPress={onTakePhoto}
+            disabled={busy || isExtracting}
+            style={({ pressed }) => [
+              styles.cameraBtn,
+              !activityPhotoUri && styles.cameraBtnFullWidth,
+              pressed ? styles.cameraBtnPressed : null,
+              busy || isExtracting ? styles.cameraBtnDisabled : null,
             ]}
             accessibilityRole="button"
-            accessibilityLabel="Premium"
+            accessibilityLabel="Take photo"
           >
             <MaterialCommunityIcons
-              name="crown-outline"
+              name="camera-outline"
               size={14}
-              color={colors.textMuted}
-              style={styles.premiumBtnIcon}
+              color={colors.text}
+              style={styles.cameraBtnIcon}
             />
-            <Text style={styles.premiumBtnText}>Premium</Text>
+            <Text style={styles.cameraBtnText}>Camera</Text>
           </Pressable>
         </View>
         <View style={styles.backgroundActionsRow}>

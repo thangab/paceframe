@@ -56,6 +56,7 @@ type Props = {
   setActivePanel: (panel: PreviewPanelTab) => void;
   busy: boolean;
   isExtracting: boolean;
+  onTakePhoto: () => void;
   onPickImage: () => void;
   onPickVideo: () => void;
   activityPhotoUri?: string | null;
@@ -135,6 +136,7 @@ export function PreviewEditorPanel({
   setActivePanel,
   busy,
   isExtracting,
+  onTakePhoto,
   onPickImage,
   onPickVideo,
   activityPhotoUri,
@@ -426,6 +428,7 @@ export function PreviewEditorPanel({
               colors={colors}
               activityPhotoUri={activityPhotoUri}
               onUseActivityPhotoBackground={onUseActivityPhotoBackground}
+              onTakePhoto={onTakePhoto}
               onPickImage={onPickImage}
               onPickVideo={onPickVideo}
               onGenerateGradient={onGenerateGradient}
@@ -755,7 +758,7 @@ function createStyles(colors: ThemeColors) {
       fontWeight: '500',
       marginTop: 2,
     },
-    premiumBtn: {
+    cameraBtn: {
       minWidth: 92,
       borderRadius: 12,
       borderWidth: 1,
@@ -765,19 +768,23 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'center',
       paddingHorizontal: 10,
     },
-    premiumBtnFullWidth: {
+    cameraBtnFullWidth: {
       flex: 1,
       minWidth: 0,
       minHeight: 68,
     },
-    premiumBtnDisabled: {
-      opacity: 0.62,
+    cameraBtnPressed: {
+      opacity: 0.88,
+      transform: [{ scale: 0.985 }],
     },
-    premiumBtnIcon: {
+    cameraBtnDisabled: {
+      opacity: 0.55,
+    },
+    cameraBtnIcon: {
       marginBottom: 4,
     },
-    premiumBtnText: {
-      color: colors.textMuted,
+    cameraBtnText: {
+      color: colors.text,
       fontSize: 12,
       fontWeight: '600',
     },

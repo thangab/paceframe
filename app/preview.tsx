@@ -16,8 +16,10 @@ import {
   useLocalSearchParams,
 } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
+import * as MediaLibrary from 'expo-media-library';
 import ImageCropPicker from 'react-native-image-crop-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { captureRef } from 'react-native-view-shot';
@@ -26,6 +28,11 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { PreviewEditorCanvas } from '@/components/preview/PreviewEditorCanvas';
+import {
+  ShareDestinationModal,
+  type ShareDestinationId,
+  type ShareExportAsset,
+} from '@/components/preview/ShareDestinationModal';
 import {
   PreviewEditorPanel,
   type PreviewPanelTab,
@@ -55,6 +62,7 @@ import {
   type PreviewDraft,
 } from '@/lib/previewDraft';
 import { removeBackgroundOnDevice } from '@/lib/backgroundRemoval';
+import { copyPngBase64ToClipboard } from '@/lib/nativeClipboard';
 import { composeVideoWithOverlay } from '@/lib/nativeVideoComposer';
 import {
   buildHeartRateAreaChartData,
@@ -157,6 +165,11 @@ export default function PreviewScreen() {
   const [isCapturingOverlay, setIsCapturingOverlay] = useState(false);
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [pngTransparentOnly, setPngTransparentOnly] = useState(false);
+  const [shareExportAsset, setShareExportAsset] =
+    useState<ShareExportAsset | null>(null);
+  const [shareToastMessage, setShareToastMessage] = useState<string | null>(
+    null,
+  );
   const [, setMessage] = useState<string | null>(null);
   const [centerGuides, setCenterGuides] = useState({
     showVertical: false,
@@ -166,6 +179,7 @@ export default function PreviewScreen() {
   const [media, setMedia] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [backgroundGradient, setBackgroundGradient] =
     useState<BackgroundGradient | null>(null);
+  const [backgroundIsTransparent, setBackgroundIsTransparent] = useState(true);
   const [autoSubjectUri, setAutoSubjectUri] = useState<string | null>(null);
   const [autoSubjectSourceUri, setAutoSubjectSourceUri] = useState<
     string | null
@@ -188,6 +202,14 @@ export default function PreviewScreen() {
     getPreviewTemplateById(selectedTemplateParam)?.id ??
       DEFAULT_PREVIEW_TEMPLATE_ID,
   );
+  useEffect(() => {
+    if (!shareToastMessage) return;
+    const timeout = setTimeout(() => {
+      setShareToastMessage(null);
+    }, 1800);
+
+    return () => clearTimeout(timeout);
+  }, [shareToastMessage]);
   const [selectedFontId, setSelectedFontId] = useState(FONT_PRESETS[0].id);
   const distanceUnit = usePreferencesStore((s) => s.distanceUnit);
   const elevationUnit = usePreferencesStore((s) => s.elevationUnit);
@@ -1019,6 +1041,7 @@ export default function PreviewScreen() {
     [canvasDisplayHeight],
   );
   const exportHeight = isSquareFormat ? EXPORT_PNG_WIDTH : 1920;
+  const sharePreviewAspectRatio = exportHeight / EXPORT_PNG_WIDTH;
   const dynamicStatsWidthDisplay = useMemo(
     () => Math.round(dynamicStatsWidth * canvasScaleX),
     [canvasScaleX, dynamicStatsWidth],
@@ -1093,6 +1116,7 @@ export default function PreviewScreen() {
       nextLayout.layout ?? LAYOUTS[0].layout;
     setMedia(null);
     setBackgroundGradient(null);
+    setBackgroundIsTransparent(true);
     setAutoSubjectUri(null);
     setAutoSubjectSourceUri(null);
     setImageOverlays([]);
@@ -1135,6 +1159,7 @@ export default function PreviewScreen() {
         ?.layout ?? LAYOUTS[0].layout;
     setMedia(draft.media ?? null);
     setBackgroundGradient(draft.backgroundGradient ?? null);
+    setBackgroundIsTransparent(!draft.media && !draft.backgroundGradient);
     setAutoSubjectUri(draft.autoSubjectUri ?? null);
     setAutoSubjectSourceUri(
       draft.autoSubjectUri && draft.media?.uri ? draft.media.uri : null,
@@ -1388,6 +1413,9 @@ export default function PreviewScreen() {
             hasStoredDraft = true;
             setMedia(draft.media);
             setBackgroundGradient(draft.backgroundGradient);
+            setBackgroundIsTransparent(
+              !draft.media && !draft.backgroundGradient,
+            );
             const mediaUri = draft.media?.uri ?? null;
             const subjectMatchesMedia =
               !templateDisablesBackgroundRemoval &&
@@ -1590,6 +1618,7 @@ export default function PreviewScreen() {
 
     setMedia(snapshot.media);
     setBackgroundGradient(snapshot.backgroundGradient);
+    setBackgroundIsTransparent(!snapshot.media && !snapshot.backgroundGradient);
     setAutoSubjectUri(snapshot.autoSubjectUri);
     setAutoSubjectSourceUri(snapshot.autoSubjectSourceUri);
     setImageOverlays(snapshot.imageOverlays);
@@ -1659,6 +1688,7 @@ export default function PreviewScreen() {
 
     setMedia(null);
     setBackgroundGradient(null);
+    setBackgroundIsTransparent(true);
     setAutoSubjectUri(null);
     setAutoSubjectSourceUri(null);
   }, [
@@ -1799,6 +1829,37 @@ export default function PreviewScreen() {
     return true;
   }
 
+  async function ensureCameraPermission() {
+    setMessage(null);
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      setMessage('Camera permission is required.');
+      return false;
+    }
+    return true;
+  }
+
+  function getBackgroundCropSize() {
+    const width =
+      templateMode && selectedTemplateDefinition?.imagePickerCropSize?.width
+        ? Math.max(
+            1,
+            Math.round(selectedTemplateDefinition.imagePickerCropSize.width),
+          )
+        : 1080;
+    const height =
+      templateMode && selectedTemplateDefinition?.imagePickerCropSize?.height
+        ? Math.max(
+            1,
+            Math.round(selectedTemplateDefinition.imagePickerCropSize.height),
+          )
+        : isSquareFormat
+          ? 1080
+          : 1920;
+
+    return { width, height };
+  }
+
   function trackManagedTempUri(uri: string | null | undefined) {
     if (!uri || !isAppOwnedCacheFile(uri)) return;
     managedTempUrisRef.current.add(uri);
@@ -1837,6 +1898,7 @@ export default function PreviewScreen() {
     const previousAutoSubjectUri = autoSubjectUri;
     setMedia(asset);
     setBackgroundGradient(null);
+    setBackgroundIsTransparent(false);
     setAutoSubjectUri(null);
     setAutoSubjectSourceUri(null);
     void cleanupMediaIfTemp(
@@ -1893,27 +1955,12 @@ export default function PreviewScreen() {
     const allowed = await ensureMediaPermission();
     if (!allowed) return;
     try {
-      const cropWidth =
-        templateMode && selectedTemplateDefinition?.imagePickerCropSize?.width
-          ? Math.max(
-              1,
-              Math.round(selectedTemplateDefinition.imagePickerCropSize.width),
-            )
-          : 1080;
-      const cropHeight =
-        templateMode && selectedTemplateDefinition?.imagePickerCropSize?.height
-          ? Math.max(
-              1,
-              Math.round(selectedTemplateDefinition.imagePickerCropSize.height),
-            )
-          : isSquareFormat
-            ? 1080
-            : 1920;
+      const cropSize = getBackgroundCropSize();
       const cropResult = await ImageCropPicker.openPicker({
         mediaType: 'photo',
         cropping: true,
-        width: cropWidth,
-        height: cropHeight,
+        width: cropSize.width,
+        height: cropSize.height,
         compressImageQuality: 1,
         forceJpg: true,
       });
@@ -1938,6 +1985,41 @@ export default function PreviewScreen() {
       setMessage(
         err instanceof Error ? err.message : 'Could not choose image.',
       );
+    }
+  }
+
+  async function takePhotoMedia() {
+    const allowed = await ensureCameraPermission();
+    if (!allowed) return;
+    try {
+      const cropSize = getBackgroundCropSize();
+      const cropResult = await ImageCropPicker.openCamera({
+        mediaType: 'photo',
+        cropping: true,
+        width: cropSize.width,
+        height: cropSize.height,
+        compressImageQuality: 1,
+        forceJpg: true,
+      });
+
+      const asset: ImagePicker.ImagePickerAsset = {
+        uri: normalizeLocalUri(cropResult.path),
+        width: cropResult.width,
+        height: cropResult.height,
+        type: 'image',
+        fileName: cropResult.filename ?? null,
+        fileSize: cropResult.size ?? null,
+        mimeType: cropResult.mime ?? null,
+        duration: null,
+        assetId: null,
+        base64: null,
+        exif: null,
+      };
+      trackManagedTempUri(asset.uri);
+      await applyImageBackground(asset);
+    } catch (err: any) {
+      if (err?.code === 'E_PICKER_CANCELLED') return;
+      setMessage(err instanceof Error ? err.message : 'Could not take photo.');
     }
   }
 
@@ -1971,6 +2053,7 @@ export default function PreviewScreen() {
     trackManagedTempUri(asset.uri);
     setMedia(asset);
     setBackgroundGradient(null);
+    setBackgroundIsTransparent(false);
     setAutoSubjectUri(null);
     setAutoSubjectSourceUri(null);
     void cleanupMediaIfTemp(
@@ -2331,46 +2414,166 @@ export default function PreviewScreen() {
     }
   }
 
+  async function openNativeShare(asset: ShareExportAsset, label = 'PaceFrame') {
+    if (!asset.uri) {
+      throw new Error('Export is not ready yet.');
+    }
+    if (!(await Sharing.isAvailableAsync())) {
+      throw new Error('Sharing is not available on this device.');
+    }
+
+    await Sharing.shareAsync(asset.uri, {
+      mimeType: asset.mimeType,
+      dialogTitle: `Share to ${label}`,
+    });
+  }
+
+  async function downloadExport(asset: ShareExportAsset) {
+    if (!asset.uri) {
+      throw new Error('Export is not ready yet.');
+    }
+    const permission = await MediaLibrary.requestPermissionsAsync();
+    if (!permission.granted) {
+      throw new Error('Photo library permission is required to save exports.');
+    }
+
+    await MediaLibrary.saveToLibraryAsync(asset.uri);
+  }
+
+  async function copyExport(asset: ShareExportAsset) {
+    if (!asset.uri) {
+      throw new Error('Export is not ready yet.');
+    }
+    if (asset.type !== 'image') {
+      await openNativeShare(asset, 'Share');
+      return;
+    }
+
+    const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    if (asset.transparent && Platform.OS === 'ios') {
+      await copyPngBase64ToClipboard(base64);
+      return;
+    }
+    await Clipboard.setImageAsync(base64);
+  }
+
+  async function createImageExportAsset() {
+    const includeOpaqueBackground = !backgroundIsTransparent;
+    setPngTransparentOnly(!includeOpaqueBackground);
+    setIsExportingPng(true);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    const exportFormat = includeOpaqueBackground ? 'jpg' : 'png';
+    const uri = await captureRef(exportRef, {
+      format: exportFormat,
+      quality: 1,
+      result: 'tmpfile',
+      width: EXPORT_PNG_WIDTH,
+      height: exportHeight,
+    });
+
+    return {
+      uri,
+      previewUri: uri,
+      type: 'image',
+      mimeType: includeOpaqueBackground ? 'image/jpeg' : 'image/png',
+      transparent: !includeOpaqueBackground,
+    } satisfies ShareExportAsset;
+  }
+
+  async function runImageShareDestination(destination: ShareDestinationId) {
+    const asset = await createImageExportAsset();
+
+    if (destination === 'copy') {
+      await copyExport(asset);
+      setShareToastMessage('Copied to clipboard');
+      setMessage('Copied to clipboard.');
+      return;
+    }
+
+    if (destination === 'download') {
+      await downloadExport(asset);
+      setShareToastMessage('Saved to photos');
+      setMessage('Saved to photo library.');
+      return;
+    }
+
+    await openNativeShare(asset, 'Share');
+    setMessage(
+      asset.mimeType === 'image/jpeg'
+        ? `JPG exported with background + layers (${EXPORT_PNG_WIDTH}x${exportHeight}).`
+        : `PNG exported with transparent background + layers only (${EXPORT_PNG_WIDTH}x${exportHeight}).`,
+    );
+  }
+
+  async function handleShareDestination(destination: ShareDestinationId) {
+    const asset = shareExportAsset;
+    if (!asset) return;
+
+    try {
+      setBusy(true);
+      setShareToastMessage(null);
+      setMessage(null);
+      if (asset.type === 'image') {
+        await runImageShareDestination(destination);
+        return;
+      }
+
+      if (destination === 'copy') {
+        await copyExport(asset);
+        setShareToastMessage('Ready to share');
+        setMessage('Video ready to share.');
+        return;
+      }
+
+      if (destination === 'download') {
+        await downloadExport(asset);
+        setShareToastMessage('Saved to photos');
+        setMessage('Saved to photo library.');
+        return;
+      }
+
+      await openNativeShare(asset, 'Share');
+      setMessage(
+        asset.type === 'video'
+          ? 'Video ready to share.'
+          : asset.mimeType === 'image/jpeg'
+            ? `JPG exported with background + layers (${EXPORT_PNG_WIDTH}x${exportHeight}).`
+            : `PNG exported with transparent background + layers only (${EXPORT_PNG_WIDTH}x${exportHeight}).`,
+      );
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Could not share export.');
+    } finally {
+      setIsExportingPng(false);
+      setPngTransparentOnly(false);
+      setBusy(false);
+    }
+  }
+
   async function exportAndShare() {
     if (!exportRef.current) return;
 
     try {
       setBusy(true);
       setMessage(null);
-      const includeOpaqueBackground =
-        media?.type === 'image' || backgroundGradient !== null;
-      setPngTransparentOnly(!includeOpaqueBackground);
-      setIsExportingPng(true);
-      await new Promise((resolve) => setTimeout(resolve, 80));
-
-      const exportFormat = includeOpaqueBackground ? 'jpg' : 'png';
-      const uri = await captureRef(exportRef, {
-        format: exportFormat,
-        quality: 1,
+      const previewUri = await captureRef(exportRef, {
+        format: 'jpg',
+        quality: 0.92,
         result: 'tmpfile',
         width: EXPORT_PNG_WIDTH,
         height: exportHeight,
       });
 
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: includeOpaqueBackground ? 'image/jpeg' : 'image/png',
-          dialogTitle: 'Share PaceFrame story',
-        });
-      } else {
-        throw new Error('Sharing is not available on this device.');
-      }
-
-      setMessage(
-        includeOpaqueBackground
-          ? `JPG exported with background + layers (${EXPORT_PNG_WIDTH}x${exportHeight}).`
-          : `PNG exported with transparent background + layers only (${EXPORT_PNG_WIDTH}x${exportHeight}).`,
-      );
+      setShareExportAsset({
+        previewUri,
+        type: 'image',
+      });
+      setShareToastMessage(null);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Failed to export.');
     } finally {
-      setIsExportingPng(false);
-      setPngTransparentOnly(false);
       setBusy(false);
     }
   }
@@ -2391,6 +2594,15 @@ export default function PreviewScreen() {
       setMessage(null);
       setMessage('Compositing video + layers...');
 
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      const previewUri = await captureRef(exportRef, {
+        format: 'jpg',
+        quality: 0.92,
+        result: 'tmpfile',
+        width: EXPORT_PNG_WIDTH,
+        height: exportHeight,
+      });
+
       setIsCapturingOverlay(true);
       await new Promise((resolve) => setTimeout(resolve, 80));
       const overlayUri = await captureRef(exportRef, {
@@ -2407,15 +2619,14 @@ export default function PreviewScreen() {
         overlayUri,
       });
 
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(composedVideoUri, {
-          dialogTitle: 'Share PaceFrame video + layers',
-        });
-      } else {
-        throw new Error('Sharing is not available on this device.');
-      }
-
-      setMessage('Video ready to share.');
+      setShareExportAsset({
+        uri: composedVideoUri,
+        previewUri,
+        type: 'video',
+        mimeType: 'video/mp4',
+        transparent: false,
+      });
+      setShareToastMessage(null);
     } catch (err) {
       setMessage(
         err instanceof Error ? err.message : 'Failed to export video + layers.',
@@ -2431,6 +2642,7 @@ export default function PreviewScreen() {
     const previousAutoSubjectUri = autoSubjectUri;
     setMedia(null);
     setBackgroundGradient(null);
+    setBackgroundIsTransparent(true);
     setAutoSubjectUri(null);
     setAutoSubjectSourceUri(null);
     void cleanupMediaIfTemp(previousMedia);
@@ -2474,6 +2686,7 @@ export default function PreviewScreen() {
     setAutoSubjectUri(null);
     setAutoSubjectSourceUri(null);
     setBackgroundGradient(nextGradient);
+    setBackgroundIsTransparent(false);
     void cleanupMediaIfTemp(previousMedia);
     void cleanupTempUriIfOwned(previousAutoSubjectUri);
   }
@@ -2728,6 +2941,7 @@ export default function PreviewScreen() {
           setActivePanel={setActivePanel}
           busy={busy}
           isExtracting={isExtracting}
+          onTakePhoto={takePhotoMedia}
           onPickImage={pickImageMedia}
           onPickVideo={pickVideoMedia}
           activityPhotoUri={activityPhotoUri}
@@ -2807,6 +3021,19 @@ export default function PreviewScreen() {
           onSetPaceChartOrientation={setPaceChartOrientation}
           paceChartFill={paceChartFill}
           onSetPaceChartFill={setPaceChartFill}
+        />
+        <ShareDestinationModal
+          asset={shareExportAsset}
+          busy={busy}
+          previewAspectRatio={sharePreviewAspectRatio}
+          toastMessage={shareToastMessage}
+          onClose={() => {
+            setShareExportAsset(null);
+            setShareToastMessage(null);
+          }}
+          onSelectDestination={(destination) => {
+            void handleShareDestination(destination);
+          }}
         />
       </View>
     </>

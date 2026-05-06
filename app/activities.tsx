@@ -77,6 +77,9 @@ export default function ActivitiesScreen() {
   const hasLoadedInitialStravaRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(false);
+  const loadingRef = useRef(false);
+  const hasFinishedInitialLoadRef = useRef(false);
+  const activitiesLengthRef = useRef(0);
   const previousSourceRef = useRef<string | null>(null);
   const previousAuthRef = useRef<string | null>(null);
   const [isPreparingPreview, setIsPreparingPreview] = useState(false);
@@ -85,10 +88,40 @@ export default function ActivitiesScreen() {
   const syncStatus = Array.isArray(rawSyncStatus)
     ? rawSyncStatus[0]
     : rawSyncStatus;
+  const [garminSyncPending, setGarminSyncPending] = useState(
+    syncStatus === 'garmin-pending',
+  );
   const isStravaSyncPending =
     activeSource === 'strava' &&
     syncStatus === 'strava-pending' &&
     activities.length === 0;
+  const showGarminSyncPending =
+    activeSource === 'garmin' && garminSyncPending;
+  const pendingEmptyStateMessage = isStravaSyncPending
+    ? 'Strava connected, activity sync in progress...'
+    : showGarminSyncPending
+      ? 'Garmin connected, activity import in progress...'
+      : null;
+  const pendingLoaderColor = pendingEmptyStateMessage
+    ? colors.textMuted
+    : colors.primary;
+
+  useEffect(() => {
+    setGarminSyncPending(syncStatus === 'garmin-pending');
+  }, [syncStatus]);
+
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
+  useEffect(() => {
+    hasFinishedInitialLoadRef.current = hasFinishedInitialLoad;
+  }, [hasFinishedInitialLoad]);
+
+  useEffect(() => {
+    activitiesLengthRef.current = activities.length;
+  }, [activities.length]);
+
   useEffect(() => {
     const authSession = `${activeProvider ?? 'none'}::${connections.garmin?.garminUserId ?? 'none'}::${connections.strava?.athleteId ?? 'none'}::${connections.mock?.athleteId ?? 'none'}`;
     if (previousAuthRef.current && previousAuthRef.current !== authSession) {
@@ -142,70 +175,39 @@ export default function ActivitiesScreen() {
       });
       await login(activeTokens);
     }
-    console.log('[Activities] getValidTokens', {
-      provider: activeTokens.provider,
-      hasToken: Boolean(activeTokens.accessToken),
-      garminUserId: activeTokens.garminUserId ?? null,
-      expiresAt: activeTokens.expiresAt,
-    });
-
     return activeTokens;
   }, [login, tokens]);
 
   const loadActivities = useCallback(
     async (force = false) => {
-      if (loading && !force) return;
-      console.log('[Activities] loadActivities entry', {
-        activeSource,
-        force,
-        hasFinishedInitialLoad,
-        loading,
-        activitiesLength: activities.length,
-      });
+      if (loadingRef.current) return;
 
-      if (activeSource === 'healthkit' && activities.length > 0) {
-        console.log('[Activities] load skipped', {
-          reason: 'healthkitHasData',
-          activitiesLength: activities.length,
-        });
+      if (activeSource === 'healthkit' && activitiesLengthRef.current > 0) {
         return;
       }
-      if (!force && activeSource !== 'strava' && hasFinishedInitialLoad) {
-        console.log('[Activities] load skipped', {
-          reason: 'nonStravaFinished',
-          activeSource,
-          hasFinishedInitialLoad,
-        });
+      if (
+        !force &&
+        activeSource !== 'strava' &&
+        hasFinishedInitialLoadRef.current
+      ) {
         return;
       }
       if (!force && activeSource === 'strava') {
         if (
-          activities.length > 0 ||
+          activitiesLengthRef.current > 0 ||
           hasLoadedInitialStravaRef.current ||
           getInitialStravaLoadDone()
         ) {
-          console.log('[Activities] load skipped', {
-            reason: 'stravaAlreadyLoaded',
-            activitiesLength: activities.length,
-            hasLoadedInitialStravaRef: hasLoadedInitialStravaRef.current,
-            initialStravaLoadDone: getInitialStravaLoadDone(),
-          });
           return;
         }
         const initialStravaLoadInFlight = getInitialStravaLoadInFlight();
         if (initialStravaLoadInFlight) {
-          console.log('[Activities] load skipped', {
-            reason: 'stravaLoadInFlight',
-          });
           await initialStravaLoadInFlight;
           return;
         }
       }
 
       if (!tokens?.accessToken && activeSource !== 'healthkit') {
-        console.log('[Activities] load skipped', {
-          reason: 'missingAccessToken',
-        });
         resetAndReplace('/login');
         return;
       }
@@ -214,11 +216,6 @@ export default function ActivitiesScreen() {
         try {
           setLoading(true);
           setError(null);
-          console.log('[Activities] Loading activities', {
-            activeSource,
-            hasToken: Boolean(tokens?.accessToken),
-            provider: tokens?.provider,
-          });
           const activeTokens = await getValidTokens();
           if (!activeTokens?.accessToken) {
             console.warn('[Activities] No active tokens after refresh');
@@ -232,30 +229,14 @@ export default function ActivitiesScreen() {
           }
 
           if (activeSource === 'garmin') {
-            console.log('[Garmin][Activities] prepare fetchGarminActivities', {
-              hasToken: Boolean(activeTokens.accessToken),
-              garminUserId: activeTokens.garminUserId ?? null,
-              refreshInFlight: Boolean(getInitialStravaLoadInFlight()),
-            });
-            console.log(
-              '[Garmin][Activities] Fetching Garmin activities...',
-              activeTokens,
-            );
             const rows = await fetchGarminActivities(
               activeTokens.accessToken,
               activeTokens.garminUserId ?? undefined,
             );
-            console.log('[Garmin][Activities] Garmin activities fetched', {
-              count: rows.length,
-            });
             setActivities(rows, 'garmin');
-            console.log('[Garmin][Activities] setActivities called', {
-              hasRows: rows.length > 0,
-            });
             return;
           }
 
-          console.log('[Strava][Activities] Fetching Strava activities...');
           const stravaAthleteId =
             activeTokens.athleteId ?? connections.strava?.athleteId ?? null;
           if (!stravaAthleteId) {
@@ -263,9 +244,6 @@ export default function ActivitiesScreen() {
           }
 
           const rows = await fetchActivitiesFromSupabase(stravaAthleteId);
-          console.log('[Strava][Activities] Strava activities fetched', {
-            count: rows.length,
-          });
           setActivities(rows, 'strava');
           hasLoadedInitialStravaRef.current = true;
           setInitialStravaLoadDone(true);
@@ -295,13 +273,10 @@ export default function ActivitiesScreen() {
     },
     [
       activeSource,
-      activities.length,
       connections.strava?.athleteId,
       tokens,
       setActivities,
       getValidTokens,
-      hasFinishedInitialLoad,
-      loading,
       resetAndReplace,
     ],
   );
@@ -309,6 +284,47 @@ export default function ActivitiesScreen() {
   useEffect(() => {
     void loadActivities();
   }, [loadActivities]);
+
+  useEffect(() => {
+    if (!showGarminSyncPending) return;
+
+    let cancelled = false;
+    let previousCount = -1;
+    let stableCount = 0;
+    const startedAt = Date.now();
+    const timeoutMs = 60_000;
+    const intervalMs = 3_000;
+
+    void (async () => {
+      while (!cancelled && Date.now() - startedAt < timeoutMs) {
+        await loadActivities(true);
+        if (cancelled) return;
+
+        const currentCount = useActivityStore.getState().activities.length;
+        if (currentCount > 0 && currentCount === previousCount) {
+          stableCount += 1;
+        } else {
+          stableCount = 0;
+        }
+        previousCount = currentCount;
+
+        if (currentCount > 0 && stableCount >= 2) {
+          setGarminSyncPending(false);
+          return;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      }
+
+      if (!cancelled) {
+        setGarminSyncPending(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadActivities, showGarminSyncPending]);
 
   async function handleOpenPreview(
     target: '/preview' | '/preview?mode=templates',
@@ -432,13 +448,13 @@ export default function ActivitiesScreen() {
         <View style={styles.bgOrbBottom} />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        {(loading || !hasFinishedInitialLoad) && activities.length === 0 ? (
+        {(loading || !hasFinishedInitialLoad || Boolean(pendingEmptyStateMessage)) &&
+        activities.length === 0 ? (
           <View style={styles.centered}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            {isStravaSyncPending ? (
+            <ActivityIndicator size="large" color={pendingLoaderColor} />
+            {pendingEmptyStateMessage ? (
               <Text style={styles.pendingSyncText}>
-                Strava connecté, synchronisation des activités en cours...
+                {pendingEmptyStateMessage}
               </Text>
             ) : null}
           </View>
@@ -477,11 +493,7 @@ export default function ActivitiesScreen() {
             }
             ListEmptyComponent={
               hasFinishedInitialLoad && !loading ? (
-                <Text style={styles.empty}>
-                  {isStravaSyncPending
-                    ? 'Strava connecté, synchronisation des activités en cours...'
-                    : 'No activities found.'}
-                </Text>
+                <Text style={styles.empty}>No activities found.</Text>
               ) : null
             }
           />

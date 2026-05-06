@@ -34,7 +34,8 @@ function normalizeGarminActivityType(value: unknown): string {
     raw === 'run' ||
     raw === 'running' ||
     raw === 'outdoor_run' ||
-    raw === 'indoor_run'
+    raw === 'indoor_run' ||
+    raw === 'track_running'
   ) {
     return 'Run';
   }
@@ -124,9 +125,7 @@ function toHeartRateSeriesFromRaw(
     .map((point) => ({ seconds: point.x, bpm: point.y }));
 }
 
-function mapRow(
-  row: Record<string, unknown>,
-): StravaActivity {
+function mapRow(row: Record<string, unknown>): StravaActivity {
   const movedSeconds = toNumber(
     row.moving_duration_seconds || row.duration_seconds,
   );
@@ -156,7 +155,10 @@ function mapRow(
           : null,
     },
     start_latlng: parseStartLatLng(row.start_latlng),
-    heartRateStream: toHeartRateSeriesFromRaw(row.hr_series, activityStartSeconds),
+    heartRateStream: toHeartRateSeriesFromRaw(
+      row.hr_series,
+      activityStartSeconds,
+    ),
     pace_series: paceSeries,
   };
 }
@@ -209,9 +211,9 @@ export async function deregisterGarminUser(
   });
 
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as
-      | { error?: string }
-      | null;
+    const payload = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
     const fallbackMessage = await response.text().catch(() => '');
     throw new Error(
       payload?.error || fallbackMessage || 'Garmin deregistration failed.',
@@ -238,14 +240,12 @@ export async function syncGarminPermissions(
     cache: 'no-store',
   });
 
-  const payload = (await response.json().catch(() => null)) as
-    | GarminPermissionsResponse
-    | null;
+  const payload = (await response
+    .json()
+    .catch(() => null)) as GarminPermissionsResponse | null;
 
   if (!response.ok || payload?.success === false) {
-    throw new Error(
-      payload?.error || 'Failed to fetch Garmin permissions.',
-    );
+    throw new Error(payload?.error || 'Failed to fetch Garmin permissions.');
   }
 
   return Array.isArray(payload?.permissions) ? payload.permissions : [];
@@ -268,12 +268,6 @@ async function fetchFromSupabase(
   }
 
   const summaries = (summaryRows ?? []) as Record<string, unknown>[];
-  console.log('[Garmin][Supabase] query', {
-    table: VIEW_WITH_DETAILS,
-    garminUserId,
-    summaryCount: summaries.length,
-  });
-
   return summaries.map((row) => mapRow(row));
 }
 

@@ -90,7 +90,6 @@ export async function registerPushTokenWithBackend(params: {
     body: JSON.stringify(payload),
     cache: 'no-store',
   });
-  console.log('POST register', JSON.stringify(payload));
   const result = (await response.json().catch(() => null)) as {
     success?: boolean;
     error?: string;

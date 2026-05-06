@@ -23,19 +23,10 @@ export function usePushNotifications() {
 
   useEffect(() => {
     const receivedSubscription =
-      Notifications.addNotificationReceivedListener((notification) => {
-        console.log('[Push] Notification received', {
-          requestIdentifier: notification.request.identifier,
-        });
-      });
+      Notifications.addNotificationReceivedListener(() => {});
 
     const responseSubscription =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        console.log('[Push] Notification response', {
-          actionIdentifier: response.actionIdentifier,
-          requestIdentifier: response.notification.request.identifier,
-        });
-      });
+      Notifications.addNotificationResponseReceivedListener(() => {});
 
     return () => {
       receivedSubscription.remove();
