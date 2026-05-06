@@ -268,12 +268,6 @@ async function fetchFromSupabase(
   }
 
   const summaries = (summaryRows ?? []) as Record<string, unknown>[];
-  console.log('[Garmin][Supabase] query', {
-    table: VIEW_WITH_DETAILS,
-    garminUserId,
-    summaryCount: summaries.length,
-  });
-
   return summaries.map((row) => mapRow(row));
 }
 

@@ -175,32 +175,14 @@ export default function ActivitiesScreen() {
       });
       await login(activeTokens);
     }
-    console.log('[Activities] getValidTokens', {
-      provider: activeTokens.provider,
-      hasToken: Boolean(activeTokens.accessToken),
-      garminUserId: activeTokens.garminUserId ?? null,
-      expiresAt: activeTokens.expiresAt,
-    });
-
     return activeTokens;
   }, [login, tokens]);
 
   const loadActivities = useCallback(
     async (force = false) => {
       if (loadingRef.current) return;
-      console.log('[Activities] loadActivities entry', {
-        activeSource,
-        force,
-        hasFinishedInitialLoad: hasFinishedInitialLoadRef.current,
-        loading: loadingRef.current,
-        activitiesLength: activitiesLengthRef.current,
-      });
 
       if (activeSource === 'healthkit' && activitiesLengthRef.current > 0) {
-        console.log('[Activities] load skipped', {
-          reason: 'healthkitHasData',
-          activitiesLength: activitiesLengthRef.current,
-        });
         return;
       }
       if (
@@ -208,11 +190,6 @@ export default function ActivitiesScreen() {
         activeSource !== 'strava' &&
         hasFinishedInitialLoadRef.current
       ) {
-        console.log('[Activities] load skipped', {
-          reason: 'nonStravaFinished',
-          activeSource,
-          hasFinishedInitialLoad: hasFinishedInitialLoadRef.current,
-        });
         return;
       }
       if (!force && activeSource === 'strava') {
@@ -221,28 +198,16 @@ export default function ActivitiesScreen() {
           hasLoadedInitialStravaRef.current ||
           getInitialStravaLoadDone()
         ) {
-          console.log('[Activities] load skipped', {
-            reason: 'stravaAlreadyLoaded',
-            activitiesLength: activitiesLengthRef.current,
-            hasLoadedInitialStravaRef: hasLoadedInitialStravaRef.current,
-            initialStravaLoadDone: getInitialStravaLoadDone(),
-          });
           return;
         }
         const initialStravaLoadInFlight = getInitialStravaLoadInFlight();
         if (initialStravaLoadInFlight) {
-          console.log('[Activities] load skipped', {
-            reason: 'stravaLoadInFlight',
-          });
           await initialStravaLoadInFlight;
           return;
         }
       }
 
       if (!tokens?.accessToken && activeSource !== 'healthkit') {
-        console.log('[Activities] load skipped', {
-          reason: 'missingAccessToken',
-        });
         resetAndReplace('/login');
         return;
       }
@@ -251,11 +216,6 @@ export default function ActivitiesScreen() {
         try {
           setLoading(true);
           setError(null);
-          console.log('[Activities] Loading activities', {
-            activeSource,
-            hasToken: Boolean(tokens?.accessToken),
-            provider: tokens?.provider,
-          });
           const activeTokens = await getValidTokens();
           if (!activeTokens?.accessToken) {
             console.warn('[Activities] No active tokens after refresh');
@@ -269,30 +229,14 @@ export default function ActivitiesScreen() {
           }
 
           if (activeSource === 'garmin') {
-            console.log('[Garmin][Activities] prepare fetchGarminActivities', {
-              hasToken: Boolean(activeTokens.accessToken),
-              garminUserId: activeTokens.garminUserId ?? null,
-              refreshInFlight: Boolean(getInitialStravaLoadInFlight()),
-            });
-            console.log(
-              '[Garmin][Activities] Fetching Garmin activities...',
-              activeTokens,
-            );
             const rows = await fetchGarminActivities(
               activeTokens.accessToken,
               activeTokens.garminUserId ?? undefined,
             );
-            console.log('[Garmin][Activities] Garmin activities fetched', {
-              count: rows.length,
-            });
             setActivities(rows, 'garmin');
-            console.log('[Garmin][Activities] setActivities called', {
-              hasRows: rows.length > 0,
-            });
             return;
           }
 
-          console.log('[Strava][Activities] Fetching Strava activities...');
           const stravaAthleteId =
             activeTokens.athleteId ?? connections.strava?.athleteId ?? null;
           if (!stravaAthleteId) {
@@ -300,9 +244,6 @@ export default function ActivitiesScreen() {
           }
 
           const rows = await fetchActivitiesFromSupabase(stravaAthleteId);
-          console.log('[Strava][Activities] Strava activities fetched', {
-            count: rows.length,
-          });
           setActivities(rows, 'strava');
           hasLoadedInitialStravaRef.current = true;
           setInitialStravaLoadDone(true);

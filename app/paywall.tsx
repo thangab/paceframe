@@ -59,7 +59,7 @@ export default function PaywallScreen() {
   const [weeklyPkg, setWeeklyPkg] = useState<PurchasesPackage | null>(null);
   const [annualPkg, setAnnualPkg] = useState<PurchasesPackage | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PlanKind | null>(null);
-  const [, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const features = [
     'All premium templates',
     'No watermark on exports',
@@ -236,6 +236,8 @@ export default function PaywallScreen() {
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} />
         ) : null}
+
+        {message ? <Text style={styles.message}>{message}</Text> : null}
 
         {!isPremium ? (
           <View style={styles.offerList}>
@@ -415,6 +417,9 @@ function createStyles(colors: ThemeColors) {
     },
     message: {
       color: colors.textMuted,
+      fontSize: 13,
+      fontWeight: '600',
+      lineHeight: 18,
     },
     linksRow: {
       flexDirection: 'row',
