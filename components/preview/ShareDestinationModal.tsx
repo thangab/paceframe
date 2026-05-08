@@ -22,7 +22,11 @@ export type ShareExportAsset = {
   transparent?: boolean;
 };
 
-export type ShareDestinationId = 'copy' | 'download' | 'share';
+export type ShareDestinationId =
+  | 'copy'
+  | 'download'
+  | 'instagramStory'
+  | 'share';
 
 const SHARE_DESTINATIONS: {
   id: ShareDestinationId;
@@ -31,6 +35,7 @@ const SHARE_DESTINATIONS: {
 }[] = [
   { id: 'copy', label: 'Copy', icon: 'content-copy' },
   { id: 'download', label: 'Save', icon: 'download' },
+  { id: 'instagramStory', label: 'Story', icon: 'instagram' },
   { id: 'share', label: 'Share', icon: 'send' },
 ];
 
@@ -264,9 +269,9 @@ function createStyles(colors: ThemeColors) {
       gap: 10,
     },
     destinationIcon: {
-      width: 76,
-      height: 76,
-      borderRadius: 20,
+      width: 68,
+      height: 68,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: '#223047',
