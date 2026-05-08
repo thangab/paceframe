@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 
@@ -35,6 +36,31 @@ const SHARE_DESTINATIONS: {
   { id: 'download', label: 'Save', icon: 'download' },
   { id: 'share', label: 'Share', icon: 'send' },
 ];
+
+function ShareVideoPreview({
+  uri,
+  style,
+}: {
+  uri: string;
+  style: any;
+}) {
+  const player = useVideoPlayer(uri, (nextPlayer) => {
+    nextPlayer.loop = true;
+    nextPlayer.muted = true;
+    nextPlayer.play();
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={style}
+      contentFit="cover"
+      nativeControls={false}
+      fullscreenOptions={{ enable: false }}
+      allowsPictureInPicture={false}
+    />
+  );
+}
 
 type Props = {
   asset: ShareExportAsset | null;
@@ -91,17 +117,30 @@ export function ShareDestinationModal({
         </View>
 
         {asset ? (
-          <Image
-            source={{ uri: asset.previewUri }}
-            resizeMode="cover"
-            style={[
-              styles.preview,
-              {
-                width: previewWidth,
-                height: previewHeight,
-              },
-            ]}
-          />
+          asset.type === 'video' && asset.uri ? (
+            <ShareVideoPreview
+              uri={asset.uri}
+              style={[
+                styles.preview,
+                {
+                  width: previewWidth,
+                  height: previewHeight,
+                },
+              ]}
+            />
+          ) : (
+            <Image
+              source={{ uri: asset.previewUri }}
+              resizeMode="cover"
+              style={[
+                styles.preview,
+                {
+                  width: previewWidth,
+                  height: previewHeight,
+                },
+              ]}
+            />
+          )
         ) : null}
 
         {toastMessage ? (
