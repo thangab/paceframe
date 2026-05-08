@@ -22,10 +22,7 @@ export type ShareExportAsset = {
   transparent?: boolean;
 };
 
-export type ShareDestinationId =
-  | 'copy'
-  | 'download'
-  | 'share';
+export type ShareDestinationId = 'copy' | 'download' | 'share';
 
 const SHARE_DESTINATIONS: {
   id: ShareDestinationId;
@@ -37,13 +34,7 @@ const SHARE_DESTINATIONS: {
   { id: 'share', label: 'Share', icon: 'send' },
 ];
 
-function ShareVideoPreview({
-  uri,
-  style,
-}: {
-  uri: string;
-  style: any;
-}) {
+function ShareVideoPreview({ uri, style }: { uri: string; style: any }) {
   const player = useVideoPlayer(uri, (nextPlayer) => {
     nextPlayer.loop = true;
     nextPlayer.muted = true;
@@ -108,12 +99,8 @@ export function ShareDestinationModal({
         </Pressable>
 
         <View style={styles.header}>
-          <Text style={styles.title}>Choose where to share</Text>
-          <Text style={styles.subtitle}>
-            {asset?.type === 'video'
-              ? 'Videos are optimized for high-quality playback on Instagram.'
-              : 'Exports are optimized for high-quality sharing on Instagram.'}
-          </Text>
+          <Text style={styles.title}>Share your PaceFrame</Text>
+          <Text style={styles.subtitle}>Your activity is ready to post.</Text>
         </View>
 
         {asset ? (
@@ -147,8 +134,8 @@ export function ShareDestinationModal({
           <View pointerEvents="none" style={styles.toast}>
             <MaterialCommunityIcons
               name="check-circle"
-              size={18}
-              color={colors.solidWhite}
+              size={17}
+              color={colors.primary}
             />
             <Text style={styles.toastText}>{toastMessage}</Text>
           </View>
@@ -233,25 +220,30 @@ function createStyles(colors: ThemeColors) {
     },
     toast: {
       position: 'absolute',
-      left: 28,
-      right: 28,
-      bottom: Platform.OS === 'ios' ? 164 : 148,
+      left: 54,
+      right: 54,
+      bottom: Platform.OS === 'ios' ? 156 : 140,
       zIndex: 3,
-      minHeight: 46,
-      borderRadius: 23,
-      paddingHorizontal: 16,
+      minHeight: 42,
+      borderRadius: 14,
+      paddingHorizontal: 14,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8,
-      backgroundColor: 'rgba(255,255,255,0.16)',
+      backgroundColor: '#223047',
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.2)',
+      borderColor: '#334156',
+      shadowColor: colors.solidBlack,
+      shadowOpacity: 0.22,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 8,
     },
     toastText: {
       color: colors.solidWhite,
-      fontSize: 15,
-      lineHeight: 19,
+      fontSize: 14,
+      lineHeight: 18,
       fontWeight: '800',
       textAlign: 'center',
     },
