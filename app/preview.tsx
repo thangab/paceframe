@@ -20,6 +20,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
 import * as MediaLibrary from 'expo-media-library';
+import Constants from 'expo-constants';
 import ImageCropPicker from 'react-native-image-crop-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { captureRef } from 'react-native-view-shot';
@@ -62,7 +63,11 @@ import {
   type PreviewDraft,
 } from '@/lib/previewDraft';
 import { removeBackgroundOnDevice } from '@/lib/backgroundRemoval';
-import { copyPngBase64ToClipboard } from '@/lib/nativeClipboard';
+import {
+  copyPngBase64ToClipboard,
+  shareImageBase64ToInstagramStory,
+  shareVideoToInstagramStory,
+} from '@/lib/nativeClipboard';
 import { composeVideoWithOverlay } from '@/lib/nativeVideoComposer';
 import {
   buildHeartRateAreaChartData,
@@ -141,6 +146,9 @@ import {
   tokenizeTemplateText,
 } from '@/features/preview/templateText';
 import { trimStickerToOpaqueBounds } from '@/features/preview/stickerTrim';
+
+const INSTAGRAM_STORIES_SOURCE_APPLICATION =
+  Constants.expoConfig?.extra?.instagramStoriesSourceApplication;
 
 type ApplyImageBackgroundOptions = {
   silent?: boolean;
@@ -2459,6 +2467,39 @@ export default function PreviewScreen() {
     await Clipboard.setImageAsync(base64);
   }
 
+  async function shareExportToInstagramStory(asset: ShareExportAsset) {
+    if (!asset.uri) {
+      throw new Error('Export is not ready yet.');
+    }
+
+    if (Platform.OS !== 'ios') {
+      throw new Error('Instagram Stories sharing is currently available on iOS only.');
+    }
+
+    if (
+      typeof INSTAGRAM_STORIES_SOURCE_APPLICATION !== 'string' ||
+      INSTAGRAM_STORIES_SOURCE_APPLICATION.trim().length === 0
+    ) {
+      throw new Error('Missing Instagram Stories source application ID.');
+    }
+
+    if (asset.type === 'video') {
+      await shareVideoToInstagramStory(
+        asset.uri,
+        INSTAGRAM_STORIES_SOURCE_APPLICATION,
+      );
+      return;
+    }
+
+    const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    await shareImageBase64ToInstagramStory(
+      base64,
+      INSTAGRAM_STORIES_SOURCE_APPLICATION,
+    );
+  }
+
   async function createImageExportAsset() {
     const includeOpaqueBackground = !backgroundIsTransparent;
     setPngTransparentOnly(!includeOpaqueBackground);
@@ -2500,6 +2541,12 @@ export default function PreviewScreen() {
       return;
     }
 
+    if (destination === 'instagramStory') {
+      await shareExportToInstagramStory(asset);
+      setMessage('Opened Instagram story.');
+      return;
+    }
+
     await openNativeShare(asset, 'Share');
     setMessage(
       asset.mimeType === 'image/jpeg'
@@ -2532,6 +2579,12 @@ export default function PreviewScreen() {
         await downloadExport(asset);
         setShareToastMessage('Saved to photos');
         setMessage('Saved to photo library.');
+        return;
+      }
+
+      if (destination === 'instagramStory') {
+        await shareExportToInstagramStory(asset);
+        setMessage('Opened Instagram story.');
         return;
       }
 

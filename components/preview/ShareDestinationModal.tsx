@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 
@@ -24,6 +25,7 @@ export type ShareExportAsset = {
 export type ShareDestinationId =
   | 'copy'
   | 'download'
+  | 'instagramStory'
   | 'share';
 
 const SHARE_DESTINATIONS: {
@@ -33,8 +35,28 @@ const SHARE_DESTINATIONS: {
 }[] = [
   { id: 'copy', label: 'Copy', icon: 'content-copy' },
   { id: 'download', label: 'Save', icon: 'download' },
+  { id: 'instagramStory', label: 'Story', icon: 'instagram' },
   { id: 'share', label: 'Share', icon: 'send' },
 ];
+
+function ShareVideoPreview({ uri, style }: { uri: string; style: any }) {
+  const player = useVideoPlayer(uri, (nextPlayer) => {
+    nextPlayer.loop = true;
+    nextPlayer.muted = true;
+    nextPlayer.play();
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={style}
+      contentFit="cover"
+      nativeControls={false}
+      fullscreenOptions={{ enable: false }}
+      allowsPictureInPicture={false}
+    />
+  );
+}
 
 type Props = {
   asset: ShareExportAsset | null;
@@ -82,34 +104,43 @@ export function ShareDestinationModal({
         </Pressable>
 
         <View style={styles.header}>
-          <Text style={styles.title}>Choose where to share</Text>
-          <Text style={styles.subtitle}>
-            {asset?.type === 'video'
-              ? 'Videos are optimized for high-quality playback on Instagram.'
-              : 'Exports are optimized for high-quality sharing on Instagram.'}
-          </Text>
+          <Text style={styles.title}>Share your PaceFrame</Text>
+          <Text style={styles.subtitle}>Your activity is ready to post.</Text>
         </View>
 
         {asset ? (
-          <Image
-            source={{ uri: asset.previewUri }}
-            resizeMode="cover"
-            style={[
-              styles.preview,
-              {
-                width: previewWidth,
-                height: previewHeight,
-              },
-            ]}
-          />
+          asset.type === 'video' && asset.uri ? (
+            <ShareVideoPreview
+              uri={asset.uri}
+              style={[
+                styles.preview,
+                {
+                  width: previewWidth,
+                  height: previewHeight,
+                },
+              ]}
+            />
+          ) : (
+            <Image
+              source={{ uri: asset.previewUri }}
+              resizeMode="cover"
+              style={[
+                styles.preview,
+                {
+                  width: previewWidth,
+                  height: previewHeight,
+                },
+              ]}
+            />
+          )
         ) : null}
 
         {toastMessage ? (
           <View pointerEvents="none" style={styles.toast}>
             <MaterialCommunityIcons
               name="check-circle"
-              size={18}
-              color={colors.solidWhite}
+              size={17}
+              color={colors.primary}
             />
             <Text style={styles.toastText}>{toastMessage}</Text>
           </View>
@@ -194,25 +225,30 @@ function createStyles(colors: ThemeColors) {
     },
     toast: {
       position: 'absolute',
-      left: 28,
-      right: 28,
-      bottom: Platform.OS === 'ios' ? 164 : 148,
+      left: 54,
+      right: 54,
+      bottom: Platform.OS === 'ios' ? 156 : 140,
       zIndex: 3,
-      minHeight: 46,
-      borderRadius: 23,
-      paddingHorizontal: 16,
+      minHeight: 42,
+      borderRadius: 14,
+      paddingHorizontal: 14,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8,
-      backgroundColor: 'rgba(255,255,255,0.16)',
+      backgroundColor: '#223047',
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.2)',
+      borderColor: '#334156',
+      shadowColor: colors.solidBlack,
+      shadowOpacity: 0.22,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 8,
     },
     toastText: {
       color: colors.solidWhite,
-      fontSize: 15,
-      lineHeight: 19,
+      fontSize: 14,
+      lineHeight: 18,
       fontWeight: '800',
       textAlign: 'center',
     },
@@ -233,9 +269,9 @@ function createStyles(colors: ThemeColors) {
       gap: 10,
     },
     destinationIcon: {
-      width: 76,
-      height: 76,
-      borderRadius: 20,
+      width: 68,
+      height: 68,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: '#223047',

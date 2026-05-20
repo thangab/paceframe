@@ -8,4 +8,18 @@ RCT_EXTERN_METHOD(
   rejecter:(RCTPromiseRejectBlock)reject
 )
 
+RCT_EXTERN_METHOD(
+  shareImageBase64ToInstagramStory:(NSString *)base64
+  sourceApplication:(NSString *)sourceApplication
+  resolver:(RCTPromiseResolveBlock)resolve
+  rejecter:(RCTPromiseRejectBlock)reject
+)
+
+RCT_EXTERN_METHOD(
+  shareVideoToInstagramStory:(NSString *)uri
+  sourceApplication:(NSString *)sourceApplication
+  resolver:(RCTPromiseResolveBlock)resolve
+  rejecter:(RCTPromiseRejectBlock)reject
+)
+
 @end
