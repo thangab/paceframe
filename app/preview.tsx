@@ -2524,6 +2524,25 @@ export default function PreviewScreen() {
     } satisfies ShareExportAsset;
   }
 
+  async function captureSharePreview() {
+    setPngTransparentOnly(false);
+    setIsExportingPng(true);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    try {
+      return await captureRef(exportRef, {
+        format: 'jpg',
+        quality: 0.92,
+        result: 'tmpfile',
+        width: EXPORT_PNG_WIDTH,
+        height: exportHeight,
+      });
+    } finally {
+      setIsExportingPng(false);
+      setPngTransparentOnly(false);
+    }
+  }
+
   async function runImageShareDestination(destination: ShareDestinationId) {
     const asset = await createImageExportAsset();
 
@@ -2611,13 +2630,7 @@ export default function PreviewScreen() {
     try {
       setBusy(true);
       setMessage(null);
-      const previewUri = await captureRef(exportRef, {
-        format: 'jpg',
-        quality: 0.92,
-        result: 'tmpfile',
-        width: EXPORT_PNG_WIDTH,
-        height: exportHeight,
-      });
+      const previewUri = await captureSharePreview();
 
       setShareExportAsset({
         previewUri,
@@ -2647,14 +2660,7 @@ export default function PreviewScreen() {
       setMessage(null);
       setMessage('Compositing video + layers...');
 
-      await new Promise((resolve) => setTimeout(resolve, 80));
-      const previewUri = await captureRef(exportRef, {
-        format: 'jpg',
-        quality: 0.92,
-        result: 'tmpfile',
-        width: EXPORT_PNG_WIDTH,
-        height: exportHeight,
-      });
+      const previewUri = await captureSharePreview();
 
       setIsCapturingOverlay(true);
       await new Promise((resolve) => setTimeout(resolve, 80));
