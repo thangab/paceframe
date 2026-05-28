@@ -284,6 +284,7 @@ export const PREVIEW_TEMPLATES: PreviewTemplateDefinition[] = [
   {
     id: 'template-neon',
     name: 'Neon',
+    premium: true,
     showBackgroundTab: false,
     defaultBackground: 'none',
     fixedImageElements: [
@@ -496,6 +497,7 @@ export const PREVIEW_TEMPLATES: PreviewTemplateDefinition[] = [
   {
     id: 'template-ticket',
     name: 'Ticket',
+    premium: true,
     showBackgroundTab: false,
     defaultBackground: 'none',
     showRoute: true,
@@ -680,6 +682,7 @@ export const PREVIEW_TEMPLATES: PreviewTemplateDefinition[] = [
   {
     id: 'template-sky-script',
     name: 'Sky Script',
+    premium: true,
     defaultBackground: 'activity-photo',
     disableBackgroundRemoval: true,
     disableVideoBackground: true,

@@ -1,7 +1,4 @@
-import {
-  StatsLayout,
-  StatsVisibleFields,
-} from '@/types/preview';
+import { StatsLayout, StatsVisibleFields } from '@/types/preview';
 
 const DEFAULT_LAYOUT_VISIBLE_FIELDS: StatsVisibleFields = {
   distance: true,
@@ -92,7 +89,7 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     id: 'mile-ring',
     name: 'Mile Ring',
     layout: 'mile-ring',
-    premium: false,
+    premium: true,
     previewHeight: 246,
     metricLimit: 5,
     defaultVisibleFields: {
@@ -241,7 +238,7 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     id: 'sunset-hero',
     name: 'Sunset Hero',
     layout: 'sunset-hero',
-    premium: false,
+    premium: true,
     previewHeight: 190,
     metricLimit: 5,
     supportsPrimaryLayer: true,
@@ -267,7 +264,7 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     id: 'morning-glass',
     name: 'Morning Glass',
     layout: 'morning-glass',
-    premium: false,
+    premium: true,
     previewHeight: 190,
     metricLimit: 6,
     supportsPrimaryLayer: true,
@@ -294,7 +291,7 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     id: 'split-bold',
     name: 'Split Bold',
     layout: 'split-bold',
-    premium: false,
+    premium: true,
     previewHeight: 228,
     metricLimit: 6,
     supportsPrimaryLayer: true,
@@ -333,8 +330,7 @@ export function getDefaultVisibleFieldsForLayout(
   if (layout.defaultVisibleFields) {
     return {
       distance:
-        layout.defaultVisibleFields.distance === true &&
-        availability.distance,
+        layout.defaultVisibleFields.distance === true && availability.distance,
       time: layout.defaultVisibleFields.time === true && availability.time,
       pace: layout.defaultVisibleFields.pace === true && availability.pace,
       elev: layout.defaultVisibleFields.elev === true && availability.elev,
@@ -350,7 +346,8 @@ export function getDefaultVisibleFieldsForLayout(
     const maxCount = Math.max(
       1,
       Math.min(
-        layout.defaultVisibleFieldCount ?? layout.defaultVisibleFieldOrder.length,
+        layout.defaultVisibleFieldCount ??
+          layout.defaultVisibleFieldOrder.length,
         layout.defaultVisibleFieldOrder.length,
       ),
     );
