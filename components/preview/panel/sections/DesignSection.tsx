@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { LayoutPreview } from '@/components/preview/panel/LayoutPreview';
 import { isSameSunsetPrimaryGradient } from '@/components/preview/panel/utils';
-import { FONT_PRESETS, TEMPLATES } from '@/lib/previewConfig';
+import { FONT_PRESETS } from '@/lib/previewConfig';
 import type {
   ChartDisplayVersion,
   FieldId,
@@ -18,6 +18,7 @@ type Props = {
   styles: any;
   colors: any;
   quickTemplateMode: boolean;
+  layoutOptions: StatsLayout[];
   templateOptions: { id: string; name: string; premium?: boolean }[];
   isPremium: boolean;
   selectedTemplateId?: string;
@@ -63,6 +64,7 @@ export function DesignSection({
   styles,
   colors,
   quickTemplateMode,
+  layoutOptions,
   templateOptions,
   isPremium,
   selectedTemplateId,
@@ -146,7 +148,7 @@ export function DesignSection({
                   </Pressable>
                 );
               })
-            : TEMPLATES.map((item) => {
+            : layoutOptions.map((item) => {
                 const isLocked = item.premium && !isPremium;
                 const selected = item.id === template.id;
                 return (
