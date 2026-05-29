@@ -1,4 +1,9 @@
-import { StatsLayout, StatsVisibleFields } from '@/types/preview';
+import {
+  FieldId,
+  StatsLayout,
+  StatsLayoutKind,
+  StatsVisibleFields,
+} from '@/types/preview';
 
 const DEFAULT_LAYOUT_VISIBLE_FIELDS: StatsVisibleFields = {
   distance: true,
@@ -305,6 +310,162 @@ export const PREVIEW_LAYOUTS: StatsLayout[] = [
     radius: 0,
   },
 ];
+
+const STATS_LAYOUT_KINDS = new Set<StatsLayoutKind>([
+  'hero',
+  'vertical',
+  'compact',
+  'columns',
+  'grid-2x2',
+  'glass-row',
+  'soft-stack',
+  'pill-inline',
+  'card-columns',
+  'panel-grid',
+  'sunset-hero',
+  'morning-glass',
+  'split-bold',
+  'mile-ring',
+  'signal-board',
+  'social-pill',
+]);
+
+const FIELD_IDS = new Set<FieldId>([
+  'distance',
+  'time',
+  'pace',
+  'elev',
+  'cadence',
+  'calories',
+  'avgHr',
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function asString(value: unknown) {
+  return typeof value === 'string' ? value : null;
+}
+
+function asNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function asOptionalNumber(value: unknown) {
+  if (value === undefined) return undefined;
+  const numberValue = asNumber(value);
+  return numberValue === null ? undefined : numberValue;
+}
+
+function asOptionalBoolean(value: unknown) {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function sanitizeDefaultVisibleFields(value: unknown) {
+  if (!isRecord(value)) return undefined;
+
+  const fields: Partial<StatsVisibleFields> = {};
+  FIELD_IDS.forEach((field) => {
+    if (typeof value[field] === 'boolean') {
+      fields[field] = value[field];
+    }
+  });
+
+  return Object.keys(fields).length > 0 ? fields : undefined;
+}
+
+function sanitizeDefaultVisibleFieldOrder(value: unknown) {
+  if (!Array.isArray(value)) return undefined;
+
+  const seen = new Set<FieldId>();
+  const fields = value.filter((item): item is FieldId => {
+    if (typeof item !== 'string' || !FIELD_IDS.has(item as FieldId)) {
+      return false;
+    }
+    const field = item as FieldId;
+    if (seen.has(field)) return false;
+    seen.add(field);
+    return true;
+  });
+
+  return fields.length > 0 ? fields : undefined;
+}
+
+export function sanitizePreviewLayout(value: unknown): StatsLayout | null {
+  if (!isRecord(value)) return null;
+
+  const id = asString(value.id);
+  const name = asString(value.name);
+  const layout = asString(value.layout);
+  const x = asNumber(value.x);
+  const y = asNumber(value.y);
+  const width = asNumber(value.width);
+  const backgroundColor = asString(value.backgroundColor);
+  const borderColor = asString(value.borderColor);
+  const borderWidth = asNumber(value.borderWidth);
+  const radius = asNumber(value.radius);
+
+  if (
+    !id ||
+    !name ||
+    !layout ||
+    !STATS_LAYOUT_KINDS.has(layout as StatsLayoutKind) ||
+    x === null ||
+    y === null ||
+    width === null ||
+    !backgroundColor ||
+    !borderColor ||
+    borderWidth === null ||
+    radius === null
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    name,
+    layout: layout as StatsLayoutKind,
+    premium: asOptionalBoolean(value.premium),
+    previewHeight: asOptionalNumber(value.previewHeight),
+    metricLimit: asOptionalNumber(value.metricLimit),
+    supportsPrimaryLayer: asOptionalBoolean(value.supportsPrimaryLayer),
+    resetTransformsOnSelect: asOptionalBoolean(value.resetTransformsOnSelect),
+    defaultVisibleFields: sanitizeDefaultVisibleFields(
+      value.defaultVisibleFields,
+    ),
+    defaultVisibleFieldOrder: sanitizeDefaultVisibleFieldOrder(
+      value.defaultVisibleFieldOrder,
+    ),
+    defaultVisibleFieldCount: asOptionalNumber(value.defaultVisibleFieldCount),
+    x,
+    y,
+    width,
+    backgroundColor,
+    borderColor,
+    borderWidth,
+    radius,
+  };
+}
+
+export function sanitizePreviewLayouts(value: unknown): StatsLayout[] | null {
+  if (!Array.isArray(value)) return null;
+
+  const layouts = value
+    .map((item) => sanitizePreviewLayout(item))
+    .filter((item): item is StatsLayout => Boolean(item));
+  const ids = new Set<string>();
+  const uniqueLayouts = layouts.filter((layout) => {
+    if (ids.has(layout.id)) return false;
+    ids.add(layout.id);
+    return true;
+  });
+
+  if (uniqueLayouts.length === 0) return null;
+  if (!uniqueLayouts.some((layout) => layout.id === 'hero')) return null;
+
+  return uniqueLayouts;
+}
 
 export function getLayoutMetricLimit(layout: StatsLayout) {
   return layout.metricLimit ?? 4;

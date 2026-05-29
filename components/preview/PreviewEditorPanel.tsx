@@ -82,6 +82,7 @@ type Props = {
   onRemoveLayer: (layer: LayerId) => void;
   template: StatsLayout;
   onSelectLayout: (t: StatsLayout) => void;
+  layoutOptions: StatsLayout[];
   templateOptions?: { id: string; name: string; premium?: boolean }[];
   selectedTemplateId?: string;
   onSelectTemplate?: (templateId: string) => void;
@@ -160,6 +161,7 @@ export function PreviewEditorPanel({
   onRemoveLayer,
   template,
   onSelectLayout,
+  layoutOptions,
   templateOptions = [],
   selectedTemplateId,
   onSelectTemplate,
@@ -468,6 +470,7 @@ export function PreviewEditorPanel({
               styles={styles}
               colors={colors}
               quickTemplateMode={quickTemplateMode}
+              layoutOptions={layoutOptions}
               templateOptions={templateOptions}
               isPremium={isPremium}
               selectedTemplateId={selectedTemplateId}

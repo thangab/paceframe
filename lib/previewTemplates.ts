@@ -1,4 +1,26 @@
-import { PreviewTemplateDefinition } from '@/types/preview';
+import {
+  ChartDisplayVersion,
+  ChartFillStyle,
+  ChartOrientation,
+  FieldId,
+  PreviewTemplateChartElement,
+  PreviewTemplateDefinition,
+  PreviewTemplateImageElement,
+  PreviewTemplateTextElement,
+  TemplateLayerStyleId,
+} from '@/types/preview';
+
+const TEMPLATE_ASSETS: Record<string, number> = {
+  runner: require('../assets/templates/runner.png'),
+  'polaroid-wood': require('../assets/templates/polaroid-wood.png'),
+  'grid-bg': require('../assets/templates/grid-bg.png'),
+  'ticket-run': require('../assets/templates/ticket-run.png'),
+  'card-member': require('../assets/templates/card-member.png'),
+};
+
+type BackgroundMediaFit = NonNullable<
+  PreviewTemplateDefinition['backgroundMediaFrame']
+>['fit'];
 
 export const PREVIEW_TEMPLATES: PreviewTemplateDefinition[] = [
   {
@@ -805,4 +827,361 @@ export const DEFAULT_PREVIEW_TEMPLATE_ID =
 export function getPreviewTemplateById(templateId: string | null | undefined) {
   if (!templateId) return null;
   return PREVIEW_TEMPLATES.find((item) => item.id === templateId) ?? null;
+}
+
+const FIELD_IDS = new Set<FieldId>([
+  'distance',
+  'time',
+  'pace',
+  'elev',
+  'cadence',
+  'calories',
+  'avgHr',
+]);
+
+const TEMPLATE_LAYER_STYLE_IDS = new Set<TemplateLayerStyleId>([
+  'meta',
+  'stats',
+  'route',
+  'primary',
+  'chartPace',
+  'chartHr',
+]);
+
+const CHART_DISPLAY_VERSIONS = new Set<ChartDisplayVersion>([
+  'v1',
+  'v2',
+  'v3',
+  'v4',
+]);
+
+const CHART_ORIENTATIONS = new Set<ChartOrientation>([
+  'vertical',
+  'horizontal',
+]);
+
+const CHART_FILL_STYLES = new Set<ChartFillStyle>(['gradient', 'plain']);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function asString(value: unknown) {
+  return typeof value === 'string' ? value : null;
+}
+
+function asOptionalString(value: unknown) {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function asNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function asOptionalNumber(value: unknown) {
+  if (value === undefined) return undefined;
+  const numberValue = asNumber(value);
+  return numberValue === null ? undefined : numberValue;
+}
+
+function asOptionalBoolean(value: unknown) {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function asFontWeight(value: unknown) {
+  if (typeof value !== 'string') return undefined;
+  return ['300', '400', '500', '600', '700', '800', '900'].includes(value)
+    ? (value as PreviewTemplateTextElement['fontWeight'])
+    : undefined;
+}
+
+function asAccentFontWeight(value: unknown) {
+  if (typeof value !== 'string') return undefined;
+  return ['400', '500', '600', '700', '800', '900'].includes(value)
+    ? (value as PreviewTemplateTextElement['accentFontWeight'])
+    : undefined;
+}
+
+function asTextAlign(value: unknown) {
+  return value === 'left' || value === 'center' || value === 'right'
+    ? value
+    : undefined;
+}
+
+function asRequiredDataFields(value: unknown) {
+  if (!Array.isArray(value)) return undefined;
+  const fields = value.filter(
+    (item): item is FieldId =>
+      typeof item === 'string' && FIELD_IDS.has(item as FieldId),
+  );
+  return fields.length > 0 ? Array.from(new Set(fields)) : undefined;
+}
+
+function sanitizeImageElement(value: unknown): PreviewTemplateImageElement | null {
+  if (!isRecord(value)) return null;
+
+  const id = asString(value.id);
+  const name = asString(value.name);
+  const x = asNumber(value.x);
+  const y = asNumber(value.y);
+  const width = asNumber(value.width);
+  const height = asNumber(value.height);
+  const uri = asOptionalString(value.uri);
+  const assetKey = asOptionalString(value.assetKey);
+  const asset = assetKey ? TEMPLATE_ASSETS[assetKey] : undefined;
+
+  if (!id || !name || x === null || y === null || width === null || height === null) {
+    return null;
+  }
+  if (!uri && typeof asset !== 'number') return null;
+
+  return {
+    id,
+    name,
+    ...(uri ? { uri } : {}),
+    ...(typeof asset === 'number' ? { asset } : {}),
+    isBehind: asOptionalBoolean(value.isBehind),
+    x,
+    y,
+    width,
+    height,
+    opacity: asOptionalNumber(value.opacity),
+    rotationDeg: asOptionalNumber(value.rotationDeg),
+  };
+}
+
+function sanitizeTextElement(value: unknown): PreviewTemplateTextElement | null {
+  if (!isRecord(value)) return null;
+
+  const id = asString(value.id);
+  const text = asString(value.text);
+  const x = asNumber(value.x);
+  const y = asNumber(value.y);
+
+  if (!id || text === null || x === null || y === null) return null;
+
+  return {
+    id,
+    text,
+    renderStyle: value.renderStyle === 'scattered' ? 'scattered' : undefined,
+    formatDate: asOptionalString(value.formatDate),
+    requiredDataFields: asRequiredDataFields(value.requiredDataFields),
+    isBehind: asOptionalBoolean(value.isBehind),
+    x,
+    y,
+    width: asOptionalNumber(value.width),
+    align: asTextAlign(value.align),
+    textAlign: asTextAlign(value.textAlign),
+    color: asOptionalString(value.color),
+    backgroundColor: asOptionalString(value.backgroundColor),
+    borderColor: asOptionalString(value.borderColor),
+    borderWidth: asOptionalNumber(value.borderWidth),
+    borderRadius: asOptionalNumber(value.borderRadius),
+    paddingX: asOptionalNumber(value.paddingX),
+    paddingY: asOptionalNumber(value.paddingY),
+    opacity: asOptionalNumber(value.opacity),
+    fontFamily: asOptionalString(value.fontFamily),
+    fontSize: asOptionalNumber(value.fontSize),
+    fontWeight: asFontWeight(value.fontWeight),
+    letterSpacing: asOptionalNumber(value.letterSpacing),
+    lineHeight: asOptionalNumber(value.lineHeight),
+    uppercase: asOptionalBoolean(value.uppercase),
+    accentFontSize: asOptionalNumber(value.accentFontSize),
+    accentFontWeight: asAccentFontWeight(value.accentFontWeight),
+    accentLetterSpacing: asOptionalNumber(value.accentLetterSpacing),
+    accentColor: asOptionalString(value.accentColor),
+    accentFontFamily: asOptionalString(value.accentFontFamily),
+    glowColor: asOptionalString(value.glowColor),
+    glowRadius: asOptionalNumber(value.glowRadius),
+    glowOffsetX: asOptionalNumber(value.glowOffsetX),
+    glowOffsetY: asOptionalNumber(value.glowOffsetY),
+  };
+}
+
+function sanitizeChartElement(value: unknown): PreviewTemplateChartElement | null {
+  if (!isRecord(value)) return null;
+
+  const id = asString(value.id);
+  const kind = value.kind === 'pace' || value.kind === 'hr' ? value.kind : null;
+  const x = asNumber(value.x);
+  const y = asNumber(value.y);
+  const width = asNumber(value.width);
+  const height = asNumber(value.height);
+
+  if (
+    !id ||
+    !kind ||
+    x === null ||
+    y === null ||
+    width === null ||
+    height === null
+  ) {
+    return null;
+  }
+
+  const version =
+    typeof value.version === 'string' &&
+    CHART_DISPLAY_VERSIONS.has(value.version as ChartDisplayVersion)
+      ? (value.version as ChartDisplayVersion)
+      : undefined;
+  const orientation =
+    typeof value.orientation === 'string' &&
+    CHART_ORIENTATIONS.has(value.orientation as ChartOrientation)
+      ? (value.orientation as ChartOrientation)
+      : undefined;
+  const fillStyle =
+    typeof value.fillStyle === 'string' &&
+    CHART_FILL_STYLES.has(value.fillStyle as ChartFillStyle)
+      ? (value.fillStyle as ChartFillStyle)
+      : undefined;
+
+  return {
+    id,
+    kind,
+    x,
+    y,
+    width,
+    height,
+    isBehind: asOptionalBoolean(value.isBehind),
+    opacity: asOptionalNumber(value.opacity),
+    color: asOptionalString(value.color),
+    version,
+    showAxes: asOptionalBoolean(value.showAxes),
+    showGrid: asOptionalBoolean(value.showGrid),
+    orientation,
+    fillStyle,
+  };
+}
+
+function sanitizeLayerStyleOverrides(value: unknown) {
+  if (!isRecord(value)) return undefined;
+
+  const entries = Object.entries(value).flatMap(([key, style]) => {
+    if (!TEMPLATE_LAYER_STYLE_IDS.has(key as TemplateLayerStyleId)) return [];
+    if (!isRecord(style)) return [];
+    const color = asString(style.color);
+    const opacity = asNumber(style.opacity);
+    if (!color || opacity === null) return [];
+    return [[key, { color, opacity }]];
+  });
+
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function sanitizeRouteTransform(value: unknown) {
+  if (!isRecord(value)) return undefined;
+
+  const x = asNumber(value.x);
+  const y = asNumber(value.y);
+  if (x === null || y === null) return undefined;
+
+  return {
+    x,
+    y,
+    scale: asOptionalNumber(value.scale),
+    rotationDeg: asOptionalNumber(value.rotationDeg),
+  };
+}
+
+function sanitizeImagePickerCropSize(value: unknown) {
+  if (!isRecord(value)) return undefined;
+  const width = asNumber(value.width);
+  const height = asNumber(value.height);
+  if (width === null || height === null) return undefined;
+  return { width, height };
+}
+
+function sanitizeBackgroundMediaFrame(value: unknown) {
+  if (!isRecord(value)) return undefined;
+
+  const width = asNumber(value.width);
+  const height = asNumber(value.height);
+  if (width === null || height === null) return undefined;
+  const fit: BackgroundMediaFit =
+    value.fit === 'cover' ||
+    value.fit === 'contain' ||
+    value.fit === 'width-crop-center'
+      ? value.fit
+      : undefined;
+
+  return {
+    width,
+    height,
+    x: asOptionalNumber(value.x),
+    y: asOptionalNumber(value.y),
+    mediaScale: asOptionalNumber(value.mediaScale),
+    mediaOffsetX: asOptionalNumber(value.mediaOffsetX),
+    mediaOffsetY: asOptionalNumber(value.mediaOffsetY),
+    fit,
+  };
+}
+
+export function sanitizePreviewTemplate(
+  value: unknown,
+): PreviewTemplateDefinition | null {
+  if (!isRecord(value)) return null;
+
+  const id = asString(value.id);
+  const name = asString(value.name);
+  if (!id || !name) return null;
+
+  const fixedImageElements = Array.isArray(value.fixedImageElements)
+    ? value.fixedImageElements
+        .map((item) => sanitizeImageElement(item))
+        .filter((item): item is PreviewTemplateImageElement => Boolean(item))
+    : undefined;
+  const fixedTextElements = Array.isArray(value.fixedTextElements)
+    ? value.fixedTextElements
+        .map((item) => sanitizeTextElement(item))
+        .filter((item): item is PreviewTemplateTextElement => Boolean(item))
+    : undefined;
+  const fixedChartElements = Array.isArray(value.fixedChartElements)
+    ? value.fixedChartElements
+        .map((item) => sanitizeChartElement(item))
+        .filter((item): item is PreviewTemplateChartElement => Boolean(item))
+    : undefined;
+
+  return {
+    id,
+    name,
+    premium: asOptionalBoolean(value.premium),
+    showBackgroundTab: asOptionalBoolean(value.showBackgroundTab),
+    disableBackgroundRemoval: asOptionalBoolean(value.disableBackgroundRemoval),
+    disableVideoBackground: asOptionalBoolean(value.disableVideoBackground),
+    imagePickerCropSize: sanitizeImagePickerCropSize(value.imagePickerCropSize),
+    defaultBackground:
+      value.defaultBackground === 'activity-photo' ||
+      value.defaultBackground === 'none'
+        ? value.defaultBackground
+        : undefined,
+    defaultFilterEffectId: asOptionalString(value.defaultFilterEffectId),
+    defaultBlurEffectId: asOptionalString(value.defaultBlurEffectId),
+    showRoute: asOptionalBoolean(value.showRoute),
+    routeTransform: sanitizeRouteTransform(value.routeTransform),
+    layerStyleOverrides: sanitizeLayerStyleOverrides(value.layerStyleOverrides),
+    fixedImageElements,
+    fixedChartElements,
+    fixedTextElements,
+    backgroundMediaFrame: sanitizeBackgroundMediaFrame(
+      value.backgroundMediaFrame,
+    ),
+  };
+}
+
+export function sanitizePreviewTemplates(
+  value: unknown,
+): PreviewTemplateDefinition[] | null {
+  if (!Array.isArray(value)) return null;
+
+  const templates = value
+    .map((item) => sanitizePreviewTemplate(item))
+    .filter((item): item is PreviewTemplateDefinition => Boolean(item));
+  const ids = new Set<string>();
+  const uniqueTemplates = templates.filter((template) => {
+    if (ids.has(template.id)) return false;
+    ids.add(template.id);
+    return true;
+  });
+
+  return uniqueTemplates.length > 0 ? uniqueTemplates : null;
 }

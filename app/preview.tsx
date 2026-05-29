@@ -49,14 +49,9 @@ import {
   getDefaultVisibleFieldsForLayout as resolveDefaultVisibleFieldsForLayout,
   getLayoutMetricLimit,
   layoutSupportsPrimaryLayer,
-  PREVIEW_LAYOUTS as LAYOUTS,
   shouldResetTransformsOnLayoutSelect,
 } from '@/lib/previewLayouts';
-import {
-  DEFAULT_PREVIEW_TEMPLATE_ID,
-  getPreviewTemplateById,
-  PREVIEW_TEMPLATES,
-} from '@/lib/previewTemplates';
+import { DEFAULT_PREVIEW_TEMPLATE_ID } from '@/lib/previewTemplates';
 import {
   BASE_LAYER_ORDER,
   sanitizePreviewDraft,
@@ -81,6 +76,8 @@ import {
 } from '@/lib/format';
 import { useActivityStore } from '@/store/activityStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
+import { usePreviewLayoutStore } from '@/store/previewLayoutStore';
+import { usePreviewTemplateStore } from '@/store/previewTemplateStore';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import {
   BackgroundGradient,
@@ -168,6 +165,8 @@ export default function PreviewScreen() {
   const activity = useActivityStore((s) => s.selectedActivity());
   const activitySource = useActivityStore((s) => s.source);
   const isPremium = useSubscriptionStore((s) => s.isPremium);
+  const LAYOUTS = usePreviewLayoutStore((s) => s.layouts);
+  const PREVIEW_TEMPLATES = usePreviewTemplateStore((s) => s.templates);
   const [busy, setBusy] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isCapturingOverlay, setIsCapturingOverlay] = useState(false);
@@ -207,8 +206,15 @@ export default function PreviewScreen() {
     : LAYOUTS[0].id;
   const [selectedLayoutId, setSelectedLayoutId] = useState(initialLayoutId);
   const [selectedTemplateId, setSelectedTemplateId] = useState(
-    getPreviewTemplateById(selectedTemplateParam)?.id ??
+    PREVIEW_TEMPLATES.find((item) => item.id === selectedTemplateParam)?.id ??
       DEFAULT_PREVIEW_TEMPLATE_ID,
+  );
+  const getTemplateById = useCallback(
+    (templateId: string | null | undefined) => {
+      if (!templateId) return null;
+      return PREVIEW_TEMPLATES.find((item) => item.id === templateId) ?? null;
+    },
+    [PREVIEW_TEMPLATES],
   );
   useEffect(() => {
     if (!shareToastMessage) return;
@@ -283,7 +289,7 @@ export default function PreviewScreen() {
     });
   const showTemplateBackgroundTab =
     !templateMode ||
-    getPreviewTemplateById(selectedTemplateId)?.showBackgroundTab !== false;
+    getTemplateById(selectedTemplateId)?.showBackgroundTab !== false;
 
   useEffect(() => {
     if (!templateMode) return;
@@ -301,7 +307,7 @@ export default function PreviewScreen() {
   useEffect(() => {
     if (!selectedTemplateParam) return;
     if (templateMode) {
-      const nextTemplate = getPreviewTemplateById(selectedTemplateParam);
+      const nextTemplate = getTemplateById(selectedTemplateParam);
       if (!nextTemplate) return;
       if (nextTemplate.premium && !isPremium) {
         router.push('/paywall');
@@ -312,7 +318,24 @@ export default function PreviewScreen() {
     }
     if (!LAYOUTS.some((item) => item.id === selectedTemplateParam)) return;
     setSelectedLayoutId(selectedTemplateParam);
-  }, [isPremium, selectedTemplateParam, templateMode]);
+  }, [getTemplateById, isPremium, LAYOUTS, selectedTemplateParam, templateMode]);
+
+  useEffect(() => {
+    if (templateMode) return;
+    if (LAYOUTS.some((item) => item.id === selectedLayoutId)) return;
+    setSelectedLayoutId(LAYOUTS[0].id);
+  }, [LAYOUTS, selectedLayoutId, templateMode]);
+
+  useEffect(() => {
+    if (!templateMode) return;
+    if (getTemplateById(selectedTemplateId)) return;
+    setSelectedTemplateId(PREVIEW_TEMPLATES[0]?.id ?? DEFAULT_PREVIEW_TEMPLATE_ID);
+  }, [
+    PREVIEW_TEMPLATES,
+    getTemplateById,
+    selectedTemplateId,
+    templateMode,
+  ]);
 
   const exportRef = useRef<View>(null);
   const managedTempUrisRef = useRef<Set<string>>(new Set());
@@ -368,10 +391,10 @@ export default function PreviewScreen() {
 
   const selectedTemplateDefinition = useMemo(
     () =>
-      getPreviewTemplateById(selectedTemplateId) ??
+      getTemplateById(selectedTemplateId) ??
       PREVIEW_TEMPLATES[0] ??
       null,
-    [selectedTemplateId],
+    [PREVIEW_TEMPLATES, getTemplateById, selectedTemplateId],
   );
   const activeLayoutId =
     templateMode && selectedTemplateDefinition ? 'hero' : selectedLayoutId;
@@ -380,7 +403,7 @@ export default function PreviewScreen() {
   );
   const template = useMemo(
     () => LAYOUTS.find((item) => item.id === activeLayoutId) ?? LAYOUTS[0],
-    [activeLayoutId],
+    [LAYOUTS, activeLayoutId],
   );
   const layerStyleMap = useMemo(
     () =>
@@ -1757,7 +1780,7 @@ export default function PreviewScreen() {
       : isHydratingDraft || !draftReady;
     const shouldRespectTemplateDisable = Boolean(
       templateMode &&
-      getPreviewTemplateById(selectedTemplateId)?.disableBackgroundRemoval,
+      getTemplateById(selectedTemplateId)?.disableBackgroundRemoval,
     );
 
     if (isDraftHydrationPending) return;
@@ -1918,7 +1941,7 @@ export default function PreviewScreen() {
       options.skipBackgroundRemoval ??
       (templateMode &&
         Boolean(
-          getPreviewTemplateById(selectedTemplateId)?.disableBackgroundRemoval,
+          getTemplateById(selectedTemplateId)?.disableBackgroundRemoval,
         ));
     if (shouldSkipBackgroundRemoval) {
       if (!options.silent) {
@@ -2234,7 +2257,7 @@ export default function PreviewScreen() {
   }
 
   function selectTemplate(templateId: string) {
-    const nextTemplate = getPreviewTemplateById(templateId);
+    const nextTemplate = getTemplateById(templateId);
     if (!nextTemplate) return;
     if (nextTemplate.premium && !isPremium) {
       router.push('/paywall');
@@ -2716,7 +2739,7 @@ export default function PreviewScreen() {
     }
     const skipBackgroundRemoval = Boolean(
       templateMode &&
-      getPreviewTemplateById(selectedTemplateId)?.disableBackgroundRemoval,
+      getTemplateById(selectedTemplateId)?.disableBackgroundRemoval,
     );
     const asset: ImagePicker.ImagePickerAsset = {
       uri: activityPhotoUri,
@@ -3024,6 +3047,7 @@ export default function PreviewScreen() {
           onRemoveLayer={removeLayer}
           template={template}
           onSelectLayout={selectLayout}
+          layoutOptions={LAYOUTS}
           templateOptions={PREVIEW_TEMPLATES.map((item) => ({
             id: item.id,
             name: item.name,

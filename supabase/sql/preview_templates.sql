@@ -1,0 +1,906 @@
+create table if not exists public.preview_templates (
+  id text primary key,
+  sort_order integer not null default 0,
+  is_published boolean not null default false,
+  template jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.preview_templates enable row level security;
+
+drop policy if exists "Published preview templates are readable" on public.preview_templates;
+
+create policy "Published preview templates are readable"
+on public.preview_templates
+for select
+to anon, authenticated
+using (is_published = true);
+
+create or replace function public.set_preview_templates_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists preview_templates_set_updated_at on public.preview_templates;
+
+create trigger preview_templates_set_updated_at
+before update on public.preview_templates
+for each row
+execute function public.set_preview_templates_updated_at();
+
+insert into public.preview_templates (id, sort_order, is_published, template)
+values
+  (
+    'template-cover',
+    10,
+    true,
+    '{
+  "id": "template-cover",
+  "name": "Cover",
+  "defaultBackground": "none",
+  "defaultBlurEffectId": "background-blur",
+  "showRoute": true,
+  "routeTransform": {
+    "x": 170,
+    "y": 460,
+    "scale": 0.5
+  },
+  "layerStyleOverrides": {
+    "route": {
+      "color": "#F5F5F5",
+      "opacity": 1
+    }
+  },
+  "fixedImageElements": [
+    {
+      "id": "title-logo",
+      "name": "Runner zine title",
+      "assetKey": "runner",
+      "isBehind": true,
+      "x": 10,
+      "y": 30,
+      "width": 340,
+      "height": 92
+    }
+  ],
+  "fixedTextElements": [
+    {
+      "id": "meta-date",
+      "text": "{date}",
+      "uppercase": true,
+      "x": 10,
+      "y": 10,
+      "width": 340,
+      "formatDate": "mm/dd/YYYY",
+      "color": "transparent",
+      "backgroundColor": "#ffffff",
+      "fontFamily": "Avenir Next",
+      "fontSize": 15,
+      "fontWeight": "700",
+      "letterSpacing": 0.3,
+      "align": "right",
+      "paddingX": 14,
+      "isBehind": true
+    },
+    {
+      "id": "meta-location",
+      "text": "{location} Edition",
+      "uppercase": true,
+      "x": 10,
+      "y": 120,
+      "width": 340,
+      "textAlign": "left",
+      "color": "transparent",
+      "fontFamily": "Avenir Next",
+      "backgroundColor": "#ffffff",
+      "fontSize": 15,
+      "fontWeight": "700",
+      "letterSpacing": 0.3,
+      "isBehind": true
+    },
+    {
+      "id": "story-copy",
+      "text": "Inside a [[{time}]] run over [[{distance}]].\nCruising at [[{pace}]] pace.",
+      "uppercase": true,
+      "x": 14,
+      "y": 180,
+      "width": 120,
+      "color": "#FFFFFF",
+      "opacity": 0.96,
+      "fontSize": 18,
+      "lineHeight": 21.599999999999998,
+      "fontWeight": "600",
+      "letterSpacing": 0.15,
+      "accentFontSize": 24,
+      "accentFontWeight": "900",
+      "accentLetterSpacing": 0.2,
+      "fontFamily": "Helvetica Neue"
+    },
+    {
+      "id": "hr-value",
+      "text": "A steady\n[[{avgHr}]]\naverage",
+      "requiredDataFields": [
+        "avgHr"
+      ],
+      "x": 256,
+      "y": 200,
+      "color": "#ffffff",
+      "accentColor": "#d7000c",
+      "accentFontWeight": "900",
+      "fontSize": 16,
+      "fontFamily": "Avenir Next",
+      "fontWeight": "700",
+      "uppercase": true,
+      "borderColor": "#ffffff",
+      "borderWidth": 4,
+      "borderRadius": 200,
+      "paddingX": 12,
+      "paddingY": 20
+    },
+    {
+      "id": "elev-value",
+      "text": "{elev}",
+      "x": 10,
+      "y": 444,
+      "color": "#d7000c",
+      "fontFamily": "Monoton",
+      "fontSize": 42,
+      "fontWeight": "900"
+    },
+    {
+      "id": "elev-label",
+      "text": "Of elevation\ngain",
+      "uppercase": true,
+      "x": 14,
+      "y": 488,
+      "color": "#FFFFFF",
+      "fontSize": 14,
+      "fontFamily": "Avenir Next",
+      "fontWeight": "800",
+      "letterSpacing": 0.8
+    },
+    {
+      "id": "calories-label",
+      "text": "CALORIES\nBURNED",
+      "requiredDataFields": [
+        "calories"
+      ],
+      "x": 260,
+      "y": 400,
+      "color": "#d7000c",
+      "fontSize": 15,
+      "fontWeight": "900",
+      "letterSpacing": 0.8,
+      "fontFamily": "Avenir Next"
+    },
+    {
+      "id": "calories-value",
+      "text": "{calories}",
+      "requiredDataFields": [
+        "calories"
+      ],
+      "x": 260,
+      "y": 364,
+      "color": "#FFFFFF",
+      "fontSize": 30,
+      "fontWeight": "900"
+    },
+    {
+      "id": "meta-name",
+      "text": "{activityName}",
+      "uppercase": true,
+      "x": 10,
+      "y": 582,
+      "color": "#d7000c",
+      "fontSize": 13,
+      "fontWeight": "800",
+      "letterSpacing": 0.6,
+      "width": 320,
+      "align": "left"
+    }
+  ]
+}'::jsonb
+  ),
+  (
+    'template-polaroid',
+    20,
+    true,
+    '{
+  "id": "template-polaroid",
+  "name": "Polaroid",
+  "disableBackgroundRemoval": true,
+  "disableVideoBackground": true,
+  "defaultFilterEffectId": "cool-night",
+  "imagePickerCropSize": {
+    "width": 650,
+    "height": 735
+  },
+  "defaultBackground": "none",
+  "backgroundMediaFrame": {
+    "x": 24,
+    "y": 35,
+    "width": 312,
+    "height": 360,
+    "mediaScale": 1,
+    "mediaOffsetX": 0,
+    "mediaOffsetY": 0,
+    "fit": "width-crop-center"
+  },
+  "fixedImageElements": [
+    {
+      "id": "polaroid-bg",
+      "name": "Polaroid background",
+      "assetKey": "polaroid-wood",
+      "x": 0,
+      "y": 0,
+      "width": 360,
+      "height": 640
+    }
+  ],
+  "fixedTextElements": [
+    {
+      "id": "meta-date",
+      "text": "{date}",
+      "formatDate": "mm/dd/YYYY",
+      "uppercase": true,
+      "x": 32,
+      "y": 360,
+      "color": "orange",
+      "fontSize": 13,
+      "fontWeight": "800",
+      "letterSpacing": 0.6,
+      "fontFamily": "Courier New",
+      "width": 300
+    },
+    {
+      "id": "meta-name",
+      "text": "{activityName}",
+      "x": 28,
+      "y": 406,
+      "color": "#000000",
+      "fontSize": 30,
+      "fontWeight": "800",
+      "letterSpacing": 0.2,
+      "fontFamily": "Autography",
+      "width": 300
+    },
+    {
+      "id": "run-distance-location",
+      "text": "Run {distance}",
+      "x": 28,
+      "y": 442,
+      "color": "#000000",
+      "fontSize": 22,
+      "fontWeight": "800",
+      "letterSpacing": 0.15,
+      "fontFamily": "Autography",
+      "width": 314
+    },
+    {
+      "id": "time-label",
+      "text": "{time}",
+      "x": 32,
+      "y": 466,
+      "color": "#000000",
+      "fontSize": 24,
+      "fontWeight": "800",
+      "letterSpacing": 0.2,
+      "fontFamily": "Autography",
+      "width": 300
+    },
+    {
+      "id": "pace-label",
+      "text": "{pace} pace",
+      "x": 32,
+      "y": 486,
+      "color": "#000000",
+      "fontSize": 24,
+      "fontWeight": "800",
+      "letterSpacing": 0.2,
+      "fontFamily": "Autography",
+      "width": 300
+    },
+    {
+      "id": "hr-label",
+      "text": "{avgHr}",
+      "requiredDataFields": [
+        "avgHr"
+      ],
+      "x": 32,
+      "y": 506,
+      "color": "#000000",
+      "fontSize": 24,
+      "fontWeight": "800",
+      "letterSpacing": 0.2,
+      "fontFamily": "Autography",
+      "width": 300
+    },
+    {
+      "id": "cal-label",
+      "text": "{calories} calories",
+      "requiredDataFields": [
+        "calories"
+      ],
+      "x": 32,
+      "y": 526,
+      "color": "#000000",
+      "fontSize": 24,
+      "fontWeight": "800",
+      "letterSpacing": 0.2,
+      "fontFamily": "Autography",
+      "width": 300
+    }
+  ]
+}'::jsonb
+  ),
+  (
+    'template-neon',
+    30,
+    true,
+    '{
+  "id": "template-neon",
+  "name": "Neon",
+  "premium": true,
+  "showBackgroundTab": false,
+  "defaultBackground": "none",
+  "fixedImageElements": [
+    {
+      "id": "grid-bg",
+      "name": "Grid background",
+      "assetKey": "grid-bg",
+      "x": 0,
+      "y": 0,
+      "width": 360,
+      "height": 640
+    }
+  ],
+  "fixedTextElements": [
+    {
+      "id": "distance-label",
+      "text": "Distance",
+      "uppercase": true,
+      "x": 23,
+      "y": 76,
+      "color": "#a1a1a1",
+      "fontSize": 14,
+      "fontWeight": "400",
+      "letterSpacing": 0.6,
+      "fontFamily": "Arial"
+    },
+    {
+      "id": "distance-value",
+      "text": "[[{distanceValue}]]\n{distanceUnit}",
+      "uppercase": true,
+      "x": 28,
+      "y": 100,
+      "color": "#a9e450",
+      "fontSize": 14,
+      "fontWeight": "400",
+      "letterSpacing": 0.6,
+      "fontFamily": "Arial",
+      "accentFontSize": 28,
+      "accentFontWeight": "500",
+      "lineHeight": 28,
+      "borderColor": "#5a5a5a",
+      "borderWidth": 1,
+      "borderRadius": 0,
+      "paddingX": 4,
+      "paddingY": 4,
+      "width": 104,
+      "align": "center"
+    },
+    {
+      "id": "hr-label",
+      "text": "AVG HR",
+      "uppercase": true,
+      "x": 131,
+      "y": 76,
+      "color": "#a1a1a1",
+      "fontSize": 14,
+      "fontWeight": "400",
+      "letterSpacing": 0.6,
+      "fontFamily": "Arial"
+    },
+    {
+      "id": "hr-value",
+      "text": "[[{avgHrValue}]]\n{avgHrUnit}",
+      "uppercase": true,
+      "x": 136,
+      "y": 100,
+      "color": "#a9e450",
+      "fontSize": 14,
+      "fontWeight": "400",
+      "letterSpacing": 0.6,
+      "fontFamily": "Arial",
+      "accentFontSize": 28,
+      "accentFontWeight": "500",
+      "lineHeight": 28,
+      "borderColor": "#5a5a5a",
+      "borderWidth": 1,
+      "borderRadius": 0,
+      "paddingX": 4,
+      "paddingY": 4,
+      "width": 92,
+      "align": "center"
+    },
+    {
+      "id": "cal-label",
+      "text": "Calories",
+      "uppercase": true,
+      "x": 227,
+      "y": 76,
+      "color": "#a1a1a1",
+      "fontSize": 14,
+      "fontWeight": "400",
+      "letterSpacing": 0.6,
+      "fontFamily": "Arial"
+    },
+    {
+      "id": "cal-value",
+      "text": "[[{calories}]]\nCal",
+      "uppercase": true,
+      "x": 232,
+      "y": 100,
+      "color": "#a9e450",
+      "fontSize": 14,
+      "fontWeight": "400",
+      "letterSpacing": 0.6,
+      "fontFamily": "Arial",
+      "accentFontSize": 28,
+      "accentFontWeight": "500",
+      "lineHeight": 28,
+      "borderColor": "#5a5a5a",
+      "borderWidth": 1,
+      "borderRadius": 0,
+      "paddingX": 4,
+      "paddingY": 4,
+      "width": 104,
+      "align": "center"
+    },
+    {
+      "id": "pace-label",
+      "text": "[[{paceValue}]] {paceUnit}",
+      "uppercase": true,
+      "x": 0,
+      "y": 240,
+      "color": "#b1ec5e",
+      "fontSize": 32,
+      "fontWeight": "400",
+      "letterSpacing": 0.6,
+      "fontFamily": "Arial",
+      "width": 360,
+      "align": "center",
+      "glowColor": "#b1ec5e",
+      "glowRadius": 8,
+      "accentFontSize": 90,
+      "accentFontWeight": "400",
+      "lineHeight": 94
+    },
+    {
+      "id": "elev-label",
+      "text": "+{elev}",
+      "uppercase": true,
+      "x": 260,
+      "y": 220,
+      "color": "#a9e450",
+      "fontSize": 16,
+      "fontWeight": "500",
+      "letterSpacing": 0.6,
+      "fontFamily": "Arial",
+      "width": 300
+    },
+    {
+      "id": "meta-date-location",
+      "text": "{date} - {location}",
+      "formatDate": "mm/dd/YYYY",
+      "uppercase": true,
+      "x": 0,
+      "y": 486,
+      "color": "#a1a1a1",
+      "fontSize": 12,
+      "fontWeight": "400",
+      "letterSpacing": 0.6,
+      "fontFamily": "Arial",
+      "width": 360,
+      "align": "right",
+      "paddingX": 26
+    },
+    {
+      "id": "time-label",
+      "text": "Duration     [[{time}]]",
+      "uppercase": true,
+      "x": 32,
+      "y": 514,
+      "color": "#a1a1a1",
+      "fontSize": 14,
+      "fontWeight": "400",
+      "accentColor": "#a9e450",
+      "accentFontSize": 24,
+      "lineHeight": 28,
+      "accentFontWeight": "400",
+      "letterSpacing": 0.6,
+      "fontFamily": "Arial"
+    },
+    {
+      "id": "meta-name",
+      "text": "{activityName}",
+      "uppercase": true,
+      "x": 32,
+      "y": 556,
+      "color": "#a1a1a1",
+      "fontSize": 14,
+      "fontWeight": "400",
+      "letterSpacing": 0.6,
+      "fontFamily": "Arial"
+    }
+  ],
+  "fixedChartElements": [
+    {
+      "id": "pace-chart-a",
+      "kind": "pace",
+      "x": 80,
+      "y": 380,
+      "width": 200,
+      "height": 90,
+      "color": "#a9e450",
+      "showAxes": true,
+      "showGrid": false,
+      "orientation": "vertical",
+      "fillStyle": "gradient"
+    }
+  ]
+}'::jsonb
+  ),
+  (
+    'template-ticket',
+    40,
+    true,
+    '{
+  "id": "template-ticket",
+  "name": "Ticket",
+  "premium": true,
+  "showBackgroundTab": false,
+  "defaultBackground": "none",
+  "showRoute": true,
+  "routeTransform": {
+    "x": 122,
+    "y": 340,
+    "scale": 0.7
+  },
+  "layerStyleOverrides": {
+    "route": {
+      "color": "#101010",
+      "opacity": 0.8
+    }
+  },
+  "fixedImageElements": [
+    {
+      "id": "grid-bg",
+      "name": "Grid background",
+      "assetKey": "ticket-run",
+      "isBehind": true,
+      "x": 0,
+      "y": 0,
+      "width": 360,
+      "height": 640
+    }
+  ],
+  "fixedTextElements": [
+    {
+      "id": "distance-label",
+      "text": "[[{distanceValue}]] {distanceUnit}",
+      "uppercase": true,
+      "x": 22,
+      "y": 120,
+      "color": "#101010",
+      "fontSize": 32,
+      "accentFontSize": 72,
+      "lineHeight": 76,
+      "fontWeight": "800",
+      "letterSpacing": 0.6,
+      "fontFamily": "Helvetica Neue",
+      "opacity": 0.8
+    },
+    {
+      "id": "time-label",
+      "text": "{time}",
+      "uppercase": true,
+      "x": 22,
+      "y": 237,
+      "color": "#101010",
+      "fontSize": 28,
+      "lineHeight": 36,
+      "fontWeight": "800",
+      "letterSpacing": 0.6,
+      "fontFamily": "Helvetica Neue",
+      "opacity": 0.8
+    },
+    {
+      "id": "pace-label",
+      "text": "[[{paceValue}]] {paceUnit}",
+      "uppercase": true,
+      "x": 152,
+      "y": 238,
+      "color": "#101010",
+      "fontSize": 20,
+      "fontWeight": "800",
+      "accentFontSize": 32,
+      "lineHeight": 36,
+      "letterSpacing": 0.6,
+      "fontFamily": "Helvetica Neue",
+      "opacity": 0.8
+    },
+    {
+      "id": "cal-label",
+      "text": "[[{calories}]] Cal.",
+      "uppercase": true,
+      "x": 22,
+      "y": 308,
+      "color": "#101010",
+      "fontSize": 20,
+      "fontWeight": "800",
+      "accentFontSize": 32,
+      "lineHeight": 36,
+      "letterSpacing": 0.6,
+      "fontFamily": "Helvetica Neue",
+      "opacity": 0.8
+    },
+    {
+      "id": "meta-date",
+      "text": "{date}",
+      "formatDate": "dd MMM YYYY",
+      "uppercase": true,
+      "x": 22,
+      "y": 390,
+      "color": "#101010",
+      "fontSize": 16,
+      "fontWeight": "800",
+      "letterSpacing": 0.6,
+      "fontFamily": "Arial",
+      "opacity": 0.8
+    },
+    {
+      "id": "meta-location",
+      "text": "{location}",
+      "uppercase": true,
+      "x": 22,
+      "y": 442,
+      "color": "#101010",
+      "fontSize": 16,
+      "fontWeight": "800",
+      "letterSpacing": 0.6,
+      "fontFamily": "Arial",
+      "opacity": 0.8
+    },
+    {
+      "id": "meta-name",
+      "text": "{activityName}",
+      "uppercase": true,
+      "x": 0,
+      "y": 542,
+      "color": "#101010",
+      "fontSize": 16,
+      "fontWeight": "900",
+      "letterSpacing": 0.6,
+      "fontFamily": "Helvetica Neue",
+      "width": 360,
+      "align": "center",
+      "opacity": 0.8
+    }
+  ]
+}'::jsonb
+  ),
+  (
+    'template-easy',
+    50,
+    true,
+    '{
+  "id": "template-easy",
+  "name": "Easy",
+  "defaultBackground": "none",
+  "defaultBlurEffectId": "background-blur",
+  "defaultFilterEffectId": "black-and-white",
+  "showRoute": false,
+  "fixedTextElements": [
+    {
+      "id": "title",
+      "text": "EASY",
+      "uppercase": true,
+      "x": 0,
+      "y": 260,
+      "color": "#ffffff",
+      "fontSize": 80,
+      "fontFamily": "Georgia",
+      "fontWeight": "900",
+      "letterSpacing": 2,
+      "width": 360,
+      "align": "center"
+    },
+    {
+      "id": "data",
+      "text": "[[{distanceValue}]] {distanceUnit} · [[{paceValue}]] {paceUnit} · [[{time}]]",
+      "x": 0,
+      "y": 380,
+      "color": "#ffffff",
+      "fontFamily": "Arial",
+      "accentFontFamily": "Helvetica Neue",
+      "accentFontSize": 24,
+      "accentFontWeight": "500",
+      "lineHeight": 28,
+      "fontSize": 16,
+      "fontWeight": "400",
+      "width": 360,
+      "align": "center"
+    },
+    {
+      "id": "location-date",
+      "text": "{location} · {date}",
+      "uppercase": true,
+      "formatDate": "MMMM dd, YYYY",
+      "x": 0,
+      "y": 500,
+      "color": "#3c3c3c",
+      "fontSize": 16,
+      "fontWeight": "400",
+      "width": 360,
+      "align": "center",
+      "fontFamily": "Arial"
+    }
+  ]
+}'::jsonb
+  ),
+  (
+    'template-sky-script',
+    60,
+    true,
+    '{
+  "id": "template-sky-script",
+  "name": "Sky Script",
+  "premium": true,
+  "defaultBackground": "activity-photo",
+  "disableBackgroundRemoval": true,
+  "disableVideoBackground": true,
+  "showRoute": false,
+  "fixedTextElements": [
+    {
+      "id": "distance-label",
+      "text": "DISTANCE",
+      "requiredDataFields": [
+        "distance"
+      ],
+      "renderStyle": "scattered",
+      "uppercase": true,
+      "x": 42,
+      "y": 120,
+      "width": 136,
+      "color": "#ffffff",
+      "fontSize": 13,
+      "fontWeight": "700",
+      "letterSpacing": 1.6,
+      "fontFamily": "DCCCloud",
+      "glowColor": "rgba(255,255,255,0.2)",
+      "glowRadius": 3
+    },
+    {
+      "id": "distance-value",
+      "text": "{distance}",
+      "requiredDataFields": [
+        "distance"
+      ],
+      "renderStyle": "scattered",
+      "uppercase": true,
+      "x": 26,
+      "y": 146,
+      "width": 170,
+      "color": "#ffffff",
+      "fontSize": 32,
+      "lineHeight": 34,
+      "fontWeight": "700",
+      "letterSpacing": 0.02,
+      "fontFamily": "DCCCloud",
+      "glowColor": "rgba(255,255,255,0.28)",
+      "glowRadius": 4
+    },
+    {
+      "id": "pace-label",
+      "text": "PACE",
+      "requiredDataFields": [
+        "pace"
+      ],
+      "renderStyle": "scattered",
+      "uppercase": true,
+      "x": 236,
+      "y": 120,
+      "width": 82,
+      "color": "#ffffff",
+      "fontSize": 13,
+      "fontWeight": "700",
+      "letterSpacing": 1.6,
+      "fontFamily": "DCCCloud",
+      "glowColor": "rgba(255,255,255,0.2)",
+      "glowRadius": 3,
+      "align": "left"
+    },
+    {
+      "id": "pace-value",
+      "text": "{pace}",
+      "requiredDataFields": [
+        "pace"
+      ],
+      "renderStyle": "scattered",
+      "uppercase": true,
+      "x": 214,
+      "y": 146,
+      "width": 132,
+      "color": "#ffffff",
+      "fontSize": 25,
+      "lineHeight": 27,
+      "fontWeight": "700",
+      "letterSpacing": 0.02,
+      "fontFamily": "DCCCloud",
+      "glowColor": "rgba(255,255,255,0.28)",
+      "glowRadius": 4,
+      "align": "left"
+    },
+    {
+      "id": "time-label",
+      "text": "TIME",
+      "renderStyle": "scattered",
+      "uppercase": true,
+      "x": 118,
+      "y": 64,
+      "width": 96,
+      "color": "#ffffff",
+      "fontSize": 12,
+      "fontWeight": "700",
+      "letterSpacing": 1.5,
+      "fontFamily": "DCCCloud",
+      "glowColor": "rgba(255,255,255,0.18)",
+      "glowRadius": 3,
+      "align": "center"
+    },
+    {
+      "id": "time-value",
+      "text": "{time}",
+      "renderStyle": "scattered",
+      "uppercase": true,
+      "x": 90,
+      "y": 84,
+      "width": 144,
+      "color": "#ffffff",
+      "fontSize": 24,
+      "lineHeight": 26,
+      "fontWeight": "700",
+      "letterSpacing": 0.02,
+      "fontFamily": "DCCCloud",
+      "glowColor": "rgba(255,255,255,0.24)",
+      "glowRadius": 4,
+      "align": "center"
+    }
+  ]
+}'::jsonb
+  )
+on conflict (id) do update set
+  sort_order = excluded.sort_order,
+  is_published = excluded.is_published,
+  template = excluded.template;
+
+-- For image elements, use either a remote "uri" or one of these bundled asset keys:
+-- "runner", "polaroid-wood", "grid-bg", "ticket-run", "card-member".
+--
+-- Example remote image element:
+-- {
+--   "id": "custom-bg",
+--   "name": "Custom background",
+--   "uri": "https://YOUR_PROJECT.supabase.co/storage/v1/object/public/templates/custom-bg.png",
+--   "x": 0,
+--   "y": 0,
+--   "width": 360,
+--   "height": 640
+-- }
