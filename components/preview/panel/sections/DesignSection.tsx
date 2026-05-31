@@ -2,11 +2,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { LayoutPreview } from '@/components/preview/panel/LayoutPreview';
+import { TemplatePreview } from '@/components/preview/panel/TemplatePreview';
 import { isSameSunsetPrimaryGradient } from '@/components/preview/panel/utils';
 import { FONT_PRESETS } from '@/lib/previewConfig';
 import type {
   ChartDisplayVersion,
   FieldId,
+  PreviewTemplateDefinition,
   StatsLayout,
 } from '@/types/preview';
 import type {
@@ -19,7 +21,7 @@ type Props = {
   colors: any;
   quickTemplateMode: boolean;
   layoutOptions: StatsLayout[];
-  templateOptions: { id: string; name: string; premium?: boolean }[];
+  templateOptions: PreviewTemplateDefinition[];
   isPremium: boolean;
   selectedTemplateId?: string;
   onSelectTemplate?: (templateId: string) => void;
@@ -133,13 +135,7 @@ export function DesignSection({
                         selected && styles.templateCardSelected,
                       ]}
                     >
-                      <View style={styles.templateModeIconWrap}>
-                        <MaterialCommunityIcons
-                          name="view-grid-outline"
-                          size={20}
-                          color={colors.text}
-                        />
-                      </View>
+                      <TemplatePreview template={item} colors={colors} />
                       {isLocked ? (
                         <Text style={styles.templatePremiumBadge}>Premium</Text>
                       ) : null}
