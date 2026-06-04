@@ -84,18 +84,6 @@ export default function LoginScreen() {
     }
   }
 
-  async function handleMockLogin() {
-    try {
-      setIsBusy(true);
-      await login(getMockTokens());
-      resetAndReplace('/activities');
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Mock login failed.');
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
   async function handleGarminLogin() {
     try {
       setIsBusy(true);
@@ -206,35 +194,6 @@ export default function LoginScreen() {
             />
           </Pressable>
 
-          <Pressable
-            onPress={handleMockLogin}
-            disabled={isBusy}
-            style={({ pressed }) => [
-              styles.demoCard,
-              pressed && !isBusy ? styles.demoCardPressed : null,
-              isBusy ? styles.demoCardDisabled : null,
-            ]}
-          >
-            <View style={styles.demoIconWrap}>
-              <MaterialCommunityIcons
-                name="flask-outline"
-                size={18}
-                color={colors.primaryText}
-              />
-            </View>
-            <View style={styles.demoCopy}>
-              <Text style={styles.demoTitle}>Use Demo Activity</Text>
-              <Text style={styles.demoSubtitle}>
-                No Strava account? Try the app with sample data.
-              </Text>
-            </View>
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={18}
-              color={colors.textMuted}
-            />
-          </Pressable>
-
           {Platform.OS === 'ios' ? (
             <Pressable
               onPress={handleHealthKitImport}
@@ -302,13 +261,18 @@ function createStyles(colors: ThemeColors) {
     },
     title: {
       color: colors.primary,
-      fontSize: 46,
-      lineHeight: 50,
-      fontWeight: '800',
-      letterSpacing: 0.5,
+      fontSize: 44,
+      lineHeight: 48,
+      fontWeight: '900',
+      letterSpacing: 0.8,
       marginTop: -16,
       alignSelf: 'center',
-      fontFamily: 'system',
+      fontFamily: Platform.select({
+        ios: 'Avenir Next',
+        android: 'sans-serif-condensed',
+        default: 'system',
+      }),
+      includeFontPadding: false,
     },
     subtitle: {
       color: 'rgba(243,246,255,0.78)',
@@ -351,47 +315,6 @@ function createStyles(colors: ThemeColors) {
       width: 120,
       margin: 0,
       padding: 0,
-    },
-    demoCard: {
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-      paddingHorizontal: spacing.sm + 2,
-      paddingVertical: spacing.sm + 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      width: '72%',
-      margin: 'auto',
-    },
-    demoCardPressed: {
-      opacity: 0.88,
-    },
-    demoCardDisabled: {
-      opacity: 0.6,
-    },
-    demoIconWrap: {
-      width: 24,
-      height: 24,
-      borderRadius: 5,
-      backgroundColor: colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    demoCopy: {
-      flex: 1,
-    },
-    demoTitle: {
-      color: colors.text,
-      fontSize: 12,
-      fontWeight: '800',
-    },
-    demoSubtitle: {
-      color: colors.textMuted,
-      fontSize: 9,
-      lineHeight: 13,
-      marginTop: 1,
     },
     healthButton: {
       borderRadius: 8,
