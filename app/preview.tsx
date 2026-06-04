@@ -3048,11 +3048,7 @@ export default function PreviewScreen() {
           template={template}
           onSelectLayout={selectLayout}
           layoutOptions={LAYOUTS}
-          templateOptions={PREVIEW_TEMPLATES.map((item) => ({
-            id: item.id,
-            name: item.name,
-            premium: item.premium,
-          }))}
+          templateOptions={PREVIEW_TEMPLATES}
           selectedTemplateId={selectedTemplateId}
           onSelectTemplate={selectTemplate}
           selectedFontId={selectedFontId}

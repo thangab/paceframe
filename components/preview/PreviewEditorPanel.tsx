@@ -43,6 +43,7 @@ import type {
   ChartOrientation,
   FieldId,
   LayerId,
+  PreviewTemplateDefinition,
   RouteMode,
   StatsLayout,
 } from '@/types/preview';
@@ -83,7 +84,7 @@ type Props = {
   template: StatsLayout;
   onSelectLayout: (t: StatsLayout) => void;
   layoutOptions: StatsLayout[];
-  templateOptions?: { id: string; name: string; premium?: boolean }[];
+  templateOptions?: PreviewTemplateDefinition[];
   selectedTemplateId?: string;
   onSelectTemplate?: (templateId: string) => void;
   selectedFontId: string;
@@ -679,13 +680,6 @@ function createStyles(colors: ThemeColors) {
       shadowRadius: 8,
       shadowOffset: { width: 0, height: 4 },
       elevation: 2,
-    },
-    templateModeIconWrap: {
-      width: '100%',
-      height: 72,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.surfaceAlt,
     },
     templateItem: {
       alignItems: 'center',
