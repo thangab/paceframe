@@ -231,16 +231,27 @@ export default function PaywallScreen() {
           ))}
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.freeTitle}>Free Tier</Text>
-          <Text style={styles.freeLine}>1 template</Text>
-          <Text style={styles.freeLine}>Watermark on export</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.premiumTitle}>Premium</Text>
-          <Text style={styles.freeLine}>3+ templates</Text>
-          <Text style={styles.freeLine}>No watermark</Text>
+        <View style={styles.upgradePanel}>
+          <View style={styles.planColumn}>
+            <Text style={styles.planEyebrow}>Free</Text>
+            <Text style={styles.planTitle}>Try the basics</Text>
+            <Text style={styles.planLine}>Single starter template</Text>
+            <Text style={styles.planLine}>PaceFrame watermark</Text>
+          </View>
+          <View style={[styles.planColumn, styles.planColumnPremium]}>
+            <View style={styles.bestValuePill}>
+              <MaterialCommunityIcons
+                name="star-four-points-outline"
+                size={12}
+                color={colors.primaryText}
+              />
+              <Text style={styles.bestValueText}>Best for sharing</Text>
+            </View>
+            <Text style={styles.planEyebrowPremium}>Premium</Text>
+            <Text style={styles.planTitlePremium}>Make every activity post-ready</Text>
+            <Text style={styles.planLinePremium}>Unlock every template pack</Text>
+            <Text style={styles.planLinePremium}>Export clean visuals without watermark</Text>
+          </View>
         </View>
 
         {loading ? (
@@ -327,12 +338,12 @@ export default function PaywallScreen() {
 
         <Text style={styles.subscriptionNotice}>
           Auto-renewable subscription: PaceFrame Premium Weekly
-          {weeklyPrice ? ` (${weeklyPrice} per week)` : ''} or PaceFrame
-          Premium Annual{annualPrice ? ` (${annualPrice} per year)` : ''}.
-          Payment is charged to your Apple ID. Subscriptions renew
-          automatically unless cancelled at least 24 hours before the end of the
-          current period. Manage or cancel in App Store account settings. By
-          subscribing, you agree to our{' '}
+          {weeklyPrice ? ` (${weeklyPrice} per week)` : ''} or PaceFrame Premium
+          Annual{annualPrice ? ` (${annualPrice} per year)` : ''}. Payment is
+          charged to your Apple ID. Subscriptions renew automatically unless
+          cancelled at least 24 hours before the end of the current period.
+          Manage or cancel in App Store account settings. By subscribing, you
+          agree to our{' '}
           <Text
             style={styles.legalLink}
             onPress={() => {
@@ -432,26 +443,75 @@ function createStyles(colors: ThemeColors) {
       fontSize: 14,
       fontWeight: '600',
     },
-    card: {
-      backgroundColor: colors.surface,
+    upgradePanel: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+    },
+    planColumn: {
+      flex: 1,
+      minHeight: 154,
+      borderRadius: radius.md + 2,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: radius.md + 2,
+      backgroundColor: colors.surface,
       padding: spacing.md,
+      gap: 7,
     },
-    freeTitle: {
-      color: colors.text,
-      fontWeight: '800',
-      marginBottom: 4,
+    planColumnPremium: {
+      borderColor: colors.primary,
+      backgroundColor: colors.surfaceAlt,
     },
-    premiumTitle: {
-      color: colors.success,
+    bestValuePill: {
+      alignSelf: 'flex-start',
+      borderRadius: 999,
+      backgroundColor: colors.primary,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginBottom: 2,
+    },
+    bestValueText: {
+      color: colors.primaryText,
+      fontSize: 11,
       fontWeight: '900',
-      marginBottom: 4,
     },
-    freeLine: {
+    planEyebrow: {
       color: colors.textMuted,
+      fontSize: 11,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+    },
+    planEyebrowPremium: {
+      color: colors.primary,
+      fontSize: 11,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+    },
+    planTitle: {
+      color: colors.text,
+      fontSize: 15,
+      lineHeight: 19,
+      fontWeight: '900',
+    },
+    planTitlePremium: {
+      color: colors.text,
+      fontSize: 16,
+      lineHeight: 20,
+      fontWeight: '900',
+    },
+    planLine: {
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 16,
       fontWeight: '600',
+    },
+    planLinePremium: {
+      color: colors.text,
+      fontSize: 12,
+      lineHeight: 16,
+      fontWeight: '700',
     },
     message: {
       color: colors.textMuted,
