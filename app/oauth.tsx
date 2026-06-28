@@ -110,7 +110,6 @@ export default function OAuthCallbackScreen() {
   function resetAndReplace(
     path:
       | '/activities'
-      | '/activities?syncStatus=strava-pending'
       | '/activities?syncStatus=garmin-pending'
       | '/login',
   ) {
@@ -237,7 +236,6 @@ export default function OAuthCallbackScreen() {
 
     let cancelled = false;
     void (async () => {
-      let initialStravaSyncPending = false;
       try {
         setLoadingMessage('Connecting Strava...');
         const nextTokens = await withTimeout(
@@ -257,7 +255,6 @@ export default function OAuthCallbackScreen() {
               limit: 5,
             });
           } catch (syncError) {
-            initialStravaSyncPending = true;
             console.warn(
               '[OAuth] Initial Strava sync failed after successful login',
               syncError,
@@ -266,11 +263,7 @@ export default function OAuthCallbackScreen() {
         }
         clearActivities();
         resetActivityLoadState();
-        resetAndReplace(
-          initialStravaSyncPending
-            ? '/activities?syncStatus=strava-pending'
-            : '/activities',
-        );
+        resetAndReplace('/activities');
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : 'Login failed.';

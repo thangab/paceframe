@@ -18,21 +18,43 @@ import { layout, spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import {
   getInitialStravaLoadDone,
-  getInitialStravaLoadInFlight,
   setInitialStravaLoadDone,
-  setInitialStravaLoadInFlight,
 } from '@/lib/activityLoadState';
 import { fetchGarminActivities } from '@/lib/garmin';
 import { mockActivities } from '@/lib/mockData';
 import {
   fetchActivityFromSupabase,
+  fetchActivitiesFromStravaApi,
   fetchActivitiesFromSupabase,
   refreshTokensWithSupabase,
+  syncStravaActivitiesWithSupabase,
   syncStravaActivityDetailsWithSupabase,
 } from '@/lib/strava';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
 
 export default function ActivitiesScreen() {
   const { syncStatus: rawSyncStatus } = useLocalSearchParams<{
@@ -91,15 +113,9 @@ export default function ActivitiesScreen() {
   const [garminSyncPending, setGarminSyncPending] = useState(
     syncStatus === 'garmin-pending',
   );
-  const isStravaSyncPending =
-    activeSource === 'strava' &&
-    syncStatus === 'strava-pending' &&
-    activities.length === 0;
   const showGarminSyncPending =
     activeSource === 'garmin' && garminSyncPending;
-  const pendingEmptyStateMessage = isStravaSyncPending
-    ? 'Strava connected, activity sync in progress...'
-    : showGarminSyncPending
+  const pendingEmptyStateMessage = showGarminSyncPending
       ? 'Garmin connected, activity import in progress...'
       : null;
   const pendingLoaderColor = pendingEmptyStateMessage
@@ -108,6 +124,9 @@ export default function ActivitiesScreen() {
 
   useEffect(() => {
     setGarminSyncPending(syncStatus === 'garmin-pending');
+    if (syncStatus === 'strava-pending') {
+      router.replace('/activities');
+    }
   }, [syncStatus]);
 
   useEffect(() => {
@@ -200,11 +219,6 @@ export default function ActivitiesScreen() {
         ) {
           return;
         }
-        const initialStravaLoadInFlight = getInitialStravaLoadInFlight();
-        if (initialStravaLoadInFlight) {
-          await initialStravaLoadInFlight;
-          return;
-        }
       }
 
       if (!tokens?.accessToken && activeSource !== 'healthkit') {
@@ -243,7 +257,37 @@ export default function ActivitiesScreen() {
             throw new Error('Missing Strava athlete ID.');
           }
 
-          const rows = await fetchActivitiesFromSupabase(stravaAthleteId);
+          let rows = await withTimeout(
+            fetchActivitiesFromSupabase(stravaAthleteId),
+            12_000,
+            'Strava is connected, but the activity sync is taking longer than expected. Pull to refresh in a moment.',
+          );
+          if (rows.length === 0) {
+            try {
+              await withTimeout(
+                syncStravaActivitiesWithSupabase({
+                  athleteId: stravaAthleteId,
+                  limit: 50,
+                }),
+                12_000,
+                'Strava sync is taking longer than expected.',
+              );
+              rows = await withTimeout(
+                fetchActivitiesFromSupabase(stravaAthleteId),
+                12_000,
+                'Strava activities are taking longer than expected.',
+              );
+            } catch (syncError) {
+              console.warn('[Activities] Strava server sync failed', syncError);
+            }
+          }
+          if (rows.length === 0) {
+            rows = await withTimeout(
+              fetchActivitiesFromStravaApi(activeTokens.accessToken, 50),
+              12_000,
+              'Strava is connected, but activities are taking longer than expected. Try again in a moment.',
+            );
+          }
           setActivities(rows, 'strava');
           hasLoadedInitialStravaRef.current = true;
           setInitialStravaLoadDone(true);
@@ -259,13 +303,7 @@ export default function ActivitiesScreen() {
       };
 
       if (!force && activeSource === 'strava') {
-        setInitialStravaLoadInFlight(runLoad());
-        try {
-          const initialStravaLoadInFlight = getInitialStravaLoadInFlight();
-          await initialStravaLoadInFlight;
-        } finally {
-          setInitialStravaLoadInFlight(null);
-        }
+        await runLoad();
         return;
       }
 
@@ -284,6 +322,21 @@ export default function ActivitiesScreen() {
   useEffect(() => {
     void loadActivities();
   }, [loadActivities]);
+
+  useEffect(() => {
+    if (activeSource !== 'strava' || activities.length > 0 || !loading) return;
+
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      setHasFinishedInitialLoad(true);
+      setError(
+        'Strava is connected, but activities are taking too long to load. Try again in a moment.',
+      );
+      router.replace('/activities');
+    }, 15_000);
+
+    return () => clearTimeout(timeout);
+  }, [activeSource, activities.length, loading]);
 
   useEffect(() => {
     if (!showGarminSyncPending) return;
@@ -447,8 +500,27 @@ export default function ActivitiesScreen() {
         <View style={styles.bgOrbTop} />
         <View style={styles.bgOrbBottom} />
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {(loading || !hasFinishedInitialLoad || Boolean(pendingEmptyStateMessage)) &&
+        {error && activities.length > 0 ? (
+          <Text style={styles.error}>{error}</Text>
+        ) : null}
+        {error && activities.length === 0 && !loading ? (
+          <View style={styles.centered}>
+            <Text style={styles.pendingSyncText}>{error}</Text>
+            <Pressable
+              onPress={() => {
+                setError(null);
+                router.replace('/activities');
+                void loadActivities(true);
+              }}
+              style={({ pressed }) => [
+                styles.retryButton,
+                pressed ? styles.retryButtonPressed : null,
+              ]}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : (loading || !hasFinishedInitialLoad || Boolean(pendingEmptyStateMessage)) &&
         activities.length === 0 ? (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={pendingLoaderColor} />
@@ -750,6 +822,21 @@ function createStyles(colors: ThemeColors) {
       color: colors.textMuted,
       textAlign: 'center',
       fontWeight: '600',
+    },
+    retryButton: {
+      borderRadius: 999,
+      backgroundColor: colors.primary,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+    },
+    retryButtonPressed: {
+      opacity: 0.85,
+      transform: [{ scale: 0.98 }],
+    },
+    retryButtonText: {
+      color: colors.primaryText,
+      fontWeight: '800',
+      fontSize: 14,
     },
     listContent: {
       paddingTop: spacing.md,

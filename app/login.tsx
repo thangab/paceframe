@@ -19,10 +19,15 @@ import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import {
   buildGarminOAuthStartUrl,
+  GARMIN_APP_OAUTH_REDIRECT_URI,
 } from '@/lib/garminOAuth';
 import { importActivitiesFromHealthKit } from '@/lib/healthkit';
+import { openInAppOAuthSession } from '@/lib/inAppOAuth';
 import { getMockTokens } from '@/lib/strava';
-import { buildStravaMobileAuthorizeUrl } from '@/lib/stravaOAuth';
+import {
+  buildStravaMobileAuthorizeUrl,
+  STRAVA_REDIRECT_URI,
+} from '@/lib/stravaOAuth';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
 
@@ -76,7 +81,7 @@ export default function LoginScreen() {
       }
 
       const authUrl = buildStravaMobileAuthorizeUrl({ clientId });
-      await Linking.openURL(authUrl);
+      await openInAppOAuthSession(authUrl, STRAVA_REDIRECT_URI);
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Login failed.');
     } finally {
@@ -88,7 +93,7 @@ export default function LoginScreen() {
     try {
       setIsBusy(true);
       const { authUrl } = await buildGarminOAuthStartUrl();
-      await Linking.openURL(authUrl);
+      await openInAppOAuthSession(authUrl, GARMIN_APP_OAUTH_REDIRECT_URI);
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Garmin login failed.');
     } finally {
