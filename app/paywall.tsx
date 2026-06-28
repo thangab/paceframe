@@ -175,6 +175,16 @@ export default function PaywallScreen() {
     }
   }
 
+  async function openLegalDocument(url: string) {
+    try {
+      await Linking.openURL(url);
+    } catch (err) {
+      setMessage(
+        err instanceof Error ? err.message : 'Could not open legal document.',
+      );
+    }
+  }
+
   const weeklyPrice = getPackagePriceLabel(weeklyPkg);
   const annualPrice = getPackagePriceLabel(annualPkg);
   const isAnyPurchaseLoading = purchaseLoadingKind !== null;
@@ -314,6 +324,34 @@ export default function PaywallScreen() {
             <Text style={styles.linkText}>Cancel anytime</Text>
           </Pressable>
         </View>
+
+        <Text style={styles.subscriptionNotice}>
+          Auto-renewable subscription: PaceFrame Premium Weekly
+          {weeklyPrice ? ` (${weeklyPrice} per week)` : ''} or PaceFrame
+          Premium Annual{annualPrice ? ` (${annualPrice} per year)` : ''}.
+          Payment is charged to your Apple ID. Subscriptions renew
+          automatically unless cancelled at least 24 hours before the end of the
+          current period. Manage or cancel in App Store account settings. By
+          subscribing, you agree to our{' '}
+          <Text
+            style={styles.legalLink}
+            onPress={() => {
+              void openLegalDocument('https://paceframe.app/terms');
+            }}
+          >
+            Terms of Use
+          </Text>{' '}
+          and{' '}
+          <Text
+            style={styles.legalLink}
+            onPress={() => {
+              void openLegalDocument('https://paceframe.app/privacy-policy');
+            }}
+          >
+            Privacy Policy
+          </Text>
+          .
+        </Text>
       </ScrollView>
     </View>
   );
@@ -434,6 +472,17 @@ function createStyles(colors: ThemeColors) {
     },
     linkDisabled: {
       opacity: 0.5,
+    },
+    subscriptionNotice: {
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 18,
+      fontWeight: '500',
+    },
+    legalLink: {
+      color: colors.primary,
+      fontWeight: '700',
+      textDecorationLine: 'underline',
     },
     offerList: {
       gap: spacing.sm,

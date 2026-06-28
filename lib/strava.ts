@@ -30,6 +30,12 @@ type SyncStravaActivityDetailsParams = {
   activityId: number;
 };
 
+type DeleteStravaAccountParams = {
+  accessToken: string;
+  refreshToken: string;
+  athleteId: number;
+};
+
 type StravaActivityRow = {
   activity_id: number;
   athlete_id: number;
@@ -161,6 +167,61 @@ function mapSupabaseRow(row: StravaActivityRow): StravaActivity {
   };
 }
 
+function mapStravaApiActivity(item: Record<string, unknown>): StravaActivity {
+  const map =
+    item.map && typeof item.map === 'object'
+      ? (item.map as Record<string, unknown>)
+      : {};
+
+  return {
+    id: Number(item.id),
+    name: typeof item.name === 'string' ? item.name : 'Untitled activity',
+    distance: Number(item.distance ?? 0),
+    moving_time: Number(item.moving_time ?? 0),
+    elapsed_time: Number(item.elapsed_time ?? 0),
+    total_elevation_gain: Number(item.total_elevation_gain ?? 0),
+    type:
+      typeof item.type === 'string'
+        ? item.type
+        : typeof item.sport_type === 'string'
+        ? item.sport_type
+        : 'Activity',
+    start_date:
+      typeof item.start_date === 'string'
+        ? item.start_date
+        : new Date().toISOString(),
+    timezone: typeof item.timezone === 'string' ? item.timezone : null,
+    average_speed: Number(item.average_speed ?? 0),
+    average_cadence:
+      typeof item.average_cadence === 'number'
+        ? item.average_cadence
+        : null,
+    average_heartrate:
+      typeof item.average_heartrate === 'number'
+        ? item.average_heartrate
+        : null,
+    kilojoules: typeof item.kilojoules === 'number' ? item.kilojoules : null,
+    calories: typeof item.calories === 'number' ? item.calories : null,
+    location_city:
+      typeof item.location_city === 'string' ? item.location_city : null,
+    location_state:
+      typeof item.location_state === 'string' ? item.location_state : null,
+    location_country:
+      typeof item.location_country === 'string' ? item.location_country : null,
+    device_name:
+      typeof item.device_name === 'string' ? item.device_name : null,
+    map: {
+      summary_polyline:
+        typeof map.summary_polyline === 'string'
+          ? map.summary_polyline
+          : null,
+    },
+    start_latlng: toLatLng(item.start_latlng),
+    end_latlng: toLatLng(item.end_latlng),
+    detailsFetchedAt: null,
+  };
+}
+
 export async function exchangeCodeWithSupabase({
   code,
   redirectUri,
@@ -245,6 +306,40 @@ export async function refreshTokensWithSupabase({
   };
 }
 
+export async function deleteStravaAccountWithSupabase({
+  accessToken,
+  refreshToken,
+  athleteId,
+}: DeleteStravaAccountParams): Promise<void> {
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error('Missing EXPO_PUBLIC_SUPABASE_URL');
+  }
+  if (!supabaseAnonKey) {
+    throw new Error('Missing EXPO_PUBLIC_SUPABASE_ANON_KEY');
+  }
+
+  const response = await fetch(
+    `${supabaseUrl}/functions/v1/strava-delete-account`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+      },
+      body: JSON.stringify({ accessToken, refreshToken, athleteId }),
+    },
+  );
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || 'Failed to delete Strava account.');
+  }
+}
+
 export async function syncStravaActivitiesWithSupabase({
   athleteId,
   limit = 5,
@@ -323,6 +418,37 @@ export async function fetchActivitiesFromSupabase(
   return ((data ?? []) as StravaActivityRow[]).map((row) =>
     mapSupabaseRow(row),
   );
+}
+
+export async function fetchActivitiesFromStravaApi(
+  accessToken: string,
+  limit = 50,
+): Promise<StravaActivity[]> {
+  const response = await fetch(
+    `https://www.strava.com/api/v3/athlete/activities?per_page=${encodeURIComponent(
+      String(limit),
+    )}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || 'Failed to fetch Strava activities.');
+  }
+
+  const data = await response.json();
+  if (!Array.isArray(data)) return [];
+
+  return data
+    .filter((item): item is Record<string, unknown> =>
+      Boolean(item && typeof item === 'object' && 'id' in item),
+    )
+    .map(mapStravaApiActivity);
 }
 
 export async function fetchActivityFromSupabase(

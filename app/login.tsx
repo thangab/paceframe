@@ -19,10 +19,16 @@ import { spacing, type ThemeColors } from '@/constants/theme';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import {
   buildGarminOAuthStartUrl,
+  GARMIN_APP_OAUTH_REDIRECT_URI,
 } from '@/lib/garminOAuth';
 import { importActivitiesFromHealthKit } from '@/lib/healthkit';
+import { openInAppOAuthSession } from '@/lib/inAppOAuth';
+import { mockActivities } from '@/lib/mockData';
 import { getMockTokens } from '@/lib/strava';
-import { buildStravaMobileAuthorizeUrl } from '@/lib/stravaOAuth';
+import {
+  buildStravaMobileAuthorizeUrl,
+  STRAVA_REDIRECT_URI,
+} from '@/lib/stravaOAuth';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
 
@@ -76,7 +82,7 @@ export default function LoginScreen() {
       }
 
       const authUrl = buildStravaMobileAuthorizeUrl({ clientId });
-      await Linking.openURL(authUrl);
+      await openInAppOAuthSession(authUrl, STRAVA_REDIRECT_URI);
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Login failed.');
     } finally {
@@ -88,7 +94,7 @@ export default function LoginScreen() {
     try {
       setIsBusy(true);
       const { authUrl } = await buildGarminOAuthStartUrl();
-      await Linking.openURL(authUrl);
+      await openInAppOAuthSession(authUrl, GARMIN_APP_OAUTH_REDIRECT_URI);
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Garmin login failed.');
     } finally {
@@ -117,6 +123,19 @@ export default function LoginScreen() {
       showError(
         err instanceof Error ? err.message : 'HealthKit import failed.',
       );
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleDemoMode() {
+    try {
+      setIsBusy(true);
+      setActivities(mockActivities, 'strava');
+      await login(getMockTokens());
+      resetAndReplace('/activities');
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Demo mode failed.');
     } finally {
       setIsBusy(false);
     }
@@ -163,6 +182,7 @@ export default function LoginScreen() {
             accessibilityRole="button"
             accessibilityLabel="Connect with Garmin"
             style={({ pressed }) => [
+              styles.authButtonBase,
               styles.garminButton,
               pressed && !isBusy ? styles.pressed : null,
               isBusy ? styles.disabled : null,
@@ -182,6 +202,7 @@ export default function LoginScreen() {
             accessibilityRole="button"
             accessibilityLabel="Connect with Strava"
             style={({ pressed }) => [
+              styles.authButtonBase,
               styles.stravaButton,
               pressed && !isBusy ? styles.pressed : null,
               isBusy ? styles.disabled : null,
@@ -199,6 +220,7 @@ export default function LoginScreen() {
               onPress={handleHealthKitImport}
               disabled={isBusy}
               style={({ pressed }) => [
+                styles.authButtonBase,
                 styles.healthButton,
                 pressed && !isBusy ? styles.pressed : null,
                 isBusy ? styles.disabled : null,
@@ -238,6 +260,26 @@ export default function LoginScreen() {
           </Text>
           .
         </Text>
+
+        <Pressable
+          onPress={handleDemoMode}
+          disabled={isBusy}
+          accessibilityRole="button"
+          accessibilityLabel="Open demo mode"
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.demoLink,
+            pressed && !isBusy ? styles.pressed : null,
+            isBusy ? styles.disabled : null,
+          ]}
+        >
+          <MaterialCommunityIcons
+            name="play-circle-outline"
+            size={14}
+            color="rgba(242,245,255,0.58)"
+          />
+          <Text style={styles.demoLinkText}>Demo mode</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -255,7 +297,7 @@ function createStyles(colors: ThemeColors) {
     },
     bottomSheet: {
       paddingHorizontal: spacing.lg,
-      gap: spacing.sm,
+      gap: spacing.xs,
       marginTop: -8,
       backgroundColor: '#131B2E',
     },
@@ -278,29 +320,34 @@ function createStyles(colors: ThemeColors) {
       color: 'rgba(243,246,255,0.78)',
       fontSize: 15,
       lineHeight: 21,
-      marginBottom: spacing.sm - 2,
+      marginBottom: spacing.xs,
       alignSelf: 'center',
+      textAlign: 'center',
     },
     actions: {
-      gap: spacing.sm,
+      gap: spacing.xs + 2,
+      alignItems: 'center',
     },
-    stravaButton: {
-      borderRadius: 16,
-      overflow: 'hidden',
-    },
-    stravaButtonImage: {
-      width: '100%',
-      height: 56,
-    },
-    garminButton: {
+    authButtonBase: {
       width: '72%',
-      margin: 'auto',
+      minWidth: 280,
+      maxWidth: 440,
+      height: 58,
       borderRadius: 8,
-      backgroundColor: colors.solidBlack,
-      height: 64,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    stravaButton: {
+      backgroundColor: '#FC4C02',
+    },
+    stravaButtonImage: {
+      width: '96%',
+      height: 46,
+    },
+    garminButton: {
+      backgroundColor: colors.solidBlack,
       gap: 0,
     },
     garminButtonText: {
@@ -311,24 +358,16 @@ function createStyles(colors: ThemeColors) {
       textTransform: 'uppercase',
     },
     garminTagImage: {
-      height: 48,
+      height: 42,
       width: 120,
       margin: 0,
       padding: 0,
     },
     healthButton: {
-      borderRadius: 8,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.solidWhite,
-      paddingHorizontal: spacing.md + 2,
-      paddingVertical: spacing.md + 2,
-      flexDirection: 'row',
-      alignItems: 'center',
       gap: spacing.sm,
-      width: '72%',
-      margin: 'auto',
-      justifyContent: 'center',
     },
     healthLinkText: {
       color: colors.solidBlack,
@@ -336,8 +375,23 @@ function createStyles(colors: ThemeColors) {
       lineHeight: 18,
       fontWeight: '500',
     },
+    demoLink: {
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      justifyContent: 'center',
+      paddingVertical: 2,
+    },
+    demoLinkText: {
+      color: 'rgba(242,245,255,0.58)',
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: '600',
+      textDecorationLine: 'underline',
+    },
     legal: {
-      marginTop: spacing.sm,
+      marginTop: spacing.xs,
       textAlign: 'center',
       color: 'rgba(242,245,255,0.64)',
       fontSize: 12,

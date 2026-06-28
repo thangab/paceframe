@@ -1,5 +1,4 @@
 import { ReactNode, useCallback, useMemo, useState } from 'react';
-import * as Linking from 'expo-linking';
 import { router, useFocusEffect } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import {
@@ -18,11 +17,16 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { resetActivityLoadState } from '@/lib/activityLoadState';
 import {
   buildGarminOAuthStartUrl,
+  GARMIN_APP_OAUTH_REDIRECT_URI,
 } from '@/lib/garminOAuth';
 import { deregisterGarminUser } from '@/lib/garmin';
 import { importActivitiesFromHealthKit } from '@/lib/healthkit';
-import { getMockTokens } from '@/lib/strava';
-import { buildStravaMobileAuthorizeUrl } from '@/lib/stravaOAuth';
+import { openInAppOAuthSession } from '@/lib/inAppOAuth';
+import { deleteStravaAccountWithSupabase, getMockTokens } from '@/lib/strava';
+import {
+  buildStravaMobileAuthorizeUrl,
+  STRAVA_REDIRECT_URI,
+} from '@/lib/stravaOAuth';
 import { useActivityStore } from '@/store/activityStore';
 import { useAuthStore } from '@/store/authStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
@@ -197,30 +201,70 @@ export default function SettingsScreen() {
     resetAndReplace('/login');
   }
 
+  function getDeleteAccountTarget(): 'strava' | 'garmin' | null {
+    if (activeProvider === 'strava' && isStravaConnected) return 'strava';
+    if (activeProvider === 'garmin' && isGarminConnected) return 'garmin';
+    if (isStravaConnected && !isGarminConnected) return 'strava';
+    if (isGarminConnected && !isStravaConnected) return 'garmin';
+    return null;
+  }
+
   async function performDeleteAccount() {
     if (isDeletingAccount) return;
+    const targetProvider = getDeleteAccountTarget();
+    if (!targetProvider) {
+      Alert.alert(
+        'Delete account',
+        'Select Strava or Garmin as the active connection before deleting an account.',
+      );
+      return;
+    }
 
     try {
       setIsDeletingAccount(true);
       setMessage(
-        isGarminConnected
-          ? 'Deleting account and deregistering Garmin connection...'
-          : 'Deleting account...',
+        targetProvider === 'strava'
+          ? 'Deleting Strava account connection and revoking access...'
+          : 'Deleting Garmin account connection...',
       );
 
+      const stravaTokens = connections.strava;
+      if (targetProvider === 'strava') {
+        if (!stravaTokens?.athleteId) {
+          throw new Error('Missing Strava athlete ID for account deletion.');
+        }
+        await deleteStravaAccountWithSupabase({
+          accessToken: stravaTokens.accessToken,
+          refreshToken: stravaTokens.refreshToken,
+          athleteId: stravaTokens.athleteId,
+        });
+      }
+
       const garminUserId = connections.garmin?.garminUserId?.trim();
-      if (isGarminConnected) {
+      if (targetProvider === 'garmin') {
         if (!garminUserId) {
           throw new Error('Missing Garmin user ID for deregistration.');
         }
         await deregisterGarminUser(garminUserId);
       }
 
-      await performLogout();
-    } catch (err) {
-      setMessage(
-        err instanceof Error ? err.message : 'Account deletion failed.',
+      const remainingConnections = { ...connections };
+      delete remainingConnections[targetProvider];
+      const hasRemainingConnection = Boolean(
+        remainingConnections.strava ||
+          remainingConnections.garmin ||
+          remainingConnections.mock,
       );
+
+      await disconnect(targetProvider);
+      clearActivities();
+      resetActivityLoadState();
+      resetAndReplace(hasRemainingConnection ? '/activities' : '/login');
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Account deletion failed.';
+      setMessage(message);
+      Alert.alert('Account deletion failed', message);
     } finally {
       setIsDeletingAccount(false);
     }
@@ -247,11 +291,14 @@ export default function SettingsScreen() {
   }
 
   function handleDeleteAccount() {
+    const targetProvider = getDeleteAccountTarget();
     Alert.alert(
       'Delete account',
-      isGarminConnected
-        ? 'This will deregister your Garmin connection and remove your local PaceFrame session from this device.'
-        : 'This will remove your local PaceFrame session and clear loaded activities on this device.',
+      targetProvider === 'strava'
+        ? 'This will revoke Strava access, delete synced Strava data, and remove the Strava connection from this device. Other connections stay connected.'
+        : targetProvider === 'garmin'
+        ? 'This will deregister your Garmin connection and remove it from this device. Other connections stay connected.'
+        : 'Select Strava or Garmin as the active connection before deleting an account.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -288,7 +335,7 @@ export default function SettingsScreen() {
       const authUrl = buildStravaMobileAuthorizeUrl({
         clientId: stravaClientId,
       });
-      await Linking.openURL(authUrl);
+      await openInAppOAuthSession(authUrl, STRAVA_REDIRECT_URI);
     } catch (err) {
       setMessage(
         err instanceof Error ? err.message : 'Strava connection failed.',
@@ -309,7 +356,7 @@ export default function SettingsScreen() {
       setIsConnectingGarmin(true);
       setMessage(null);
       const { authUrl } = await buildGarminOAuthStartUrl();
-      await Linking.openURL(authUrl);
+      await openInAppOAuthSession(authUrl, GARMIN_APP_OAUTH_REDIRECT_URI);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Garmin login failed.');
     } finally {
@@ -375,7 +422,7 @@ export default function SettingsScreen() {
                 const authUrl = buildStravaMobileAuthorizeUrl({
                   clientId: stravaClientId,
                 });
-                await Linking.openURL(authUrl);
+                await openInAppOAuthSession(authUrl, STRAVA_REDIRECT_URI);
               } catch (err) {
                 setMessage(
                   err instanceof Error
@@ -406,7 +453,10 @@ export default function SettingsScreen() {
                 setIsConnectingGarmin(true);
                 setMessage(null);
                 const { authUrl } = await buildGarminOAuthStartUrl();
-                await Linking.openURL(authUrl);
+                await openInAppOAuthSession(
+                  authUrl,
+                  GARMIN_APP_OAUTH_REDIRECT_URI,
+                );
               } catch (err) {
                 setMessage(
                   err instanceof Error ? err.message : 'Garmin login failed.',
@@ -768,7 +818,7 @@ export default function SettingsScreen() {
         />
       </View>
 
-      {isGarminActive ? (
+      {isStravaConnected || isGarminConnected ? (
         <View style={styles.deleteWrap}>
           <PrimaryButton
             label="Delete account"
