@@ -40,7 +40,7 @@ type CustomRendererHelpers = {
   SplitBoldPrimaryValue: (props: any) => React.JSX.Element;
   metricIcon: (metricId: string) => any;
   metricIconColor: (metricId: string) => string;
-  splitBoldLabel: (metricId: string) => string;
+  splitBoldLabel: (metricId: string, metricLabel?: string) => string;
   isDefaultSunsetHeroColor: (color: string) => boolean;
 };
 
@@ -293,7 +293,7 @@ function renderSplitBoldLayout(
                 { fontFamily: fontPreset.family },
               ]}
             >
-              {splitBoldLabel(metric.id)}
+              {splitBoldLabel(metric.id, metric.label)}
             </Text>
             <ValueWithUnit
               value={metric.value}

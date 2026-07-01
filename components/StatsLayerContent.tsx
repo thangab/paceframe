@@ -26,6 +26,7 @@ type Props = {
   distanceText: string;
   durationText: string;
   paceText: string;
+  paceLabel?: string;
   elevText: string;
   cadenceText: string;
   caloriesText: string;
@@ -63,6 +64,7 @@ export function StatsLayerContent({
   distanceText,
   durationText,
   paceText,
+  paceLabel = 'Pace',
   elevText,
   cadenceText,
   caloriesText,
@@ -74,7 +76,7 @@ export function StatsLayerContent({
       ? { id: 'distance', label: 'Distance', value: distanceText }
       : null,
     visible.time ? { id: 'time', label: 'Time', value: durationText } : null,
-    visible.pace ? { id: 'pace', label: 'Pace', value: paceText } : null,
+    visible.pace ? { id: 'pace', label: paceLabel, value: paceText } : null,
     visible.elev ? { id: 'elev', label: 'Elev Gain', value: elevText } : null,
     visible.cadence
       ? { id: 'cadence', label: 'Cadence', value: cadenceText }
@@ -439,12 +441,12 @@ function metricIconColor(metricId: string) {
   }
 }
 
-function splitBoldLabel(metricId: string) {
+function splitBoldLabel(metricId: string, metricLabel?: string) {
   switch (metricId) {
     case 'time':
       return 'TIME';
     case 'pace':
-      return 'PACE';
+      return (metricLabel ?? 'Pace').toUpperCase();
     case 'elev':
       return 'GAIN';
     case 'avgHr':

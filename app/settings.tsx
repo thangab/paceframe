@@ -24,7 +24,7 @@ import { importActivitiesFromHealthKit } from '@/lib/healthkit';
 import { openInAppOAuthSession } from '@/lib/inAppOAuth';
 import { deleteStravaAccountWithSupabase, getMockTokens } from '@/lib/strava';
 import {
-  buildStravaMobileAuthorizeUrl,
+  buildStravaAuthorizeUrl,
   STRAVA_REDIRECT_URI,
 } from '@/lib/stravaOAuth';
 import { useActivityStore } from '@/store/activityStore';
@@ -332,7 +332,7 @@ export default function SettingsScreen() {
     try {
       setIsConnectingStrava(true);
       setMessage(null);
-      const authUrl = buildStravaMobileAuthorizeUrl({
+      const authUrl = buildStravaAuthorizeUrl({
         clientId: stravaClientId,
       });
       await openInAppOAuthSession(authUrl, STRAVA_REDIRECT_URI);
@@ -419,7 +419,7 @@ export default function SettingsScreen() {
               try {
                 setIsConnectingStrava(true);
                 setMessage(null);
-                const authUrl = buildStravaMobileAuthorizeUrl({
+                const authUrl = buildStravaAuthorizeUrl({
                   clientId: stravaClientId,
                 });
                 await openInAppOAuthSession(authUrl, STRAVA_REDIRECT_URI);

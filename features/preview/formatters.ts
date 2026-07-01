@@ -1,4 +1,5 @@
 import type { StatsLayout } from '@/types/preview';
+import type { DistanceUnit } from '@/lib/format';
 import { getLayoutMetricLimit as getConfiguredLayoutMetricLimit } from '@/lib/previewLayouts';
 
 export function splitMetricValueUnit(text: string): {
@@ -101,6 +102,35 @@ export function formatCadence(
   }
 
   return `${Math.round(raw)} rpm`;
+}
+
+export function isBikeActivity(type?: string | null) {
+  const normalized = (type ?? '').toLowerCase();
+  return (
+    normalized === 'bike' ||
+    normalized === 'ride' ||
+    normalized === 'road_biking'
+  );
+}
+
+export function getPaceMetricLabel(activityType?: string | null) {
+  return isBikeActivity(activityType) ? 'Avg speed' : 'Pace';
+}
+
+export function formatAverageSpeed(
+  metersPerSecond: number | null | undefined,
+  unit: DistanceUnit = 'km',
+) {
+  const speedKmh =
+    typeof metersPerSecond === 'number' && metersPerSecond > 0
+      ? metersPerSecond * 3.6
+      : 0;
+  const convertedSpeed = unit === 'mi' ? speedKmh * 0.621371 : speedKmh;
+  const speedUnit = unit === 'mi' ? 'mph' : 'km/h';
+
+  return convertedSpeed > 0
+    ? `${convertedSpeed.toFixed(1)} ${speedUnit}`
+    : `--.- ${speedUnit}`;
 }
 
 export function getDynamicStatsWidth(template: StatsLayout, visibleCount: number) {

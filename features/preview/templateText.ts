@@ -9,6 +9,8 @@ type TemplateTextVars = {
   distanceValue: string;
   distanceUnit: string;
   durationText: string;
+  paceLabel: string;
+  paceLabelLower: string;
   paceText: string;
   paceValue: string;
   paceUnit: string;
@@ -41,6 +43,8 @@ export function resolveTemplateText(
     .replaceAll('{distanceValue}', vars.distanceValue)
     .replaceAll('{distanceUnit}', vars.distanceUnit)
     .replaceAll('{time}', vars.durationText)
+    .replaceAll('{paceLabel}', vars.paceLabel)
+    .replaceAll('{paceLabelLower}', vars.paceLabelLower)
     .replaceAll('{pace}', vars.paceText)
     .replaceAll('{paceValue}', vars.paceValue)
     .replaceAll('{paceUnit}', vars.paceUnit)
