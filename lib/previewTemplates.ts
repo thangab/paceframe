@@ -86,7 +86,7 @@ export const PREVIEW_TEMPLATES: PreviewTemplateDefinition[] = [
       },
       {
         id: 'story-copy',
-        text: 'Inside a [[{time}]] run over [[{distance}]].\nCruising at [[{pace}]] pace.',
+        text: 'Inside a [[{time}]] run over [[{distance}]].\nCruising at [[{pace}]] {paceLabelLower}.',
         uppercase: true,
         x: 14,
         y: 180,
@@ -265,7 +265,7 @@ export const PREVIEW_TEMPLATES: PreviewTemplateDefinition[] = [
       },
       {
         id: 'pace-label',
-        text: '{pace} pace',
+        text: '{pace} {paceLabelLower}',
         x: 32,
         y: 486,
         color: '#000000',
@@ -747,7 +747,7 @@ export const PREVIEW_TEMPLATES: PreviewTemplateDefinition[] = [
       },
       {
         id: 'pace-label',
-        text: 'PACE',
+        text: '{paceLabel}',
         requiredDataFields: ['pace'],
         renderStyle: 'scattered',
         uppercase: true,

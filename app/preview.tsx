@@ -122,9 +122,12 @@ import {
   VISUAL_EFFECT_PRESETS,
 } from '@/features/preview/config';
 import {
+  formatAverageSpeed,
   formatCadence,
   formatPreviewDate,
+  getPaceMetricLabel,
   getDynamicStatsWidth,
+  isBikeActivity,
   splitMetricValueUnit,
 } from '@/features/preview/formatters';
 import {
@@ -466,11 +469,14 @@ export default function PreviewScreen() {
     distanceUnit,
   );
   const durationText = formatDuration(activity?.moving_time ?? 0);
-  const paceText = formatPace(
-    activity?.distance ?? 0,
-    activity?.moving_time ?? 0,
-    distanceUnit,
-  );
+  const paceMetricLabel = getPaceMetricLabel(activity?.type);
+  const paceText = isBikeActivity(activity?.type)
+    ? formatAverageSpeed(activity?.average_speed, distanceUnit)
+    : formatPace(
+        activity?.distance ?? 0,
+        activity?.moving_time ?? 0,
+        distanceUnit,
+      );
   const elevText = formatElevationMeters(
     activity?.total_elevation_gain ?? 0,
     elevationUnit,
@@ -585,6 +591,8 @@ export default function PreviewScreen() {
       distanceValue: distanceParts.value,
       distanceUnit: distanceParts.unit,
       durationText,
+      paceLabel: paceMetricLabel,
+      paceLabelLower: paceMetricLabel.toLowerCase(),
       paceText,
       paceValue: paceParts.value,
       paceUnit: paceParts.unit,
@@ -639,6 +647,7 @@ export default function PreviewScreen() {
     elevParts.value,
     elevText,
     locationText,
+    paceMetricLabel,
     paceParts.unit,
     paceParts.value,
     paceText,
@@ -865,7 +874,9 @@ export default function PreviewScreen() {
     const t = (activity?.type || '').toLowerCase();
     return (
       t === 'run' ||
+      t === 'bike' ||
       t === 'ride' ||
+      t === 'road_biking' ||
       t === 'walk' ||
       t === 'hike' ||
       t === 'swim'
@@ -2970,6 +2981,7 @@ export default function PreviewScreen() {
           distanceText={distanceText}
           durationText={durationText}
           paceText={paceText}
+          paceLabel={paceMetricLabel}
           elevText={elevText}
           cadenceText={cadenceText}
           caloriesText={caloriesText}

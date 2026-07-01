@@ -138,6 +138,7 @@ type Props = {
   distanceText: string;
   durationText: string;
   paceText: string;
+  paceLabel: string;
   elevText: string;
   cadenceText: string;
   caloriesText: string;
@@ -309,6 +310,7 @@ export function PreviewEditorCanvas({
   distanceText,
   durationText,
   paceText,
+  paceLabel,
   elevText,
   cadenceText,
   caloriesText,
@@ -1506,6 +1508,7 @@ export function PreviewEditorCanvas({
                   distanceText={distanceText}
                   durationText={durationText}
                   paceText={paceText}
+                  paceLabel={paceLabel}
                   elevText={elevText}
                   cadenceText={cadenceText}
                   caloriesText={caloriesText}
