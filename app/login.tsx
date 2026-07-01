@@ -26,7 +26,7 @@ import { openInAppOAuthSession } from '@/lib/inAppOAuth';
 import { mockActivities } from '@/lib/mockData';
 import { getMockTokens } from '@/lib/strava';
 import {
-  buildStravaMobileAuthorizeUrl,
+  buildStravaAuthorizeUrl,
   STRAVA_REDIRECT_URI,
 } from '@/lib/stravaOAuth';
 import { useActivityStore } from '@/store/activityStore';
@@ -81,7 +81,7 @@ export default function LoginScreen() {
         throw new Error('Strava client ID is not configured.');
       }
 
-      const authUrl = buildStravaMobileAuthorizeUrl({ clientId });
+      const authUrl = buildStravaAuthorizeUrl({ clientId });
       await openInAppOAuthSession(authUrl, STRAVA_REDIRECT_URI);
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Login failed.');

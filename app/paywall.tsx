@@ -27,6 +27,9 @@ import { useSubscriptionStore } from '@/store/subscriptionStore';
 
 type PlanKind = 'weekly' | 'annual';
 
+const TERMS_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+const PRIVACY_POLICY_URL = 'https://paceframe.app/privacy-policy';
+
 function getPackageSearchText(pack: PurchasesPackage) {
   return `${pack.identifier} ${String(pack.packageType ?? '')}`.toLowerCase();
 }
@@ -337,26 +340,27 @@ export default function PaywallScreen() {
         </View>
 
         <Text style={styles.subscriptionNotice}>
-          Auto-renewable subscription: PaceFrame Premium Weekly
-          {weeklyPrice ? ` (${weeklyPrice} per week)` : ''} or PaceFrame Premium
-          Annual{annualPrice ? ` (${annualPrice} per year)` : ''}. Payment is
-          charged to your Apple ID. Subscriptions renew automatically unless
-          cancelled at least 24 hours before the end of the current period.
-          Manage or cancel in App Store account settings. By subscribing, you
-          agree to our{' '}
+          Auto-renewable subscriptions: PaceFrame Premium Weekly, 1 week
+          {weeklyPrice ? `, ${weeklyPrice} per week` : ', price shown above'};
+          and PaceFrame Premium Annual, 1 year
+          {annualPrice ? `, ${annualPrice} per year` : ', price shown above'}.
+          Payment is charged to your Apple ID. Subscriptions renew
+          automatically unless cancelled at least 24 hours before the end of
+          the current period. Manage or cancel in App Store account settings.
+          By subscribing, you agree to our{' '}
           <Text
             style={styles.legalLink}
             onPress={() => {
-              void openLegalDocument('https://paceframe.app/terms');
+              void openLegalDocument(TERMS_URL);
             }}
           >
-            Terms of Use
+            Terms of Use (EULA)
           </Text>{' '}
           and{' '}
           <Text
             style={styles.legalLink}
             onPress={() => {
-              void openLegalDocument('https://paceframe.app/privacy-policy');
+              void openLegalDocument(PRIVACY_POLICY_URL);
             }}
           >
             Privacy Policy

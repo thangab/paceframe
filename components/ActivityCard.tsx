@@ -304,7 +304,7 @@ function activityTypeIcon(
   type: string,
 ): keyof typeof MaterialCommunityIcons.glyphMap {
   if (type === 'Run') return 'run-fast';
-  if (type === 'Ride') return 'bike';
+  if (type === 'Ride' || type === 'ROAD_BIKING') return 'bike';
   if (type === 'Walk') return 'walk';
   if (type === 'Hike') return 'hiking';
   if (type === 'Swim') return 'swim';
@@ -354,7 +354,10 @@ function isRunLikeActivity(type: string) {
 }
 
 function isRideActivity(type: string) {
-  return (type || '').toLowerCase() === 'ride';
+  return (
+    (type || '').toLowerCase() === 'ride' ||
+    (type || '').toLowerCase() === 'road_biking'
+  );
 }
 
 function getFallbackMetrics(activity: StravaActivity, timeText: string) {
@@ -388,7 +391,8 @@ function shouldShowDetailedMetrics(type: string) {
     normalized === 'run' ||
     normalized === 'walk' ||
     normalized === 'hike' ||
-    normalized === 'ride'
+    normalized === 'ride' ||
+    normalized === 'road_biking'
   );
 }
 
