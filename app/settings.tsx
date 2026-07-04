@@ -798,15 +798,13 @@ export default function SettingsScreen() {
         />
       </SectionCard>
 
-      {!isPremium ? (
-        <View style={styles.actions}>
-          <PrimaryButton
-            label="Unlock Premium Layouts"
-            onPress={() => router.push('/paywall')}
-            variant="secondary"
-          />
-        </View>
-      ) : null}
+      <View style={styles.actions}>
+        <PrimaryButton
+          label={isPremium ? 'View Premium' : 'Unlock Premium Layouts'}
+          onPress={() => router.push('/paywall')}
+          variant="secondary"
+        />
+      </View>
 
       <View style={styles.actions}>
         <PrimaryButton
