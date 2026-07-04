@@ -263,63 +263,78 @@ export default function PaywallScreen() {
 
         {message ? <Text style={styles.message}>{message}</Text> : null}
 
-        {!isPremium ? (
-          <View style={styles.offerList}>
-            <View style={styles.offerRow}>
-              <Pressable
-                onPress={() => weeklyPkg && setSelectedPlan('weekly')}
-                disabled={!weeklyPkg || loading || isAnyPurchaseLoading}
-                style={[
-                  styles.offerCard,
-                  styles.offerCardHalf,
-                  selectedPlan === 'weekly' ? styles.offerCardSelected : null,
-                  !weeklyPkg ? styles.offerCardDisabled : null,
-                ]}
-              >
-                <Text style={styles.offerTitle}>Weekly</Text>
-                <Text style={styles.offerPrice}>
-                  {weeklyPrice ?? 'Not available'}
-                </Text>
-                <Text style={styles.offerCaption}>
-                  {selectedPlan === 'weekly' ? 'Selected' : 'Tap to select'}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => annualPkg && setSelectedPlan('annual')}
-                disabled={!annualPkg || loading || isAnyPurchaseLoading}
-                style={[
-                  styles.offerCard,
-                  styles.offerCardHalf,
-                  selectedPlan === 'annual' ? styles.offerCardSelected : null,
-                  !annualPkg ? styles.offerCardDisabled : null,
-                ]}
-              >
-                <Text style={styles.offerTitle}>Annual</Text>
-                <Text style={styles.offerPrice}>
-                  {annualPrice ?? 'Not available'}
-                </Text>
-                <Text style={styles.offerCaption}>
-                  {selectedPlan === 'annual' ? 'Selected' : 'Tap to select'}
-                </Text>
-              </Pressable>
-            </View>
-
-            <PrimaryButton
-              label={
-                isAnyPurchaseLoading ? 'Processing...' : 'Confirm Purchase'
-              }
-              onPress={handleConfirmPurchase}
+        <View style={styles.offerList}>
+          <View style={styles.offerRow}>
+            <Pressable
+              onPress={() => weeklyPkg && !isPremium && setSelectedPlan('weekly')}
               disabled={
-                loading ||
-                isAnyPurchaseLoading ||
-                !selectedPlan ||
-                (selectedPlan === 'weekly' && !weeklyPkg) ||
-                (selectedPlan === 'annual' && !annualPkg)
+                isPremium || !weeklyPkg || loading || isAnyPurchaseLoading
               }
-            />
+              style={[
+                styles.offerCard,
+                styles.offerCardHalf,
+                selectedPlan === 'weekly' ? styles.offerCardSelected : null,
+                !weeklyPkg ? styles.offerCardDisabled : null,
+              ]}
+            >
+              <Text style={styles.offerTitle}>Weekly</Text>
+              <Text style={styles.offerPrice}>
+                {weeklyPrice ?? 'Not available'}
+              </Text>
+              <Text style={styles.offerCaption}>
+                {isPremium
+                  ? 'Available subscription'
+                  : selectedPlan === 'weekly'
+                    ? 'Selected'
+                    : 'Tap to select'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => annualPkg && !isPremium && setSelectedPlan('annual')}
+              disabled={
+                isPremium || !annualPkg || loading || isAnyPurchaseLoading
+              }
+              style={[
+                styles.offerCard,
+                styles.offerCardHalf,
+                selectedPlan === 'annual' ? styles.offerCardSelected : null,
+                !annualPkg ? styles.offerCardDisabled : null,
+              ]}
+            >
+              <Text style={styles.offerTitle}>Annual</Text>
+              <Text style={styles.offerPrice}>
+                {annualPrice ?? 'Not available'}
+              </Text>
+              <Text style={styles.offerCaption}>
+                {isPremium
+                  ? 'Available subscription'
+                  : selectedPlan === 'annual'
+                    ? 'Selected'
+                    : 'Tap to select'}
+              </Text>
+            </Pressable>
           </View>
-        ) : null}
+
+          <PrimaryButton
+            label={
+              isPremium
+                ? 'Premium Active'
+                : isAnyPurchaseLoading
+                  ? 'Processing...'
+                  : 'Confirm Purchase'
+            }
+            onPress={handleConfirmPurchase}
+            disabled={
+              isPremium ||
+              loading ||
+              isAnyPurchaseLoading ||
+              !selectedPlan ||
+              (selectedPlan === 'weekly' && !weeklyPkg) ||
+              (selectedPlan === 'annual' && !annualPkg)
+            }
+          />
+        </View>
         <View style={styles.linksRow}>
           <Pressable
             onPress={handleRestore}
