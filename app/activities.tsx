@@ -26,6 +26,9 @@ import {
   fetchActivityFromSupabase,
   fetchActivitiesFromStravaApi,
   fetchActivitiesFromSupabase,
+  isStravaAccessTokenInvalidError,
+  isStravaRateLimitExceededError,
+  isStravaReconnectRequiredError,
   refreshTokensWithSupabase,
   syncStravaActivitiesWithSupabase,
   syncStravaActivityDetailsWithSupabase,
@@ -278,20 +281,54 @@ export default function ActivitiesScreen() {
                 'Strava activities are taking longer than expected.',
               );
             } catch (syncError) {
+              if (isStravaReconnectRequiredError(syncError)) {
+                throw syncError;
+              }
+              if (isStravaRateLimitExceededError(syncError)) {
+                throw syncError;
+              }
               console.warn('[Activities] Strava server sync failed', syncError);
             }
           }
           if (rows.length === 0) {
-            rows = await withTimeout(
-              fetchActivitiesFromStravaApi(activeTokens.accessToken, 50),
-              12_000,
-              'Strava is connected, but activities are taking longer than expected. Try again in a moment.',
-            );
+            try {
+              rows = await withTimeout(
+                fetchActivitiesFromStravaApi(activeTokens.accessToken, 50),
+                12_000,
+                'Strava is connected, but activities are taking longer than expected. Try again in a moment.',
+              );
+            } catch (stravaError) {
+              if (
+                isStravaRateLimitExceededError(stravaError) ||
+                !isStravaAccessTokenInvalidError(stravaError) ||
+                !activeTokens.refreshToken
+              ) {
+                throw stravaError;
+              }
+
+              const refreshedTokens = await refreshTokensWithSupabase({
+                refreshToken: activeTokens.refreshToken,
+              });
+              await login(refreshedTokens);
+              rows = await withTimeout(
+                fetchActivitiesFromStravaApi(refreshedTokens.accessToken, 50),
+                12_000,
+                'Strava is connected, but activities are taking longer than expected. Try again in a moment.',
+              );
+            }
           }
           setActivities(rows, 'strava');
           hasLoadedInitialStravaRef.current = true;
           setInitialStravaLoadDone(true);
         } catch (err) {
+          if (isStravaRateLimitExceededError(err)) {
+            setError(
+              err instanceof Error ? err.message : 'Strava rate limit reached.',
+            );
+            hasLoadedInitialStravaRef.current = true;
+            setInitialStravaLoadDone(true);
+            return;
+          }
           console.error('[Activities] Load failed', err);
           setError(
             err instanceof Error ? err.message : 'Could not load activities.',
@@ -313,6 +350,7 @@ export default function ActivitiesScreen() {
       activeSource,
       connections.strava?.athleteId,
       tokens,
+      login,
       setActivities,
       getValidTokens,
       resetAndReplace,
