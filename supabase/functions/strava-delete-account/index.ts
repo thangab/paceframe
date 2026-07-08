@@ -37,7 +37,12 @@ async function refreshAccessToken(refreshToken: string) {
     throw new Error(data?.message || 'Failed to refresh Strava token.');
   }
 
-  return String(data.access_token);
+  return {
+    accessToken: String(data.access_token),
+    refreshToken:
+      typeof data?.refresh_token === 'string' ? data.refresh_token : null,
+    athleteId: typeof data?.athlete?.id === 'number' ? data.athlete.id : null,
+  };
 }
 
 async function fetchStravaAthleteId(accessToken: string) {
@@ -103,6 +108,39 @@ async function deleteRowsForAthlete(
   }
 }
 
+async function hasStoredTokenForAthlete(
+  supabase: ReturnType<typeof createClient>,
+  athleteId: number,
+  tokens: string[],
+) {
+  const candidateTokens = tokens.filter(Boolean);
+  if (candidateTokens.length === 0) return false;
+
+  const response = await supabase
+    .from('strava_users')
+    .select('access_token, refresh_token')
+    .eq('athlete_id', athleteId)
+    .maybeSingle();
+
+  if (response.error) {
+    if (isMissingRelationError(response.error)) return false;
+    throw response.error;
+  }
+
+  const storedAccessToken =
+    typeof response.data?.access_token === 'string'
+      ? response.data.access_token
+      : null;
+  const storedRefreshToken =
+    typeof response.data?.refresh_token === 'string'
+      ? response.data.refresh_token
+      : null;
+
+  return candidateTokens.some(
+    (token) => token === storedAccessToken || token === storedRefreshToken,
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -128,26 +166,40 @@ Deno.serve(async (req) => {
       });
     }
 
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
     let verifiedAthleteId = await fetchStravaAthleteId(accessToken);
     let tokenForRevocation = accessToken;
+    let refreshedRefreshToken: string | null = null;
+    if (verifiedAthleteId !== athleteId) {
+      const refreshed = await refreshAccessToken(refreshToken);
+      tokenForRevocation = refreshed.accessToken;
+      refreshedRefreshToken = refreshed.refreshToken;
+      verifiedAthleteId = refreshed.athleteId;
+    }
 
     if (verifiedAthleteId !== athleteId) {
-      tokenForRevocation = await refreshAccessToken(refreshToken);
       verifiedAthleteId = await fetchStravaAthleteId(tokenForRevocation);
     }
 
     if (verifiedAthleteId !== athleteId) {
-      return new Response('Strava token does not match athleteId', {
-        status: 403,
-        headers: corsHeaders,
-      });
+      const hasStoredToken = await hasStoredTokenForAthlete(supabase, athleteId, [
+        accessToken,
+        refreshToken,
+        tokenForRevocation,
+        refreshedRefreshToken ?? '',
+      ]);
+      if (!hasStoredToken) {
+        return new Response('Strava token does not match athleteId', {
+          status: 403,
+          headers: corsHeaders,
+        });
+      }
     }
 
     await deauthorizeStrava(tokenForRevocation);
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
     await deleteRowsForAthlete(supabase, athleteId);
 
     return new Response(JSON.stringify({ success: true }), {

@@ -10,6 +10,82 @@ const STRAVA_ACTIVITIES_TABLE = 'strava_activities';
 const STRAVA_SYNC_URL =
   process.env.EXPO_PUBLIC_STRAVA_SYNC_URL?.trim() ||
   'https://paceframe.app/api/strava/sync';
+const STRAVA_RECONNECT_MESSAGE =
+  'Strava needs to be reconnected. Open Settings, disconnect Strava, then connect it again.';
+const STRAVA_TOKEN_REFRESH_MESSAGE =
+  'Strava session expired. Please retry.';
+const STRAVA_RATE_LIMIT_MESSAGE =
+  'Strava rate limit reached. Please try again later.';
+
+export class StravaReconnectRequiredError extends Error {
+  constructor(message = STRAVA_RECONNECT_MESSAGE) {
+    super(message);
+    this.name = 'StravaReconnectRequiredError';
+  }
+}
+
+export function isStravaReconnectRequiredError(error: unknown) {
+  return error instanceof StravaReconnectRequiredError;
+}
+
+export class StravaAccessTokenInvalidError extends Error {
+  constructor(message = STRAVA_TOKEN_REFRESH_MESSAGE) {
+    super(message);
+    this.name = 'StravaAccessTokenInvalidError';
+  }
+}
+
+export function isStravaAccessTokenInvalidError(error: unknown) {
+  return error instanceof StravaAccessTokenInvalidError;
+}
+
+export class StravaRateLimitExceededError extends Error {
+  constructor(message = STRAVA_RATE_LIMIT_MESSAGE) {
+    super(message);
+    this.name = 'StravaRateLimitExceededError';
+  }
+}
+
+export function isStravaRateLimitExceededError(error: unknown) {
+  return error instanceof StravaRateLimitExceededError;
+}
+
+function stravaErrorRequiresReconnect(message: string) {
+  return (
+    /"resource"\s*:\s*"Application"/i.test(message) &&
+    /"field"\s*:\s*"Status"/i.test(message) &&
+    /"code"\s*:\s*"inactive"/i.test(message)
+  );
+}
+
+function stravaErrorHasInvalidAccessToken(message: string) {
+  return (
+    /"resource"\s*:\s*"Athlete"/i.test(message) &&
+    /"field"\s*:\s*"access_token"/i.test(message) &&
+    /"code"\s*:\s*"invalid"/i.test(message)
+  );
+}
+
+function stravaErrorHasRateLimitExceeded(message: string) {
+  return (
+    /rate limit exceeded/i.test(message) ||
+    (/"field"\s*:\s*"read rate limit"/i.test(message) &&
+      /"code"\s*:\s*"exceeded"/i.test(message))
+  );
+}
+
+function createStravaRequestError(message: string, fallback: string) {
+  if (stravaErrorRequiresReconnect(message)) {
+    return new StravaReconnectRequiredError();
+  }
+  if (stravaErrorHasInvalidAccessToken(message)) {
+    return new StravaAccessTokenInvalidError();
+  }
+  if (stravaErrorHasRateLimitExceeded(message)) {
+    return new StravaRateLimitExceededError();
+  }
+  return new Error(message || fallback);
+}
 
 export type ExchangeCodeParams = {
   code: string;
@@ -356,7 +432,10 @@ export async function syncStravaActivitiesWithSupabase({
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || 'Failed to sync Strava activities.');
+    throw createStravaRequestError(
+      message,
+      'Failed to sync Strava activities.',
+    );
   }
 
   const payload = (await response.json()) as {
@@ -365,7 +444,10 @@ export async function syncStravaActivitiesWithSupabase({
     error?: string;
   };
   if (payload.success === false) {
-    throw new Error(payload.error || 'Failed to sync Strava activities.');
+    throw createStravaRequestError(
+      payload.error ?? '',
+      'Failed to sync Strava activities.',
+    );
   }
   return { synced: payload.synced ?? 0 };
 }
@@ -386,7 +468,10 @@ export async function syncStravaActivityDetailsWithSupabase({
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || 'Failed to sync Strava activity details.');
+    throw createStravaRequestError(
+      message,
+      'Failed to sync Strava activity details.',
+    );
   }
 
   const payload = (await response.json()) as {
@@ -395,7 +480,10 @@ export async function syncStravaActivityDetailsWithSupabase({
     error?: string;
   };
   if (payload.success === false) {
-    throw new Error(payload.error || 'Failed to sync Strava activity details.');
+    throw createStravaRequestError(
+      payload.error ?? '',
+      'Failed to sync Strava activity details.',
+    );
   }
   return { synced: payload.synced ?? 0 };
 }
@@ -438,7 +526,10 @@ export async function fetchActivitiesFromStravaApi(
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || 'Failed to fetch Strava activities.');
+    throw createStravaRequestError(
+      message,
+      'Failed to fetch Strava activities.',
+    );
   }
 
   const data = await response.json();

@@ -52,13 +52,19 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
+const stravaCodeExchanges = new Map<string, Promise<void>>();
+const completedStravaCodes = new Set<string>();
+
+function hasAuthenticatedSession() {
+  const state = useAuthStore.getState();
+  return Boolean(state.tokens?.accessToken || state.activeProvider);
+}
+
 export default function OAuthCallbackScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const login = useAuthStore((s) => s.login);
   const logout = useAuthStore((s) => s.logout);
-  const tokens = useAuthStore((s) => s.tokens);
-  const activeProvider = useAuthStore((s) => s.activeProvider);
   const isHydrated = useAuthStore((s) => s.isHydrated);
   const clearActivities = useActivityStore((s) => s.clearActivities);
   const {
@@ -224,7 +230,7 @@ export default function OAuthCallbackScreen() {
     }
 
     if (!code || typeof code !== 'string') {
-      if (tokens?.accessToken || activeProvider) {
+      if (hasAuthenticatedSession()) {
         resetAndReplace('/activities');
         return;
       }
@@ -238,40 +244,54 @@ export default function OAuthCallbackScreen() {
     void (async () => {
       try {
         setLoadingMessage('Connecting Strava...');
-        const nextTokens = await withTimeout(
-          exchangeCodeWithSupabase({
-            code,
-            redirectUri: STRAVA_REDIRECT_URI,
-          }),
-          12000,
-        );
-        if (cancelled) return;
-        await login(nextTokens);
-        if (nextTokens.athleteId) {
-          setLoadingMessage('Syncing Strava activities...');
-          try {
-            await syncStravaActivitiesWithSupabase({
-              athleteId: nextTokens.athleteId,
-              limit: 5,
-            });
-          } catch (syncError) {
-            console.warn(
-              '[OAuth] Initial Strava sync failed after successful login',
-              syncError,
+        let exchange = stravaCodeExchanges.get(code);
+        if (!exchange) {
+          exchange = (async () => {
+            const nextTokens = await withTimeout(
+              exchangeCodeWithSupabase({
+                code,
+                redirectUri: STRAVA_REDIRECT_URI,
+              }),
+              12000,
             );
-          }
+            await login(nextTokens);
+            completedStravaCodes.add(code);
+            if (nextTokens.athleteId) {
+              try {
+                await syncStravaActivitiesWithSupabase({
+                  athleteId: nextTokens.athleteId,
+                  limit: 5,
+                });
+              } catch (syncError) {
+                console.warn(
+                  '[OAuth] Initial Strava sync failed after successful login',
+                  syncError,
+                );
+              }
+            }
+            clearActivities();
+            resetActivityLoadState();
+          })();
+          stravaCodeExchanges.set(code, exchange);
         }
-        clearActivities();
-        resetActivityLoadState();
+
+        await exchange;
+        if (cancelled) return;
         resetAndReplace('/activities');
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : 'Login failed.';
         if (isStaleOAuthCodeError(message)) {
-          resetAndReplace('/login');
+          if (completedStravaCodes.has(code) || hasAuthenticatedSession()) {
+            resetAndReplace('/activities');
+          } else {
+            resetAndReplace('/login');
+          }
           return;
         }
         setError(message);
+      } finally {
+        stravaCodeExchanges.delete(code);
       }
     })();
 
@@ -292,8 +312,6 @@ export default function OAuthCallbackScreen() {
     accessToken,
     expiresIn,
     refreshToken,
-    activeProvider,
-    tokens?.accessToken,
     clearActivities,
   ]);
 
